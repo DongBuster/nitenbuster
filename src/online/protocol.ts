@@ -13,6 +13,7 @@ export type RoomPhase = 'idle' | 'lobby' | 'playing';
 export interface RoomSettings {
   maxPlayers: number;
   fillWithBots: boolean;
+  botCount: number;
   difficulty: BotDifficulty;
   deckMode: GameDeckMode;
   turnTimeSec: number;

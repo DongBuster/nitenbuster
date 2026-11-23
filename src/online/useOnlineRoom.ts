@@ -36,8 +36,9 @@ export type ConnectionStatus =
 const PEER_STORAGE_KEY = 'paws_online_peer_id_v1';
 
 const DEFAULT_ROOM_SETTINGS: RoomSettings = {
-  maxPlayers: 4,
+  maxPlayers: 8,
   fillWithBots: true,
+  botCount: 3,
   difficulty: 'medium',
   deckMode: 'full',
   turnTimeSec: 20,
@@ -603,9 +604,14 @@ export function useOnlineRoom() {
     setRoomAccessories(accMap);
     roomAccessoriesRef.current = accMap;
 
-    const fillToCount = settings.fillWithBots
-      ? Math.max(2, Math.min(8, settings.maxPlayers))
-      : Math.max(2, humans.length);
+    const maxAllowedBots = Math.max(0, 8 - humans.length);
+    const requestedBots =
+      typeof settings.botCount === 'number'
+        ? Math.max(0, Math.min(maxAllowedBots, settings.botCount))
+        : settings.fillWithBots
+          ? Math.max(0, settings.maxPlayers - humans.length)
+          : 0;
+    const fillToCount = Math.max(2, Math.min(8, humans.length + requestedBots));
 
     const dealt = dealOnlineGame({
       humans,

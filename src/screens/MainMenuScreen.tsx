@@ -400,16 +400,21 @@ export function MainMenuScreen({
 
             {/* Action Buttons */}
             <div className="space-y-3 pt-2">
-              <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <button
                   type="button"
                   onClick={() => {
                     playSfx('paws');
                     onStartGame();
                   }}
-                  className="w-full cursor-pointer rounded-2xl bg-gradient-to-r from-amber-400 via-orange-400 to-amber-500 px-5 py-4 font-display text-base font-black text-[#2C1B11] shadow-[0_8px_28px_rgba(251,191,36,0.38)] transition-transform hover:scale-[1.01] active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-200 sm:text-lg"
+                  className="flex w-full cursor-pointer flex-col items-center justify-center rounded-2xl bg-gradient-to-r from-amber-400 via-orange-400 to-amber-500 px-5 py-3.5 text-[#2C1B11] shadow-[0_8px_28px_rgba(251,191,36,0.38)] transition-transform hover:scale-[1.01] active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-200"
                 >
-                  🚀 Bắt Đầu Ván Đấu 3D
+                  <span className="font-display text-lg font-black leading-tight">
+                    🤖 Chơi với Bot
+                  </span>
+                  <span className="mt-0.5 text-[11px] font-extrabold opacity-85">
+                    Đấu Offline ngay · {settings.botCount + 1} người
+                  </span>
                 </button>
                 <button
                   type="button"
@@ -417,9 +422,14 @@ export function MainMenuScreen({
                     playSfx('click');
                     onOpenOnline();
                   }}
-                  className="w-full cursor-pointer rounded-2xl bg-gradient-to-r from-sky-500 to-indigo-500 px-5 py-4 font-display text-base font-black text-white shadow-[0_8px_28px_rgba(56,189,248,0.32)] transition-transform hover:scale-[1.01] active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-200 sm:text-lg"
+                  className="flex w-full cursor-pointer flex-col items-center justify-center rounded-2xl bg-gradient-to-r from-sky-500 to-indigo-500 px-5 py-3.5 text-white shadow-[0_8px_28px_rgba(56,189,248,0.32)] transition-transform hover:scale-[1.01] active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-200"
                 >
-                  🌐 Chơi Online (Mã Phòng)
+                  <span className="font-display text-lg font-black leading-tight">
+                    🌐 Chơi Online
+                  </span>
+                  <span className="mt-0.5 text-[11px] font-bold text-sky-100/90">
+                    Tạo / vào mã phòng · thêm Bot tùy chọn
+                  </span>
                 </button>
               </div>
 

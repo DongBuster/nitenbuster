@@ -328,11 +328,17 @@ function OverlayProjector({
       el.style.transform = `translate(-50%, -100%) translate3d(${px}px, ${py}px, 0)`;
     };
 
-    for (const seat of botSeats) {
+    for (let i = 0; i < botSeats.length; i++) {
+      const seat = botSeats[i];
+      // Stagger alternating badge heights on crowded 6-8 player tables so pills never collide
+      const yAnchor =
+        botSeats.length >= 5 && i % 2 === 1
+          ? 2.22 * seat.scale
+          : 1.78 * seat.scale;
       applyProjection(
         badgeRefs.current[seat.player.id] ?? null,
         seat.position[0],
-        1.85 * seat.scale,
+        yAnchor,
         seat.position[2],
       );
     }
@@ -401,9 +407,10 @@ export function GameTableScene3D({
     }
 
     const botCount = botIndices.length;
-    const radius = 3.05;
-    const startAngle = Math.PI * 0.84;
-    const endAngle = Math.PI * 0.16;
+    const isCrowded = botCount >= 5;
+    const radius = isCrowded ? 3.22 : 3.05;
+    const startAngle = isCrowded ? Math.PI * 0.96 : Math.PI * 0.84;
+    const endAngle = isCrowded ? -Math.PI * 0.06 : Math.PI * 0.16;
 
     botIndices.forEach((pIdx, bIdx) => {
       const t = botCount === 1 ? 0.5 : bIdx / (botCount - 1);
@@ -416,7 +423,7 @@ export function GameTableScene3D({
         playerIndex: pIdx,
         position: [x, 0, z],
         rotY,
-        scale: botCount >= 6 ? 0.84 : 0.94,
+        scale: botCount >= 6 ? 0.78 : botCount >= 5 ? 0.86 : 0.94,
         isHuman: false,
       });
     });
@@ -425,13 +432,17 @@ export function GameTableScene3D({
   }, [state.players, resolvedHumanId]);
 
   const botSeats = useMemo(() => seats.filter((s) => !s.isHuman), [seats]);
+  const isDenseTable = state.players.length >= 7;
 
   return (
     <div className={`relative h-full w-full ${className}`}>
       <Canvas
         shadows
         dpr={[1, 1.5]}
-        camera={{ position: [0, 4.4, 7.6], fov: 44 }}
+        camera={{
+          position: isDenseTable ? [0, 4.75, 8.35] : [0, 4.4, 7.6],
+          fov: 44,
+        }}
         gl={{ alpha: false, antialias: true, powerPreference: 'high-performance' }}
       >
         <color attach="background" args={['#261810']} />
@@ -605,7 +616,11 @@ export function GameTableScene3D({
                   )}
 
                   <div
-                    className={`flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-0.5 text-xs font-extrabold shadow-md backdrop-blur-sm ${
+                    className={`flex items-center gap-1.5 whitespace-nowrap rounded-full border shadow-md backdrop-blur-sm ${
+                      isDenseTable
+                        ? 'px-2 py-0.5 text-[11px] font-extrabold'
+                        : 'px-2.5 py-0.5 text-xs font-extrabold'
+                    } ${
                       isActive
                         ? 'border-amber-300 bg-amber-500/95 text-slate-950'
                         : 'border-white/25 bg-slate-900/82 text-white'

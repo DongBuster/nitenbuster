@@ -332,13 +332,14 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
   }
 
   // 3. Lobby Room (Connected, Waiting to Start)
-  const canHostStart =
-    room.isHost &&
-    (room.roomSettings.fillWithBots || room.members.length >= 2);
-  const emptyBotSlots = Math.max(
-    0,
-    room.roomSettings.maxPlayers - room.members.length,
+  const humanCount = room.members.length;
+  const maxBotsAllowed = Math.max(0, 8 - humanCount);
+  const effectiveBotCount = Math.min(
+    Math.max(0, room.roomSettings.botCount ?? 0),
+    maxBotsAllowed,
   );
+  const totalPlayers = humanCount + effectiveBotCount;
+  const canHostStart = room.isHost && totalPlayers >= 2;
 
   const connectionPill =
     room.connectionStatus === 'connected'
@@ -394,12 +395,12 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
           <section className="rounded-3xl border border-white/15 bg-slate-900/85 p-5 shadow-xl lg:col-span-3">
             <div className="flex items-center justify-between">
               <h2 className="text-base font-black text-amber-200">
-                👥 Người Chơi Trong Phòng ({room.members.length}/{room.roomSettings.maxPlayers})
+                👥 Người Chơi Trong Phòng ({totalPlayers}/8 người)
               </h2>
               <span className="text-xs font-bold text-slate-400">
-                {room.roomSettings.fillWithBots
-                  ? `Tự thêm ${emptyBotSlots} Bot khi bắt đầu`
-                  : 'Chỉ chơi giữa người thật'}
+                {effectiveBotCount > 0
+                  ? `${humanCount} người thật + ${effectiveBotCount} Bot`
+                  : `${humanCount} người thật (0 Bot)`}
               </span>
             </div>
 
@@ -473,17 +474,17 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
                 );
               })}
 
-              {room.roomSettings.fillWithBots &&
-                Array.from({ length: emptyBotSlots }).map((_, idx) => (
+              {effectiveBotCount > 0 &&
+                Array.from({ length: effectiveBotCount }).map((_, idx) => (
                   <div
                     key={`bot-slot-${idx}`}
-                    className="flex items-center justify-between rounded-2xl border border-dashed border-white/15 bg-white/[0.02] px-4 py-3 text-slate-400"
+                    className="flex items-center justify-between rounded-2xl border border-dashed border-white/15 bg-white/[0.02] px-4 py-3 text-slate-300"
                   >
                     <span className="text-xs font-bold">
-                      🤖 Ghế Bot tự động #{idx + 1}
+                      🤖 Bot AI #{idx + 1}
                     </span>
-                    <span className="text-[11px] font-semibold">
-                      Có thể mời thêm bạn bằng mã phòng
+                    <span className="text-[11px] font-semibold text-slate-400">
+                      Tự động tham gia khi bắt đầu
                     </span>
                   </div>
                 ))}
@@ -498,57 +499,82 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
                   ⚙️ Cài Đặt Phòng (Chủ phòng)
                 </h2>
 
-                {/* Fill with Bots toggle */}
-                <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-3.5 py-2.5">
-                  <div>
-                    <div className="text-xs font-black text-white">
-                      🤖 Lấp Bot tự động
+                {/* Explicit Bot Count Control (0 to 8 - humans) */}
+                <div className="space-y-2 rounded-2xl border border-white/10 bg-white/5 p-3.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <div className="text-xs font-black text-white">
+                        🤖 Thêm Bot vào phòng
+                      </div>
+                      <div className="text-[11px] text-slate-400">
+                        Tối đa 8 người ({humanCount} thật + {effectiveBotCount} Bot)
+                      </div>
                     </div>
-                    <div className="text-[11px] text-slate-400">
-                      Thêm Bot cho đủ số ghế tối đa
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      playSfx('click');
-                      room.updateRoomSettings({
-                        fillWithBots: !room.roomSettings.fillWithBots,
-                      });
-                    }}
-                    className={`cursor-pointer rounded-full px-3 py-1 text-xs font-black transition ${
-                      room.roomSettings.fillWithBots
-                        ? 'bg-emerald-500 text-slate-950'
-                        : 'bg-white/15 text-slate-300'
-                    }`}
-                  >
-                    {room.roomSettings.fillWithBots ? 'Bật' : 'Tắt'}
-                  </button>
-                </div>
-
-                {/* Max Players 4–8 */}
-                <div>
-                  <span className="text-xs font-bold text-slate-300">
-                    Số người tối đa
-                  </span>
-                  <div className="mt-1.5 grid grid-cols-5 gap-1.5">
-                    {[4, 5, 6, 7, 8].map((n) => (
+                    <div className="flex items-center gap-1.5">
                       <button
-                        key={n}
                         type="button"
+                        disabled={effectiveBotCount <= 0}
                         onClick={() => {
                           playSfx('click');
-                          room.updateRoomSettings({ maxPlayers: n });
+                          const next = Math.max(0, effectiveBotCount - 1);
+                          room.updateRoomSettings({
+                            botCount: next,
+                            fillWithBots: next > 0,
+                          });
                         }}
-                        className={`cursor-pointer rounded-xl py-1.5 text-xs font-black transition ${
-                          room.roomSettings.maxPlayers === n
-                            ? 'bg-amber-400 text-slate-950'
-                            : 'bg-white/10 text-slate-200 hover:bg-white/20'
-                        }`}
+                        aria-label="Giảm 1 Bot"
+                        className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg bg-white/10 text-sm font-black text-white transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40"
                       >
-                        {n}
+                        −
                       </button>
-                    ))}
+                      <span className="min-w-[2rem] text-center text-sm font-black text-amber-300">
+                        {effectiveBotCount}
+                      </span>
+                      <button
+                        type="button"
+                        disabled={effectiveBotCount >= maxBotsAllowed}
+                        onClick={() => {
+                          playSfx('click');
+                          const next = Math.min(maxBotsAllowed, effectiveBotCount + 1);
+                          room.updateRoomSettings({
+                            botCount: next,
+                            fillWithBots: next > 0,
+                          });
+                        }}
+                        aria-label="Thêm 1 Bot"
+                        className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg bg-amber-400 text-sm font-black text-slate-950 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-8 gap-1">
+                    {[0, 1, 2, 3, 4, 5, 6, 7].map((cnt) => {
+                      const disabled = cnt > maxBotsAllowed;
+                      const active = effectiveBotCount === cnt;
+                      return (
+                        <button
+                          key={cnt}
+                          type="button"
+                          disabled={disabled}
+                          onClick={() => {
+                            playSfx('click');
+                            room.updateRoomSettings({
+                              botCount: cnt,
+                              fillWithBots: cnt > 0,
+                            });
+                          }}
+                          className={`cursor-pointer rounded-lg py-1 text-xs font-black transition disabled:cursor-not-allowed disabled:opacity-30 ${
+                            active
+                              ? 'bg-amber-400 text-slate-950'
+                              : 'bg-white/10 text-slate-200 hover:bg-white/20'
+                          }`}
+                        >
+                          {cnt}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -648,14 +674,12 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
                 </h2>
                 <div className="space-y-2 rounded-2xl border border-white/10 bg-white/5 p-3.5 text-xs text-slate-200">
                   <div className="flex justify-between">
-                    <span className="text-slate-400">Số ghế tối đa:</span>
-                    <strong>{room.roomSettings.maxPlayers} người</strong>
+                    <span className="text-slate-400">Tổng người chơi:</span>
+                    <strong>{totalPlayers}/8 người</strong>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-400">Lấp Bot:</span>
-                    <strong>
-                      {room.roomSettings.fillWithBots ? 'Có' : 'Không'}
-                    </strong>
+                    <span className="text-slate-400">Số Bot thêm:</span>
+                    <strong>{effectiveBotCount} Bot</strong>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-400">Bộ bài:</span>
@@ -678,17 +702,24 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
 
             {/* Primary Start / Ready Action */}
             {room.isHost ? (
-              <button
-                type="button"
-                disabled={!canHostStart}
-                onClick={() => {
-                  playSfx('click');
-                  room.startOnlineMatch();
-                }}
-                className="w-full cursor-pointer rounded-2xl bg-gradient-to-r from-amber-400 to-orange-500 px-5 py-3.5 text-base font-black text-slate-950 shadow-lg transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                🚀 Bắt Đầu Ván Online 3D!
-              </button>
+              <div className="space-y-2">
+                {!canHostStart && (
+                  <p className="text-center text-xs font-bold text-amber-300">
+                    Cần ít nhất 2 người (mời thêm bạn hoặc tăng số Bot ở trên)
+                  </p>
+                )}
+                <button
+                  type="button"
+                  disabled={!canHostStart}
+                  onClick={() => {
+                    playSfx('click');
+                    room.startOnlineMatch();
+                  }}
+                  className="w-full cursor-pointer rounded-2xl bg-gradient-to-r from-amber-400 to-orange-500 px-5 py-3.5 text-base font-black text-slate-950 shadow-lg transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  🚀 Bắt Đầu Ván Online 3D!
+                </button>
+              </div>
             ) : (
               <button
                 type="button"
