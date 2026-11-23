@@ -1,7 +1,11 @@
-import { useMemo, useRef, type RefObject } from 'react';
+import { createContext, useContext, useMemo, useRef, type RefObject } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
+import type { PartyMotionState } from '../brawl/sim/partyMotion';
 import type { Emotion } from '../engine/types';
+
+export const BrawlMotionContext =
+  createContext<RefObject<PartyMotionState | null> | null>(null);
 
 export interface Animal3DProps {
   emotion?: Emotion;
@@ -42,10 +46,12 @@ export function useAnimalMotion(
   isActive = false,
 ): void {
   const phaseRef = useRef(Math.random() * Math.PI * 2);
+  const brawlMotionRef = useContext(BrawlMotionContext);
 
   useFrame((state, delta) => {
     const dt = Math.min(delta, 0.05);
-    const smooth = 1 - Math.exp(-10 * dt);
+    const pm = brawlMotionRef?.current ?? null;
+    const smooth = 1 - Math.exp(-(pm ? 18 : 10) * dt);
     const t = state.clock.elapsedTime + phaseRef.current;
 
     const root = refs.root.current;
@@ -163,13 +169,107 @@ export function useAnimalMotion(
       armRRotZ = Math.sin(t * 2.4) * 0.06;
       tailRotY = Math.sin(t * 3.6) * 0.22;
 
-      if (isActive) {
+      if (isActive && !pm) {
         const eagerHop = Math.abs(Math.sin(t * 4.4));
         rootY = eagerHop * 0.1;
         bodyRotZ = Math.sin(t * 4.4) * 0.04;
         tailRotY = Math.sin(t * 8.5) * 0.38;
         armLRotZ = -(0.22 + Math.sin(t * 8.8) * 0.14);
         armRRotZ = +(0.22 + Math.sin(t * 8.8) * 0.14);
+      }
+    }
+
+    // Layer Party Animals spring-physics & limb choreography when inside Brawl Arena
+    if (pm) {
+      const sq = pm.squashY.value;
+      const invSq = 1 / Math.sqrt(Math.max(0.55, sq));
+      bodyScaleY *= sq;
+      bodyScaleX *= invSq;
+      bodyScaleZ *= invSq;
+
+      // Secondary floppy inertia on head, ears, and tail
+      const lagX = pm.headLagX.value;
+      const lagZ = pm.headLagZ.value;
+      headRotX += lagX;
+      headRotZ += lagZ;
+      earLRotX += lagX * 1.35;
+      earRRotX += lagX * 1.35;
+      earLRotZ += lagZ * 1.15 - Math.abs(lagX) * 0.32;
+      earRRotZ += lagZ * 1.15 + Math.abs(lagX) * 0.32;
+      tailRotX += lagX * 1.15;
+      tailRotY -= lagZ * 1.5;
+
+      const act = pm.action;
+      const prog = pm.actionProgress;
+
+      if (act === 'run') {
+        const amp = Math.min(1.35, pm.speedNorm) * (pm.sprinting ? 1.2 : 0.88);
+        const swing = Math.sin(pm.walkPhase) * amp;
+        armLRotX = swing;
+        armRRotX = -swing;
+        armLRotZ = -(0.24 + Math.abs(swing) * 0.22);
+        armRRotZ = +(0.24 + Math.abs(swing) * 0.22);
+        earLRotZ -= Math.abs(Math.sin(pm.walkPhase)) * 0.24 * pm.speedNorm;
+        earRRotZ += Math.abs(Math.cos(pm.walkPhase)) * 0.24 * pm.speedNorm;
+        tailRotY += Math.sin(pm.walkPhase * 1.5) * 0.48 * Math.min(1.2, pm.speedNorm);
+      } else if (act === 'punch_left') {
+        const p = Math.sin(prog * Math.PI);
+        armLRotX = -1.8 * p;
+        armLRotZ = -0.32 * p;
+        armRRotX = 0.75 * p;
+        armRRotZ = 0.28;
+        rootRotY = -0.46 * p;
+        headRotY += 0.24 * p;
+      } else if (act === 'punch_right') {
+        const p = Math.sin(prog * Math.PI);
+        armRRotX = -1.8 * p;
+        armRRotZ = 0.32 * p;
+        armLRotX = 0.75 * p;
+        armLRotZ = -0.28;
+        rootRotY = 0.46 * p;
+        headRotY -= 0.24 * p;
+      } else if (act === 'headbutt') {
+        const p = Math.sin(prog * Math.PI);
+        headRotX += 0.68 * p;
+        bodyRotX += 0.3 * p;
+        armLRotX = 1.15 * p;
+        armRRotX = 1.15 * p;
+        armLRotZ = -0.45 * p;
+        armRRotZ = 0.45 * p;
+        earLRotX -= 0.45 * p;
+        earRRotX -= 0.45 * p;
+      } else if (act === 'dropkick' || act === 'dropkick_slide') {
+        armLRotX = -0.95;
+        armRRotX = -0.95;
+        armLRotZ = -0.82;
+        armRRotZ = 0.82;
+        headRotX -= 0.32;
+        earLRotX -= 0.38;
+        earRRotX -= 0.38;
+      } else if (act === 'grab_hold') {
+        const strain = Math.sin(t * 14) * 0.08;
+        armLRotX = -1.42 + strain;
+        armRRotX = -1.42 - strain;
+        armLRotZ = 0.22;
+        armRRotZ = -0.22;
+        bodyRotX += 0.14;
+      } else if (act === 'grabbed' || act === 'stunned') {
+        armLRotX = Math.sin(t * 24) * 1.15;
+        armRRotX = Math.cos(t * 24) * 1.15;
+        armLRotZ = -(0.72 + Math.sin(t * 19) * 0.42);
+        armRRotZ = +(0.72 + Math.cos(t * 19) * 0.42);
+        headRotZ += Math.sin(t * 15) * 0.28;
+        headRotX += Math.cos(t * 13) * 0.22;
+      } else if (act === 'jump' || act === 'fall') {
+        armLRotZ = -(0.68 + Math.sin(t * 15) * 0.24);
+        armRRotZ = +(0.68 + Math.cos(t * 15) * 0.24);
+        armLRotX = Math.sin(t * 15) * 0.45;
+        armRRotX = -Math.sin(t * 15) * 0.45;
+      } else if (act === 'wakeup') {
+        const w = (1 - prog) * Math.sin(prog * Math.PI * 3);
+        rootRotY += w * 0.45;
+        armLRotZ = -0.8 * (1 - prog);
+        armRRotZ = 0.8 * (1 - prog);
       }
     }
 

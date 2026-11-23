@@ -13,7 +13,15 @@ export type SfxType =
   | 'paws'
   | 'win'
   | 'lose'
-  | 'click';
+  | 'click'
+  | 'punch'
+  | 'ko'
+  | 'pickup'
+  | 'roll'
+  | 'countdown'
+  | 'roundStart'
+  | 'tileFall'
+  | 'grab';
 
 export interface AudioPreferences {
   sfxEnabled?: boolean;
@@ -228,6 +236,44 @@ export function playSfx(type: SfxType): void {
         playTone(ctx, { freq: 370, type: 'triangle', startOffset: 0.18, duration: 0.18, gain: 0.2 });
         playTone(ctx, { freq: 349, type: 'triangle', startOffset: 0.36, duration: 0.18, gain: 0.18 });
         playTone(ctx, { freq: 311, endFreq: 277, type: 'triangle', startOffset: 0.54, duration: 0.34, gain: 0.2 });
+        break;
+
+      case 'punch':
+        playNoiseBurst(ctx, { duration: 0.08, filterFreq: 550, filterType: 'lowpass', gain: 0.28 });
+        playTone(ctx, { freq: 185, endFreq: 68, type: 'triangle', duration: 0.11, gain: 0.28 });
+        break;
+
+      case 'ko':
+        playTone(ctx, { freq: 580, endFreq: 130, type: 'sine', duration: 0.34, gain: 0.24 });
+        playNoiseBurst(ctx, { duration: 0.18, startOffset: 0.22, filterFreq: 380, filterType: 'lowpass', gain: 0.22 });
+        break;
+
+      case 'pickup':
+        playTone(ctx, { freq: 660, type: 'sine', startOffset: 0, duration: 0.08, gain: 0.18 });
+        playTone(ctx, { freq: 880, type: 'sine', startOffset: 0.06, duration: 0.12, gain: 0.2 });
+        break;
+
+      case 'roll':
+        playNoiseBurst(ctx, { duration: 0.12, filterFreq: 1300, gain: 0.15 });
+        playTone(ctx, { freq: 240, endFreq: 420, type: 'sine', duration: 0.11, gain: 0.14 });
+        break;
+
+      case 'countdown':
+        playTone(ctx, { freq: 523.25, type: 'triangle', duration: 0.1, gain: 0.2 });
+        break;
+
+      case 'roundStart':
+        playTone(ctx, { freq: 783.99, type: 'triangle', startOffset: 0, duration: 0.12, gain: 0.24 });
+        playTone(ctx, { freq: 1046.5, type: 'triangle', startOffset: 0.08, duration: 0.22, gain: 0.26 });
+        break;
+
+      case 'tileFall':
+        playNoiseBurst(ctx, { duration: 0.16, filterFreq: 460, filterType: 'lowpass', gain: 0.18 });
+        playTone(ctx, { freq: 160, endFreq: 85, type: 'sine', duration: 0.18, gain: 0.16 });
+        break;
+
+      case 'grab':
+        playTone(ctx, { freq: 310, endFreq: 470, type: 'triangle', duration: 0.08, gain: 0.18 });
         break;
     }
   } catch {

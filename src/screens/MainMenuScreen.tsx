@@ -18,6 +18,7 @@ export interface MainMenuScreenProps {
   onStartGame: () => void;
   onOpenOnline: () => void;
   onOpenStudio3D: () => void;
+  onBackToModeSelect?: () => void;
 }
 
 const BOT_COUNTS = [3, 4, 5, 6, 7] as const;
@@ -43,6 +44,7 @@ export function MainMenuScreen({
   onStartGame,
   onOpenOnline,
   onOpenStudio3D,
+  onBackToModeSelect,
 }: MainMenuScreenProps) {
   const {
     cookies,
@@ -85,14 +87,28 @@ export function MainMenuScreen({
       <div className="mx-auto flex min-h-screen max-w-7xl flex-col justify-between px-4 pb-8 pt-16 sm:px-6 lg:px-8">
         {/* Top Hero Header */}
         <header className="mb-6 flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-amber-300/30 bg-amber-400/10 px-3 py-1 text-[11px] font-extrabold tracking-wide text-amber-200">
-              <span>❄️</span>
-              <span>WINTER CABIN · GAME BÀI 3D</span>
+          <div className="flex flex-wrap items-center gap-3">
+            {onBackToModeSelect && (
+              <button
+                type="button"
+                onClick={() => {
+                  playSfx('click');
+                  onBackToModeSelect();
+                }}
+                className="cursor-pointer rounded-xl border border-white/15 bg-[#26170F]/80 px-3 py-2 text-xs font-extrabold text-amber-100 shadow-lg transition-colors hover:bg-[#3A2417] focus-visible:outline-2 focus-visible:outline-amber-300"
+              >
+                ← Đổi Chế Độ
+              </button>
+            )}
+            <div>
+              <div className="inline-flex items-center gap-2 rounded-full border border-amber-300/30 bg-amber-400/10 px-3 py-1 text-[11px] font-extrabold tracking-wide text-amber-200">
+                <span>❄️</span>
+                <span>WINTER CABIN · GAME BÀI 3D</span>
+              </div>
+              <h1 className="mt-1.5 font-display text-3xl font-black tracking-tight text-[#FFFBF4] drop-shadow-sm sm:text-4xl">
+                🐾 PAWS 3D
+              </h1>
             </div>
-            <h1 className="mt-1.5 font-display text-3xl font-black tracking-tight text-[#FFFBF4] drop-shadow-sm sm:text-4xl">
-              🐾 PAWS 3D
-            </h1>
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">

@@ -198,6 +198,17 @@ export function useProfileStore() {
     return reward;
   }, []);
 
+  const recordBrawlResult = useCallback((rank: number): number => {
+    const reward = rank === 1 ? 40 : rank === 2 ? 25 : rank === 3 ? 15 : 5;
+    persistAndNotify({
+      ...currentProfile,
+      cookies: currentProfile.cookies + reward,
+      gamesPlayed: currentProfile.gamesPlayed + 1,
+      gamesWon: currentProfile.gamesWon + (rank === 1 ? 1 : 0),
+    });
+    return reward;
+  }, []);
+
   const buyAccessory = useCallback((id: string): boolean => {
     const item = SHOP_ITEMS.find((i) => i.id === id);
     if (!item) return false;
@@ -231,6 +242,7 @@ export function useProfileStore() {
     selectAnimal,
     updateSettings,
     recordMatchResult,
+    recordBrawlResult,
     buyAccessory,
     equipAccessory,
   };
