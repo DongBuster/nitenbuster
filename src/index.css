@@ -1,0 +1,31 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Fredoka", "Nunito", ui-rounded, "Hiragino Maru Gothic ProN",
+    Quicksand, Comfortaa, "Arial Rounded MT", sans-serif;
+  --font-sans: "Nunito", "Fredoka", ui-rounded, system-ui, -apple-system,
+    BlinkMacSystemFont, "Segoe UI", sans-serif;
+
+  --color-paws-pink: #f472b6;
+  --color-paws-blue: #38bdf8;
+  --color-paws-green: #4ade80;
+  --color-paws-yellow: #facc15;
+  --color-paws-ink: #4a3728;
+  --color-paws-cream: #fff9f0;
+}
+
+@layer base {
+  html,
+  body {
+    font-family: var(--font-sans);
+    color: var(--color-paws-ink);
+    background-color: var(--color-paws-cream);
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+  }
+}
