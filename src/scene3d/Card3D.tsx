@@ -17,6 +17,7 @@ export interface Card3DProps {
   rotation?: [number, number, number];
   scale?: number;
   hoverLift?: boolean;
+  hoverZBoost?: number;
   onClick?: () => void;
 }
 
@@ -52,6 +53,7 @@ export function Card3D({
   rotation = [0, 0, 0],
   scale = 1,
   hoverLift = true,
+  hoverZBoost = 0.25,
   onClick,
 }: Card3DProps) {
   const innerGroupRef = useRef<THREE.Group>(null);
@@ -89,11 +91,11 @@ export function Card3D({
 
     if (grp) {
       const canLift = hoverLift && playable && hovered;
-      const targetY = selected ? 0.24 : canLift ? 0.16 : 0;
-      const targetZ = selected ? 0.12 : canLift ? 0.06 : 0;
+      const targetY = selected ? 0.24 : canLift ? 0.24 : 0;
+      const targetZ = selected ? hoverZBoost : canLift ? hoverZBoost : 0;
       const targetRotY = faceDown ? Math.PI : 0;
-      const targetRotX = canLift && !selected ? -0.08 : 0;
-      const targetScale = selected ? 1.05 : canLift ? 1.06 : 1;
+      const targetRotX = 0;
+      const targetScale = selected ? 1.08 : canLift ? 1.12 : 1;
 
       grp.position.y = THREE.MathUtils.lerp(grp.position.y, targetY, lerpFactor);
       grp.position.z = THREE.MathUtils.lerp(grp.position.z, targetZ, lerpFactor);

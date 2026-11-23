@@ -6,6 +6,7 @@ export interface CardFan3DProps {
   cards: CardData[];
   playableIds?: string[];
   interactive?: boolean;
+  layout?: 'fan' | 'row';
   selectedId?: string | null;
   onSelectCard?: (card: CardData, index: number) => void;
   position?: [number, number, number];
@@ -18,13 +19,15 @@ export interface CardFan3DProps {
 }
 
 /**
- * Renders a hand of PAWS cards in a graceful 3D curved arc fan
- * with hover lift, playable dimming, click selection, and clean depth layering.
+ * Renders a hand of PAWS cards either as a full-width horizontal row (zero/minimal overlap
+ * for instant readability) or a 3D curved arc fan, ensuring hovered cards always pop cleanly
+ * in front of all neighboring cards.
  */
 export function CardFan3D({
   cards,
   playableIds,
   interactive = true,
+  layout = 'fan',
   selectedId,
   onSelectCard,
   position = [0, 0, 0],
@@ -44,29 +47,49 @@ export function CardFan3D({
     return null;
   }
 
-  // Dynamically widen arc and gently scale down when hand grows beyond 8 cards
+  const isRow = layout === 'row';
+  const zStep = isRow ? 0.04 : count > 10 ? 0.048 : 0.055;
+
+  // For full-width horizontal row: up to 7 cards have zero overlap (step = 1.06 > 1.0 card width),
+  // and larger hands compress gracefully across the full width.
+  const rowMaxSpan = 6.9;
+  const rowStep = count <= 1 ? 0 : Math.min(1.06, rowMaxSpan / (count - 1));
+  const rowScale =
+    isRow && count > 10
+      ? scale * Math.max(0.76, 1 - (count - 10) * 0.04)
+      : scale;
+
+  // For curved fan layout
   const extraCards = Math.max(0, count - 8);
   const effectiveSpread = Math.min(spreadAngle * (1 + extraCards * 0.085), 1.24);
-  const effectiveScale = scale * Math.max(0.68, 1 - extraCards * 0.042);
-  const zStep = count > 10 ? 0.048 : 0.055;
+  const effectiveScale = isRow
+    ? rowScale
+    : scale * Math.max(0.68, 1 - extraCards * 0.042);
 
   return (
     <group position={position} rotation={rotation} scale={effectiveScale}>
       {cards.map((card, index) => {
-        const t = count === 1 ? 0 : index / (count - 1) - 0.5;
-        const angle = t * effectiveSpread;
+        let x = 0;
+        let y = 0;
+        let rotZ = 0;
 
-        // Strictly parallel Z planes (zStep > 0.035 card thickness) prevent 3D edge clipping
-        const x = Math.sin(angle) * radius * 0.76;
-        const y = (Math.cos(angle) - 1) * radius * 0.34;
+        if (isRow) {
+          const mid = (count - 1) / 2;
+          x = (index - mid) * rowStep;
+        } else {
+          const t = count === 1 ? 0 : index / (count - 1) - 0.5;
+          const angle = t * effectiveSpread;
+          x = Math.sin(angle) * radius * 0.76;
+          y = (Math.cos(angle) - 1) * radius * 0.34;
+          rotZ = -angle * 0.48;
+        }
+
         const z = index * zStep;
-
-        const rotZ = -angle * 0.48;
-        const rotY = 0;
+        // Guarantee hovered/selected card always pops cleanly in front of ALL cards in the hand
+        const hoverZBoost = (count - 1 - index) * zStep + 0.32;
 
         const isSelected = effectiveSelectedId === card.id;
         const isFaceDown = faceDownIds ? faceDownIds.includes(card.id) : false;
-        // When interactive === false (e.g. waiting for bot turns), keep cards visually bright
         const isPlayable = !interactive
           ? true
           : playableIds
@@ -85,8 +108,9 @@ export function CardFan3D({
             selected={isSelected}
             activeWildColor={activeWildColor}
             position={[x, y, z]}
-            rotation={[0, rotY, rotZ]}
+            rotation={[0, 0, rotZ]}
             hoverLift={canInteract}
+            hoverZBoost={hoverZBoost}
             onClick={
               canInteract
                 ? () => {

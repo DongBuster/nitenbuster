@@ -218,7 +218,7 @@ const DrawPile3D = memo(function DrawPile3D({
           hoverLift={false}
           scale={0.82}
           position={[0, i * 0.042, 0]}
-          rotation={[Math.PI / 2, 0, 0.04 - i * 0.012]}
+          rotation={[-Math.PI / 2, 0, 0.04 - i * 0.012]}
         />
       ))}
 
@@ -245,7 +245,7 @@ const DrawPile3D = memo(function DrawPile3D({
           faceDown
           hoverLift={false}
           scale={0.82}
-          rotation={[Math.PI / 2, 0, -0.02]}
+          rotation={[-Math.PI / 2, 0, -0.02]}
         />
       </group>
     </group>
@@ -278,7 +278,7 @@ const DiscardPile3D = memo(function DiscardPile3D({
             value={card.value}
             activeWildColor={isTop && isWild ? currentColor : undefined}
             hoverLift={false}
-            scale={0.84}
+            scale={0.96}
             position={[0, i * 0.042 + 0.018, 0]}
             rotation={[-Math.PI / 2, 0, yaw]}
           />
@@ -296,13 +296,17 @@ function OverlayProjector({
   botSeats,
   badgeRefs,
   drawBadgeRef,
+  discardBadgeRef,
   bombBadgeRef,
+  hasDiscardBadge,
   hasBomb,
 }: {
   botSeats: SeatTransform[];
   badgeRefs: MutableRefObject<Record<string, HTMLDivElement | null>>;
   drawBadgeRef: MutableRefObject<HTMLDivElement | null>;
+  discardBadgeRef: MutableRefObject<HTMLDivElement | null>;
   bombBadgeRef: MutableRefObject<HTMLDivElement | null>;
+  hasDiscardBadge: boolean;
   hasBomb: boolean;
 }) {
   const tempVec = useMemo(() => new THREE.Vector3(), []);
@@ -343,7 +347,11 @@ function OverlayProjector({
       );
     }
 
-    applyProjection(drawBadgeRef.current, -0.78, 0.55, 0.56);
+    applyProjection(drawBadgeRef.current, -0.78, 0.34, 0.78);
+
+    if (hasDiscardBadge) {
+      applyProjection(discardBadgeRef.current, 0.78, 0.42, 0.72);
+    }
 
     if (hasBomb) {
       applyProjection(bombBadgeRef.current, 0, 1.55, -0.55);
@@ -380,7 +388,14 @@ export function GameTableScene3D({
 
   const badgeRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const drawBadgeRef = useRef<HTMLDivElement | null>(null);
+  const discardBadgeRef = useRef<HTMLDivElement | null>(null);
   const bombBadgeRef = useRef<HTMLDivElement | null>(null);
+
+  const topDiscard = state.discardPile[state.discardPile.length - 1];
+  const showBananaColorBadge =
+    Boolean(topDiscard?.color && topDiscard.color !== state.currentColor) ||
+    Boolean(state.lastEffectBanner?.includes('Vỏ Chuối'));
+  const activeColorTheme = COLOR_THEME[state.currentColor];
 
   const seats = useMemo<SeatTransform[]>(() => {
     const result: SeatTransform[] = [];
@@ -474,10 +489,11 @@ export function GameTableScene3D({
           />
           {state.activeBomb && <ActiveBomb3D bomb={state.activeBomb} />}
 
-          {/* Human Player's 3D Fanned Hand directly in foreground */}
+          {/* Human Player's 3D Horizontal Row Hand directly in foreground */}
           {humanPlayer && humanPlayer.hand.length > 0 && (
             <CardFan3D
               cards={humanPlayer.hand}
+              layout="row"
               interactive={resolvedIsHumanTurn}
               playableIds={resolvedIsHumanTurn ? playableCardIds : undefined}
               onSelectCard={(card) => {
@@ -485,9 +501,9 @@ export function GameTableScene3D({
                   onPlayCard?.(card);
                 }
               }}
-              position={[0, 0.95, 3.65]}
-              rotation={[-0.32, 0, 0]}
-              scale={0.74}
+              position={[0, 1.02, 3.65]}
+              rotation={[-0.36, 0, 0]}
+              scale={0.76}
             />
           )}
 
@@ -532,7 +548,9 @@ export function GameTableScene3D({
               botSeats={botSeats}
               badgeRefs={badgeRefs}
               drawBadgeRef={drawBadgeRef}
+              discardBadgeRef={discardBadgeRef}
               bombBadgeRef={bombBadgeRef}
+              hasDiscardBadge={showBananaColorBadge}
               hasBomb={Boolean(state.activeBomb)}
             />
           )}
@@ -558,9 +576,42 @@ export function GameTableScene3D({
                   : 'pointer-events-none border-white/25 bg-slate-900/80 text-slate-200'
               }`}
             >
-              📥 Rút ({state.drawPile.length})
+              {(() => {
+                if (!resolvedIsHumanTurn) {
+                  return `📥 Chồng bài (${state.drawPile.length})`;
+                }
+                const base =
+                  state.pending?.kind === 'draw' ? state.pending.count : 1;
+                const bombExtra =
+                  state.activeBomb && state.activeBomb.fuse <= 1 ? 4 : 0;
+                const guaranteed = base + bombExtra;
+                return guaranteed > 1
+                  ? `📥 Nhận +${guaranteed} lá (${state.drawPile.length})`
+                  : `📥 Rút 1 lá (${state.drawPile.length})`;
+              })()}
             </button>
           </div>
+
+          {/* Banana Color Override Pill on Discard Pile */}
+          {showBananaColorBadge && (
+            <div
+              ref={discardBadgeRef}
+              className="absolute top-0 left-0 will-change-transform"
+              style={{ opacity: 0 }}
+            >
+              <div
+                className="flex items-center gap-1 whitespace-nowrap rounded-full border-2 border-white px-2.5 py-0.5 text-[11px] font-black shadow-lg"
+                style={{
+                  backgroundColor: activeColorTheme.primary,
+                  color: activeColorTheme.cornerText,
+                }}
+              >
+                <span>🍌 Vỏ Chuối →</span>
+                <span>{activeColorTheme.shapeSymbol}</span>
+                <span>{activeColorTheme.label}</span>
+              </div>
+            </div>
+          )}
 
           {/* Active Bomb Fuse Pill */}
           {state.activeBomb && (

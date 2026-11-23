@@ -11,7 +11,7 @@ import {
 import { ONLINE_EMOTES } from '../online/protocol';
 import type { OnlineRoomController } from '../online/useOnlineRoom';
 import { GameTableScene3D } from '../scene3d/GameTableScene3D';
-import { COLOR_THEME } from '../components/Card/cardMeta';
+import { CARD_META, COLOR_THEME } from '../components/Card/cardMeta';
 import {
   ColorPickerModal,
   ResultModal,
@@ -309,6 +309,22 @@ export function OnlineGame3DScreen({
             <span>{activeTheme.label}</span>
           </div>
 
+          {(() => {
+            const top =
+              gameState.discardPile[gameState.discardPile.length - 1];
+            if (!top) return null;
+            const label =
+              top.type === 'basic'
+                ? `Số ${top.value ?? 0}`
+                : CARD_META[top.type].name;
+            return (
+              <div className="inline-flex items-center gap-1.5 rounded-xl border border-amber-200/35 bg-slate-900/90 px-2.5 py-1.5 text-xs font-black text-amber-100 shadow-lg backdrop-blur-md">
+                <span aria-hidden="true">🃏</span>
+                <span>Trên bàn: {label}</span>
+              </div>
+            );
+          })()}
+
           <span className="rounded-xl border border-white/15 bg-slate-900/85 px-2.5 py-1.5 text-xs font-bold text-slate-200 shadow-lg backdrop-blur-md">
             {gameState.direction === 1 ? '↻ Thuận chiều' : '↺ Ngược chiều'}
           </span>
@@ -461,7 +477,30 @@ export function OnlineGame3DScreen({
                 : 'cursor-not-allowed border border-white/15 bg-slate-900/75 text-slate-500'
             }`}
           >
-            📥 Rút Bài (Space)
+            {(() => {
+              const base =
+                gameState.pending?.kind === 'draw'
+                  ? gameState.pending.count
+                  : 1;
+              const bombExtra =
+                isHumanTurn &&
+                gameState.activeBomb &&
+                gameState.activeBomb.fuse <= 1
+                  ? 4
+                  : 0;
+              const guaranteed = base + bombExtra;
+              if (guaranteed > 1) {
+                const parts: string[] = [];
+                if (gameState.pending?.kind === 'draw') {
+                  parts.push(`${gameState.pending.count} Xẻng`);
+                } else {
+                  parts.push('1 rút');
+                }
+                if (bombExtra > 0) parts.push('4 Bom');
+                return `📥 Nhận +${guaranteed} lá (${parts.join(' + ')})`;
+              }
+              return '📥 Rút 1 lá (Space)';
+            })()}
           </button>
         </div>
       </footer>

@@ -861,12 +861,18 @@ export function drawTurnAction(
 
   if (workingState.pending?.kind === 'draw') {
     const penaltyCount = workingState.pending.count;
-    const { state: afterPenalty } = drawCardsForPlayer(
+    const {
+      state: afterPenalty,
+      drawnCards,
+      hitBanana,
+    } = drawCardsForPlayer(
       workingState,
       state.currentIndex,
       penaltyCount,
       seed,
     );
+    const totalDrawn = drawnCards.length;
+    const bananaExtra = Math.max(0, totalDrawn - penaltyCount);
     const nextIdx = getNextIndex(
       state.currentIndex,
       afterPenalty.direction,
@@ -874,28 +880,31 @@ export function drawTurnAction(
       0,
     );
     const nextPlayers = updatePlayerAt(afterPenalty.players, state.currentIndex, {
-      emotion: 'sad',
+      emotion: hitBanana ? 'shock' : 'sad',
     });
+
+    const summaryText = hitBanana
+      ? `📥 ${currentPlayer.name} rút ${penaltyCount} (Xẻng) + ${bananaExtra} (🍌 Vỏ Chuối) = ${totalDrawn} lá!`
+      : `📥 ${currentPlayer.name} chịu phạt và rút ${totalDrawn} lá bài!`;
 
     const settled: GameState = {
       ...afterPenalty,
       players: nextPlayers,
       pending: null,
       currentIndex: nextIdx,
-      logs: appendLog(
-        afterPenalty.logs,
-        nextTurnCount,
-        `📥 ${currentPlayer.name} chịu phạt và rút ${penaltyCount} lá bài!`,
-        'penalty',
-      ),
-      lastEffectBanner: `📥 ${currentPlayer.name} rút ${penaltyCount} lá phạt!`,
+      logs: appendLog(afterPenalty.logs, nextTurnCount, summaryText, 'penalty'),
+      lastEffectBanner: summaryText,
     };
 
     return tickActiveBomb(settled, seed);
   }
 
   // Standard 1-card draw and pass turn
-  const { state: afterDraw, hitBanana } = drawCardsForPlayer(
+  const {
+    state: afterDraw,
+    drawnCards: normalDrawn,
+    hitBanana,
+  } = drawCardsForPlayer(
     workingState,
     state.currentIndex,
     1,
@@ -908,18 +917,18 @@ export function drawTurnAction(
     0,
   );
 
+  const normalTotal = normalDrawn.length;
+  const normalSummary = hitBanana
+    ? `📥 ${currentPlayer.name} rút 1 + ${Math.max(0, normalTotal - 1)} (🍌 Vỏ Chuối) = ${normalTotal} lá!`
+    : `${currentPlayer.name} rút 1 lá bài và qua lượt.`;
+
   const settled: GameState = {
     ...afterDraw,
     currentIndex: nextIdx,
     logs: hitBanana
       ? afterDraw.logs
-      : appendLog(
-          afterDraw.logs,
-          nextTurnCount,
-          `${currentPlayer.name} rút 1 lá bài và qua lượt.`,
-          'draw',
-        ),
-    lastEffectBanner: hitBanana ? afterDraw.lastEffectBanner : null,
+      : appendLog(afterDraw.logs, nextTurnCount, normalSummary, 'draw'),
+    lastEffectBanner: hitBanana ? normalSummary : null,
   };
 
   return tickActiveBomb(settled, seed);
