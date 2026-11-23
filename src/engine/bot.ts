@@ -257,14 +257,9 @@ export function chooseBotAction(state: GameState, seed?: number): BotAction {
 
 export function shouldBotCallPaws(
   player: Player,
-  difficulty: BotDifficulty,
-  seed?: number
+  _difficulty?: BotDifficulty,
+  _seed?: number
 ): boolean {
   if (player.calledPaws) return false;
-  if (player.hand.length < 1 || player.hand.length > 2) return false;
-  if (difficulty === 'hard') return true;
-
-  const rng = createSeededRng(seed ?? (player.hand.length * 131 + player.name.length * 17));
-  if (difficulty === 'medium') return rng() < 0.8;
-  return rng() < 0.4;
+  return player.hand.length >= 1 && player.hand.length <= 2;
 }
