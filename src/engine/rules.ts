@@ -1,4 +1,4 @@
-import type { CardData, CardType, GameState } from './types.ts';
+import type { CardData, CardType, GameState, Player } from './types.ts';
 
 const WILD_TYPES = new Set<CardType>([
   'taser',
@@ -66,4 +66,18 @@ export function needsColorChoice(type: CardType): boolean {
 
 export function needsTargetChoice(type: CardType): boolean {
   return type === 'crossbow';
+}
+
+/**
+ * Predicts which player will be hit by the active Candy Bomb (+4 cards)
+ * if turns continue normally without Freeze / Boomerang / Taser altering turn order.
+ */
+export function getPredictedBombVictim(state: GameState): Player | null {
+  if (!state.activeBomb || state.winnerId !== null || state.players.length === 0) {
+    return null;
+  }
+  const n = state.players.length;
+  const fuse = Math.max(0, state.activeBomb.fuse);
+  const victimIndex = (((state.currentIndex + state.direction * fuse) % n) + n) % n;
+  return state.players[victimIndex] ?? null;
 }

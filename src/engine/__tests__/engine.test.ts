@@ -6,6 +6,7 @@ import {
   totalCardsInState,
 } from '../deck.ts';
 import {
+  getPredictedBombVictim,
   isPlayable,
   needsColorChoice,
   needsTargetChoice,
@@ -515,5 +516,46 @@ describe('PAWS Card Game Engine', () => {
       completedMatches >= 35,
       `Expected at least 35/50 matches to finish within 200 turns, got ${completedMatches}`
     );
+  });
+
+  it('15. getPredictedBombVictim matches the actual player hit when bomb explodes', () => {
+    const state = makeCustomState({
+      currentIndex: 0,
+      direction: 1,
+      players: [
+        makePlayer('p0', [
+          { id: 'bomb-1', type: 'bomb' },
+          { id: 'p0-keep', type: 'basic', color: 'pink', value: 1 },
+        ], false, 'dog'),
+        makePlayer('p1', [{ id: 'p1-1', type: 'basic', color: 'pink', value: 2 }], true, 'cat'),
+        makePlayer('p2', [{ id: 'p2-1', type: 'basic', color: 'pink', value: 3 }], true, 'duck'),
+        makePlayer('p3', [{ id: 'p3-1', type: 'basic', color: 'pink', value: 4 }], true, 'shark'),
+      ],
+    });
+
+    assert.equal(getPredictedBombVictim(state), null);
+
+    let s = playCard(state, 'p0', 'bomb-1', { chosenColor: 'pink', seed: 11 });
+    assert.equal(s.activeBomb?.fuse, 4);
+    assert.equal(getPredictedBombVictim(s)?.id, 'p1');
+
+    // Advance 3 turns by drawing: predicted victim stays p1 each step
+    s = drawTurnAction(s, 'p1', 12);
+    assert.equal(s.activeBomb?.fuse, 3);
+    assert.equal(getPredictedBombVictim(s)?.id, 'p1');
+
+    s = drawTurnAction(s, 'p2', 13);
+    assert.equal(s.activeBomb?.fuse, 2);
+    assert.equal(getPredictedBombVictim(s)?.id, 'p1');
+
+    s = drawTurnAction(s, 'p3', 14);
+    assert.equal(s.activeBomb?.fuse, 1);
+    assert.equal(getPredictedBombVictim(s)?.id, 'p1');
+
+    const p1Before = s.players.find((p) => p.id === 'p1')!.hand.length;
+    s = drawTurnAction(s, 'p0', 15);
+    assert.equal(s.activeBomb, null);
+    assert.equal(getPredictedBombVictim(s), null);
+    assert.equal(s.players.find((p) => p.id === 'p1')!.hand.length, p1Before + 4);
   });
 });

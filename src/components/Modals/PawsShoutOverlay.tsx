@@ -25,65 +25,73 @@ export function PawsShoutOverlay({ shout }: { shout: PawsShoutInfo | null }) {
     : ANIMALS[0];
 
   return (
-    <AnimatePresence>
-      {shout && (
-        <motion.div
-          key={shout.key}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.2 }}
-          aria-live="polite"
-          className="pointer-events-none fixed inset-0 z-40 flex items-start justify-center overflow-hidden pt-28 sm:pt-32"
-        >
-          {/* Full-screen edge glow frame (center stays 100% clear so table & cards remain visible) */}
+    <div
+      role="region"
+      aria-label="Thông báo hô PAWS"
+      aria-live="polite"
+      className="pointer-events-none fixed inset-0 z-40 overflow-hidden"
+    >
+      <AnimatePresence>
+        {shout && (
           <motion.div
-            initial={prefersReducedMotion ? { opacity: 0.85 } : { opacity: 0 }}
+            key={shout.key}
+            initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.25 }}
-            className="absolute inset-0 border-4 border-amber-300/55 shadow-[inset_0_0_90px_rgba(251,191,36,0.5)]"
-          />
-
-          {/* Compact Upper Banner (doesn't cover the 3D discard pile) */}
-          <motion.div
-            initial={
-              prefersReducedMotion
-                ? { opacity: 0 }
-                : { opacity: 0, scale: 0.8, y: -20 }
-            }
-            animate={
-              prefersReducedMotion
-                ? { opacity: 1 }
-                : { opacity: 1, scale: 1, y: 0 }
-            }
-            exit={
-              prefersReducedMotion
-                ? { opacity: 0 }
-                : { opacity: 0, scale: 0.95, y: -12 }
-            }
-            transition={{ type: 'spring', stiffness: 440, damping: 26 }}
-            className="relative mx-4 flex flex-wrap items-center justify-center gap-2.5 rounded-2xl border-2 border-amber-200 bg-gradient-to-r from-amber-400 via-orange-400 to-amber-500 px-5 py-2.5 text-[#2C1B11] shadow-[0_12px_40px_rgba(251,191,36,0.55)]"
+            transition={{ duration: 0.2 }}
+            className="absolute inset-0"
           >
-            <div className="flex items-center gap-1.5 rounded-full bg-[#2C1B11]/90 px-3 py-1 text-xs font-black uppercase tracking-wider text-amber-200">
-              <span
-                className="inline-block h-2.5 w-2.5 rounded-full"
-                style={{ backgroundColor: meta.accentHex }}
-              />
-              <span>{ANIMAL_EMOJI[shout.animal]}</span>
-              <span>{shout.playerName}</span>
-            </div>
+            {/* Subtle full-screen edge glow frame (center stays 100% clear) */}
+            <motion.div
+              initial={prefersReducedMotion ? { opacity: 0.85 } : { opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.25 }}
+              className="absolute inset-0 border-4 border-amber-300/50 shadow-[inset_0_0_72px_rgba(251,191,36,0.42)]"
+            />
 
-            <div className="font-display text-2xl font-black tracking-tight drop-shadow-sm sm:text-3xl">
-              🐾 PAWS!!
-            </div>
+            {/* Compact Top-Right Banner (stays clear of center timer, characters & chat bubbles) */}
+            <div className="absolute top-16 right-3 sm:top-16 sm:right-4">
+              <motion.div
+                initial={
+                  prefersReducedMotion
+                    ? { opacity: 0 }
+                    : { opacity: 0, scale: 0.86, x: 24 }
+                }
+                animate={
+                  prefersReducedMotion
+                    ? { opacity: 1 }
+                    : { opacity: 1, scale: 1, x: 0 }
+                }
+                exit={
+                  prefersReducedMotion
+                    ? { opacity: 0 }
+                    : { opacity: 0, scale: 0.94, x: 16 }
+                }
+                transition={{ type: 'spring', stiffness: 440, damping: 28 }}
+                className="flex items-center gap-2 rounded-2xl border-2 border-amber-200 bg-gradient-to-r from-amber-400 via-orange-400 to-amber-500 px-3.5 py-2 text-[#2C1B11] shadow-[0_10px_32px_rgba(251,191,36,0.5)]"
+              >
+                <div className="flex items-center gap-1 rounded-full bg-[#2C1B11]/90 px-2.5 py-0.5 text-[11px] font-black uppercase tracking-wider text-amber-200">
+                  <span
+                    className="inline-block h-2 w-2 rounded-full"
+                    style={{ backgroundColor: meta.accentHex }}
+                  />
+                  <span>{ANIMAL_EMOJI[shout.animal]}</span>
+                  <span className="max-w-[96px] truncate">{shout.playerName}</span>
+                </div>
 
-            <span className="rounded-full bg-white/35 px-2.5 py-0.5 text-xs font-extrabold text-[#2C1B11]">
-              Còn 1 lá!
-            </span>
+                <div className="font-display text-lg font-black leading-none tracking-tight drop-shadow-sm sm:text-xl">
+                  🐾 PAWS!!
+                </div>
+
+                <span className="rounded-full bg-white/40 px-2 py-0.5 text-[10px] font-extrabold text-[#2C1B11]">
+                  1 lá!
+                </span>
+              </motion.div>
+            </div>
           </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }

@@ -6,3 +6,5 @@ export {
   WILD_CARD_TYPES,
 } from './cardMeta';
 export type { CardMeta, ColorTheme } from './cardMeta';
+export { CardInfoButton } from './CardInfoTooltip';
+export type { CardInfoButtonProps } from './CardInfoTooltip';

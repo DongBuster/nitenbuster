@@ -215,7 +215,10 @@ export function chooseBotAction(state: GameState, seed?: number): BotAction {
   if (playable.length === 0) {
     return {
       action: 'draw',
-      quip: pickFrom(quips.draw, rng),
+      quip:
+        state.pending?.kind === 'draw'
+          ? `⛏️ Dính phạt rút +${state.pending.count} lá!`
+          : pickFrom(quips.draw, rng),
     };
   }
 

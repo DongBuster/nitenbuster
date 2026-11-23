@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ANIMALS,
+  getPredictedBombVictim,
   isPlayable,
   needsColorChoice,
   needsTargetChoice,
@@ -11,7 +12,7 @@ import {
 import { ONLINE_EMOTES } from '../online/protocol';
 import type { OnlineRoomController } from '../online/useOnlineRoom';
 import { GameTableScene3D } from '../scene3d/GameTableScene3D';
-import { CARD_META, COLOR_THEME } from '../components/Card/cardMeta';
+import { CARD_META, COLOR_THEME, CardInfoButton } from '../components/Card';
 import {
   ColorPickerModal,
   ResultModal,
@@ -71,7 +72,9 @@ export function OnlineGame3DScreen({
   const [showTutorial, setShowTutorial] = useState<boolean>(false);
   const [cookiesEarned, setCookiesEarned] = useState<number>(0);
   const [pawsShout, setPawsShout] = useState<PawsShoutInfo | null>(null);
+  const [penaltyNotice, setPenaltyNotice] = useState<string | null>(null);
   const prevCalledPawsRef = useRef<Set<string>>(new Set());
+  const prevHumanHandLenRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!gameState) return;
@@ -122,6 +125,48 @@ export function OnlineGame3DScreen({
       null
     );
   }, [gameState, room.myPeerId]);
+
+  // Surface a clear reason toast whenever the local player receives penalty/extra cards online
+  useEffect(() => {
+    if (!gameState || !humanPlayer) {
+      prevHumanHandLenRef.current = null;
+      return;
+    }
+
+    const prevLen = prevHumanHandLenRef.current;
+    const currLen = humanPlayer.hand.length;
+    prevHumanHandLenRef.current = currLen;
+
+    if (
+      prevLen === null ||
+      gameState.turnCount === 0 ||
+      gameState.winnerId !== null ||
+      currLen <= prevLen
+    ) {
+      return;
+    }
+
+    const delta = currLen - prevLen;
+    const latest =
+      gameState.logs.length > 0
+        ? gameState.logs[gameState.logs.length - 1]
+        : null;
+    const reason = gameState.lastEffectBanner ?? latest?.text ?? '';
+    const isNotableEvent =
+      delta >= 2 ||
+      latest?.type === 'penalty' ||
+      reason.includes('Nỏ Thần') ||
+      reason.includes('PAWS') ||
+      reason.includes('Bom') ||
+      reason.includes('Vỏ Chuối') ||
+      reason.includes('Tia Chớp');
+
+    if (isNotableEvent && reason) {
+      setPenaltyNotice(`+${delta} lá — ${reason}`);
+      const timer = window.setTimeout(() => setPenaltyNotice(null), 2800);
+      return () => window.clearTimeout(timer);
+    }
+  }, [gameState, humanPlayer]);
 
   const currentPlayer = gameState
     ? gameState.players[gameState.currentIndex]
@@ -269,6 +314,7 @@ export function OnlineGame3DScreen({
     !humanPlayer.calledPaws;
 
   const isLowTimer = room.turnSecondsLeft <= 5 && gameState.winnerId === null;
+  const predictedBombVictim = getPredictedBombVictim(gameState);
 
   const lastEmoteSender = room.lastEmote
     ? gameState.players.find((p) => p.id === room.lastEmote?.peerId)?.name ??
@@ -338,6 +384,13 @@ export function OnlineGame3DScreen({
               <div className="inline-flex items-center gap-1.5 rounded-xl border border-amber-200/35 bg-slate-900/90 px-2.5 py-1.5 text-xs font-black text-amber-100 shadow-lg backdrop-blur-md">
                 <span aria-hidden="true">🃏</span>
                 <span>Trên bàn: {label}</span>
+                <CardInfoButton
+                  type={top.type}
+                  color={top.color}
+                  value={top.value}
+                  placement="bottom"
+                  size="xs"
+                />
               </div>
             );
           })()}
@@ -465,8 +518,15 @@ export function OnlineGame3DScreen({
         )}
 
         {gameState.activeBomb && (
-          <div className="rounded-full border border-orange-300/70 bg-orange-600/90 px-3.5 py-1 text-xs font-black text-white shadow-lg">
-            💣 Bom Kẹo đang cháy — nổ sau {gameState.activeBomb.fuse} lượt (+4 lá)!
+          <div
+            className={`rounded-full border px-3.5 py-1 text-xs font-black text-white shadow-lg ${
+              predictedBombVictim?.id === humanPlayer.id
+                ? 'animate-pulse border-red-200 bg-red-600/95'
+                : 'border-orange-300/70 bg-orange-600/90'
+            }`}
+          >
+            💣 Bom Kẹo: còn {gameState.activeBomb.fuse} lượt → dự kiến nổ vào{' '}
+            {predictedBombVictim?.name ?? '...'} (+4 lá)!
           </div>
         )}
 
@@ -484,6 +544,19 @@ export function OnlineGame3DScreen({
         )}
       </div>
 
+      {/* Penalty Reason Toast (when local player receives extra/penalty cards) */}
+      {penaltyNotice && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="pointer-events-none fixed inset-x-0 bottom-20 z-30 flex justify-center px-4"
+        >
+          <div className="rounded-2xl border-2 border-rose-300/80 bg-rose-950/95 px-4 py-2 text-xs font-black text-rose-100 shadow-[0_10px_30px_rgba(225,29,72,0.45)] backdrop-blur-md sm:text-sm">
+            ⚠️ {penaltyNotice}
+          </div>
+        </div>
+      )}
+
       {/* Bottom Compact HUD */}
       <footer className="pointer-events-none fixed inset-x-0 bottom-0 z-20 flex flex-wrap items-end justify-between gap-2 p-3 sm:p-4">
         {/* Human Player Pill */}
@@ -498,6 +571,11 @@ export function OnlineGame3DScreen({
               <span className="rounded-full bg-white/15 px-1.5 py-0.5 text-[10px]">
                 🎴 {humanPlayer.hand.length}
               </span>
+              {predictedBombVictim?.id === humanPlayer.id && gameState.activeBomb && (
+                <span className="animate-pulse rounded-full border border-red-200 bg-red-600 px-1.5 py-0.5 text-[10px] font-black text-white">
+                  💣 Tầm nổ ({gameState.activeBomb.fuse})
+                </span>
+              )}
             </div>
             <div className="text-[11px] font-bold text-amber-300">
               {isHumanTurn
@@ -551,26 +629,8 @@ export function OnlineGame3DScreen({
             }`}
           >
             {(() => {
-              const base =
-                gameState.pending?.kind === 'draw'
-                  ? gameState.pending.count
-                  : 1;
-              const bombExtra =
-                isHumanTurn &&
-                gameState.activeBomb &&
-                gameState.activeBomb.fuse <= 1
-                  ? 4
-                  : 0;
-              const guaranteed = base + bombExtra;
-              if (guaranteed > 1) {
-                const parts: string[] = [];
-                if (gameState.pending?.kind === 'draw') {
-                  parts.push(`${gameState.pending.count} Xẻng`);
-                } else {
-                  parts.push('1 rút');
-                }
-                if (bombExtra > 0) parts.push('4 Bom');
-                return `📥 Nhận +${guaranteed} lá (${parts.join(' + ')})`;
+              if (gameState.pending?.kind === 'draw') {
+                return `📥 Nhận +${gameState.pending.count} lá (${gameState.pending.count} Xẻng)`;
               }
               return '📥 Rút 1 lá (Space)';
             })()}

@@ -176,7 +176,8 @@ export const CARD_META: Record<CardType, CardMeta> = {
     type: 'bomb',
     name: 'Bom Kẹo',
     shortLabel: 'Bom Kẹo',
-    description: 'Wild: chọn màu, gắn ngòi nổ hẹn giờ phạt +4 khi phát nổ.',
+    description:
+      'Wild: chọn màu & đặt Bom đếm ngược theo số lượt. Khi về 0 trước mặt ai, người đó nổ +4 lá (đảo chiều hoặc đóng băng sẽ đổi mục tiêu).',
     isWild: true,
     phase: 'v1.0',
   },

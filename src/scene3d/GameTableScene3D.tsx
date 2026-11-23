@@ -10,7 +10,8 @@ import type {
   GameState,
   Player,
 } from '../engine/types';
-import { CARD_META, COLOR_THEME } from '../components/Card/cardMeta';
+import { CARD_META, COLOR_THEME, CardInfoButton } from '../components/Card';
+import { getPredictedBombVictim } from '../engine/rules';
 import { WinterCabinStage } from './WinterCabinStage';
 import { Character3D } from './Character3D';
 import { Card3D } from './Card3D';
@@ -138,27 +139,33 @@ const ActiveBomb3D = memo(function ActiveBomb3D({ bomb }: { bomb: BombState }) {
   return (
     <group ref={bombRef} position={[0, 1.05, -0.55]}>
       <mesh castShadow>
-        <sphereGeometry args={[0.26, 24, 24]} />
-        <meshStandardMaterial color="#1E1B4B" roughness={0.28} metalness={0.35} />
-      </mesh>
-      <mesh rotation={[Math.PI / 2, 0, 0]}>
-        <torusGeometry args={[0.255, 0.028, 12, 32]} />
+        <sphereGeometry args={[0.29, 24, 24]} />
         <meshStandardMaterial
-          color={theme.primary}
-          emissive={theme.primary}
-          emissiveIntensity={0.7}
+          color="#1E1B4B"
+          emissive={bomb.fuse <= 1 ? '#DC2626' : '#000000'}
+          emissiveIntensity={bomb.fuse <= 1 ? 0.45 : 0}
+          roughness={0.28}
+          metalness={0.35}
         />
       </mesh>
-      <mesh position={[0, 0.25, 0]}>
-        <cylinderGeometry args={[0.075, 0.095, 0.08, 16]} />
+      <mesh rotation={[Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[0.285, 0.032, 12, 32]} />
+        <meshStandardMaterial
+          color={bomb.fuse <= 1 ? '#EF4444' : theme.primary}
+          emissive={bomb.fuse <= 1 ? '#EF4444' : theme.primary}
+          emissiveIntensity={bomb.fuse <= 1 ? 1.15 : 0.75}
+        />
+      </mesh>
+      <mesh position={[0, 0.28, 0]}>
+        <cylinderGeometry args={[0.08, 0.1, 0.08, 16]} />
         <meshStandardMaterial color="#475569" roughness={0.4} metalness={0.4} />
       </mesh>
-      <mesh ref={sparkRef} position={[0.07, 0.36, 0]}>
-        <octahedronGeometry args={[0.085, 0]} />
+      <mesh ref={sparkRef} position={[0.075, 0.4, 0]}>
+        <octahedronGeometry args={[0.095, 0]} />
         <meshStandardMaterial
           color="#FBBF24"
           emissive="#EF4444"
-          emissiveIntensity={1.6}
+          emissiveIntensity={bomb.fuse <= 1 ? 2.1 : 1.6}
         />
       </mesh>
     </group>
@@ -292,9 +299,15 @@ const DiscardPile3D = memo(function DiscardPile3D({
  * Lightweight 60fps world-to-screen projector driving pure React DOM overlays
  * outside <Canvas> (zero drei <Html> portals, zero React 19 unmount crashes).
  */
+const HAND_POS: [number, number, number] = [0, 1.02, 3.65];
+const HAND_ROT_X = -0.36;
+const HAND_BASE_SCALE = 0.76;
+
 function OverlayProjector({
   botSeats,
+  humanHand,
   badgeRefs,
+  handInfoRefs,
   drawBadgeRef,
   discardBadgeRef,
   bombBadgeRef,
@@ -302,7 +315,9 @@ function OverlayProjector({
   hasBomb,
 }: {
   botSeats: SeatTransform[];
+  humanHand: CardData[];
   badgeRefs: MutableRefObject<Record<string, HTMLDivElement | null>>;
+  handInfoRefs: MutableRefObject<Record<string, HTMLDivElement | null>>;
   drawBadgeRef: MutableRefObject<HTMLDivElement | null>;
   discardBadgeRef: MutableRefObject<HTMLDivElement | null>;
   bombBadgeRef: MutableRefObject<HTMLDivElement | null>;
@@ -317,6 +332,7 @@ function OverlayProjector({
       wx: number,
       wy: number,
       wz: number,
+      translate = 'translate(-50%, -100%)',
     ) => {
       if (!el) return;
       tempVec.set(wx, wy, wz).project(camera);
@@ -329,7 +345,7 @@ function OverlayProjector({
       const py = (-tempVec.y * 0.5 + 0.5) * size.height;
       el.style.opacity = '1';
       el.style.visibility = 'visible';
-      el.style.transform = `translate(-50%, -100%) translate3d(${px}px, ${py}px, 0)`;
+      el.style.transform = `${translate} translate3d(${px}px, ${py}px, 0)`;
     };
 
     for (let i = 0; i < botSeats.length; i++) {
@@ -347,6 +363,42 @@ function OverlayProjector({
       );
     }
 
+    // Project compact "!" info triggers onto the top-right corner of each card in the player's 3D hand
+    const handCount = humanHand.length;
+    if (handCount > 0) {
+      const rowStep = handCount <= 1 ? 0 : Math.min(1.06, 6.9 / (handCount - 1));
+      const effectiveScale =
+        handCount > 10
+          ? HAND_BASE_SCALE * Math.max(0.76, 1 - (handCount - 10) * 0.04)
+          : HAND_BASE_SCALE;
+      const mid = (handCount - 1) / 2;
+      const cosX = Math.cos(HAND_ROT_X);
+      const sinX = Math.sin(HAND_ROT_X);
+
+      for (let i = 0; i < handCount; i++) {
+        const card = humanHand[i];
+        const localX = (i - mid) * rowStep + 0.34;
+        const localY = 0.66;
+        const localZ = i * 0.04 + 0.03;
+
+        const sx = localX * effectiveScale;
+        const sy = localY * effectiveScale;
+        const sz = localZ * effectiveScale;
+
+        const wx = HAND_POS[0] + sx;
+        const wy = HAND_POS[1] + sy * cosX - sz * sinX;
+        const wz = HAND_POS[2] + sy * sinX + sz * cosX;
+
+        applyProjection(
+          handInfoRefs.current[card.id] ?? null,
+          wx,
+          wy,
+          wz,
+          'translate(-50%, -50%)',
+        );
+      }
+    }
+
     applyProjection(drawBadgeRef.current, -0.78, 0.34, 0.78);
 
     if (hasDiscardBadge) {
@@ -354,7 +406,7 @@ function OverlayProjector({
     }
 
     if (hasBomb) {
-      applyProjection(bombBadgeRef.current, 0, 1.55, -0.55);
+      applyProjection(bombBadgeRef.current, 0, 1.62, -0.55);
     }
   });
 
@@ -387,9 +439,16 @@ export function GameTableScene3D({
   );
 
   const badgeRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const handInfoRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const drawBadgeRef = useRef<HTMLDivElement | null>(null);
   const discardBadgeRef = useRef<HTMLDivElement | null>(null);
   const bombBadgeRef = useRef<HTMLDivElement | null>(null);
+
+  const predictedBombVictim = useMemo(
+    () => getPredictedBombVictim(state),
+    [state],
+  );
+  const humanHand = humanPlayer?.hand ?? [];
 
   const topDiscard = state.discardPile[state.discardPile.length - 1];
   const showBananaColorBadge =
@@ -512,6 +571,9 @@ export function GameTableScene3D({
             const isActive =
               state.winnerId === null && state.currentIndex === seat.playerIndex;
             const isTargetable = targetPickingMode && !seat.isHuman;
+            const isBombVictim =
+              state.winnerId === null &&
+              predictedBombVictim?.id === seat.player.id;
 
             return (
               <group key={seat.player.id} position={seat.position}>
@@ -539,6 +601,19 @@ export function GameTableScene3D({
                     />
                   </mesh>
                 )}
+
+                {!isTargetable && isBombVictim && (
+                  <mesh position={[0, 0.03, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+                    <ringGeometry args={[0.64, 0.82, 32]} />
+                    <meshStandardMaterial
+                      color="#EF4444"
+                      emissive="#EF4444"
+                      emissiveIntensity={
+                        state.activeBomb && state.activeBomb.fuse <= 1 ? 1.4 : 0.85
+                      }
+                    />
+                  </mesh>
+                )}
               </group>
             );
           })}
@@ -546,7 +621,9 @@ export function GameTableScene3D({
           {showOverlays && (
             <OverlayProjector
               botSeats={botSeats}
+              humanHand={humanHand}
               badgeRefs={badgeRefs}
+              handInfoRefs={handInfoRefs}
               drawBadgeRef={drawBadgeRef}
               discardBadgeRef={discardBadgeRef}
               bombBadgeRef={bombBadgeRef}
@@ -580,11 +657,8 @@ export function GameTableScene3D({
                 if (!resolvedIsHumanTurn) {
                   return `📥 Chồng bài (${state.drawPile.length})`;
                 }
-                const base =
+                const guaranteed =
                   state.pending?.kind === 'draw' ? state.pending.count : 1;
-                const bombExtra =
-                  state.activeBomb && state.activeBomb.fuse <= 1 ? 4 : 0;
-                const guaranteed = base + bombExtra;
                 return guaranteed > 1
                   ? `📥 Nhận +${guaranteed} lá (${state.drawPile.length})`
                   : `📥 Rút 1 lá (${state.drawPile.length})`;
@@ -620,17 +694,45 @@ export function GameTableScene3D({
               className="absolute top-0 left-0 will-change-transform"
               style={{ opacity: 0 }}
             >
-              <div className="whitespace-nowrap rounded-full border border-red-300/80 bg-red-600/95 px-2.5 py-0.5 text-xs font-extrabold text-white shadow-lg">
+              <div
+                className={`whitespace-nowrap rounded-full border px-2.5 py-0.5 text-xs font-extrabold text-white shadow-lg ${
+                  state.activeBomb.fuse <= 1
+                    ? 'animate-pulse border-amber-200 bg-red-600'
+                    : 'border-red-300/80 bg-red-600/95'
+                }`}
+              >
                 💣 Nổ sau {state.activeBomb.fuse} lượt
+                {predictedBombVictim ? ` → ${predictedBombVictim.name} (+4)` : ' (+4)'}
               </div>
             </div>
           )}
+
+          {/* Projected "!" Card Info Buttons on Player's 3D Hand */}
+          {humanHand.map((card) => (
+            <div
+              key={`info-${card.id}`}
+              ref={(el) => {
+                handInfoRefs.current[card.id] = el;
+              }}
+              className="absolute top-0 left-0 z-20 will-change-transform"
+              style={{ opacity: 0 }}
+            >
+              <CardInfoButton
+                type={card.type}
+                color={card.color}
+                value={card.value}
+                placement="top"
+                size="xs"
+              />
+            </div>
+          ))}
 
           {/* Floating Bot Badges */}
           {botSeats.map((seat) => {
             const isActive =
               state.winnerId === null && state.currentIndex === seat.playerIndex;
             const isTargetable = targetPickingMode && !seat.isHuman;
+            const isBombVictim = predictedBombVictim?.id === seat.player.id;
             const hasPaws = seat.player.hand.length === 1;
             const missedPaws = hasPaws && !seat.player.calledPaws;
 
@@ -648,6 +750,12 @@ export function GameTableScene3D({
                     <div className="max-w-[160px] animate-bounce rounded-2xl border border-amber-200/80 bg-white/95 px-2.5 py-1 text-center text-[11px] font-bold text-slate-900 shadow-lg">
                       “{seat.player.quip}”
                     </div>
+                  )}
+
+                  {isBombVictim && (
+                    <span className="animate-pulse whitespace-nowrap rounded-full border border-red-200 bg-red-600/95 px-2 py-0.5 text-[10px] font-black text-white shadow-md">
+                      💣 Tầm nổ (+4)
+                    </span>
                   )}
 
                   {missedPaws && onCatchPaws ? (

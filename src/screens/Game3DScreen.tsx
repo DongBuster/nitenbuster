@@ -6,6 +6,7 @@ import {
   chooseBotAction,
   dealGame,
   drawTurnAction,
+  getPredictedBombVictim,
   isPlayable,
   needsColorChoice,
   needsTargetChoice,
@@ -17,7 +18,7 @@ import {
   type GameState,
 } from '../engine';
 import { GameTableScene3D } from '../scene3d/GameTableScene3D';
-import { CARD_META, COLOR_THEME } from '../components/Card/cardMeta';
+import { CARD_META, COLOR_THEME, CardInfoButton } from '../components/Card';
 import {
   ColorPickerModal,
   ResultModal,
@@ -138,6 +139,67 @@ export function Game3DScreen({ onBackToMenu }: Game3DScreenProps) {
 
   const [pawsShout, setPawsShout] = useState<PawsShoutInfo | null>(null);
   const prevCalledPawsRef = useRef<Set<string>>(new Set());
+  const humanOneCardSinceRef = useRef<number | null>(null);
+  const prevHumanHandLenRef = useRef<number>(humanPlayer.hand.length);
+  const [penaltyNotice, setPenaltyNotice] = useState<string | null>(null);
+
+  const predictedBombVictim = useMemo(
+    () => getPredictedBombVictim(gameState),
+    [gameState],
+  );
+
+  // Track how long human has been at 1 card without calling PAWS (2.5s grace window)
+  useEffect(() => {
+    if (
+      gameState.winnerId === null &&
+      humanPlayer.hand.length === 1 &&
+      !humanPlayer.calledPaws
+    ) {
+      if (humanOneCardSinceRef.current === null) {
+        humanOneCardSinceRef.current = Date.now();
+      }
+    } else {
+      humanOneCardSinceRef.current = null;
+    }
+  }, [humanPlayer.hand.length, humanPlayer.calledPaws, gameState.winnerId]);
+
+  // Surface a clear reason toast whenever the human receives penalty/extra cards
+  useEffect(() => {
+    const prevLen = prevHumanHandLenRef.current;
+    const currLen = humanPlayer.hand.length;
+    prevHumanHandLenRef.current = currLen;
+
+    if (
+      gameState.turnCount === 0 ||
+      gameState.winnerId !== null ||
+      currLen <= prevLen
+    ) {
+      return;
+    }
+
+    const delta = currLen - prevLen;
+    const reason = gameState.lastEffectBanner ?? latestLog?.text ?? '';
+    const isNotableEvent =
+      delta >= 2 ||
+      latestLog?.type === 'penalty' ||
+      reason.includes('Nỏ Thần') ||
+      reason.includes('PAWS') ||
+      reason.includes('Bom') ||
+      reason.includes('Vỏ Chuối') ||
+      reason.includes('Tia Chớp');
+
+    if (isNotableEvent && reason) {
+      setPenaltyNotice(`+${delta} lá — ${reason}`);
+      const timer = window.setTimeout(() => setPenaltyNotice(null), 2800);
+      return () => window.clearTimeout(timer);
+    }
+  }, [
+    humanPlayer.hand.length,
+    gameState.turnCount,
+    gameState.winnerId,
+    gameState.lastEffectBanner,
+    latestLog,
+  ]);
 
   const canCallPaws =
     gameState.winnerId === null &&
@@ -319,9 +381,15 @@ export function Game3DScreen({ onBackToMenu }: Game3DScreenProps) {
     setTurnSecondsLeft(OFFLINE_TURN_TIME_SEC);
   }, [gameState.turnCount, gameState.currentIndex]);
 
-  // Turn countdown tick (pauses while rules/tutorial modals are open or game over)
+  // Turn countdown tick (pauses while modals/pickers are open or game over)
   useEffect(() => {
-    if (gameState.winnerId !== null || showRules || showTutorial) {
+    if (
+      gameState.winnerId !== null ||
+      showRules ||
+      showTutorial ||
+      pendingColorCard !== null ||
+      pendingTargetCard !== null
+    ) {
       return;
     }
 
@@ -330,7 +398,13 @@ export function Game3DScreen({ onBackToMenu }: Game3DScreenProps) {
     }, 1000);
 
     return () => window.clearInterval(interval);
-  }, [gameState.winnerId, showRules, showTutorial]);
+  }, [
+    gameState.winnerId,
+    showRules,
+    showTutorial,
+    pendingColorCard,
+    pendingTargetCard,
+  ]);
 
   // Auto-draw 1 card when time expires on human turn
   useEffect(() => {
@@ -339,7 +413,9 @@ export function Game3DScreen({ onBackToMenu }: Game3DScreenProps) {
       !isHumanTurn ||
       gameState.winnerId !== null ||
       showRules ||
-      showTutorial
+      showTutorial ||
+      pendingColorCard !== null ||
+      pendingTargetCard !== null
     ) {
       return;
     }
@@ -353,6 +429,8 @@ export function Game3DScreen({ onBackToMenu }: Game3DScreenProps) {
     gameState.winnerId,
     showRules,
     showTutorial,
+    pendingColorCard,
+    pendingTargetCard,
     humanId,
   ]);
 
@@ -364,16 +442,24 @@ export function Game3DScreen({ onBackToMenu }: Game3DScreenProps) {
     }
 
     const timer = window.setTimeout(() => {
-      let workingState = gameState;
+      const workingState = gameState;
       const human = workingState.players.find((p) => p.id === humanId);
+      const oneCardElapsed =
+        humanOneCardSinceRef.current !== null
+          ? Date.now() - humanOneCardSinceRef.current
+          : 0;
+
+      // Give human a 2.5s grace window to press "Hô PAWS!", and report catch as its own visible step
       if (
         human &&
         human.hand.length === 1 &&
         !human.calledPaws &&
-        workingState.difficulty !== 'easy'
+        workingState.difficulty !== 'easy' &&
+        oneCardElapsed >= 2500
       ) {
-        workingState = catchMissedPaws(workingState, humanId, active.name);
         playSfx('paws');
+        setGameState(catchMissedPaws(workingState, humanId, active.name));
+        return;
       }
 
       const decision = chooseBotAction(workingState);
@@ -496,6 +582,13 @@ export function Game3DScreen({ onBackToMenu }: Game3DScreenProps) {
                 <div className="inline-flex items-center gap-1.5 rounded-xl border border-amber-200/35 bg-[#26170F]/88 px-3 py-1.5 text-xs font-black text-amber-100 shadow-lg backdrop-blur-md">
                   <span aria-hidden="true">🃏</span>
                   <span>Trên bàn: {label}</span>
+                  <CardInfoButton
+                    type={top.type}
+                    color={top.color}
+                    value={top.value}
+                    placement="bottom"
+                    size="xs"
+                  />
                 </div>
               );
             })()}
@@ -662,8 +755,18 @@ export function Game3DScreen({ onBackToMenu }: Game3DScreenProps) {
           )}
 
           {gameState.activeBomb && (
-            <div className="rounded-full border border-amber-300/60 bg-amber-950/90 px-4 py-1 text-xs font-extrabold text-amber-200 shadow-lg backdrop-blur-md">
-              💣 Bom Kẹo đang đếm ngược: nổ sau {gameState.activeBomb.fuse} lượt (phạt +4 lá)!
+            <div
+              className={`rounded-full border px-4 py-1 text-xs font-extrabold shadow-lg backdrop-blur-md ${
+                predictedBombVictim?.id === humanId
+                  ? 'animate-pulse border-red-300 bg-red-950/92 text-red-100'
+                  : 'border-amber-300/60 bg-amber-950/90 text-amber-200'
+              }`}
+            >
+              💣 Bom Kẹo: còn {gameState.activeBomb.fuse} lượt → dự kiến nổ vào{' '}
+              <strong>{predictedBombVictim?.name ?? '...'}</strong> (+4 lá)!
+              <span className="hidden opacity-85 sm:inline">
+                {' '}· Đảo chiều / Đóng băng để đổi mục tiêu
+              </span>
             </div>
           )}
 
@@ -693,6 +796,19 @@ export function Game3DScreen({ onBackToMenu }: Game3DScreenProps) {
         </div>
       </header>
 
+      {/* ================= PENALTY REASON TOAST (WHEN HUMAN GAINS EXTRA CARDS) ================= */}
+      {penaltyNotice && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="pointer-events-none fixed inset-x-0 bottom-20 z-30 flex justify-center px-4"
+        >
+          <div className="rounded-2xl border-2 border-rose-300/80 bg-rose-950/95 px-4 py-2 text-xs font-black text-rose-100 shadow-[0_10px_30px_rgba(225,29,72,0.45)] backdrop-blur-md sm:text-sm">
+            ⚠️ {penaltyNotice}
+          </div>
+        </div>
+      )}
+
       {/* ================= COMPACT NON-BLOCKING BOTTOM HUD BAR ================= */}
       <div className="pointer-events-none fixed inset-x-0 bottom-3 z-30 flex justify-center px-3 sm:px-6">
         <div className="pointer-events-auto flex w-full max-w-3xl flex-wrap items-center justify-between gap-2.5 rounded-2xl border border-amber-200/20 bg-[#26170F]/82 px-3.5 py-2 shadow-2xl backdrop-blur-md">
@@ -710,6 +826,11 @@ export function Game3DScreen({ onBackToMenu }: Game3DScreenProps) {
               {humanPlayer.calledPaws && (
                 <span className="rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-black text-[#2C1B11]">
                   PAWS!
+                </span>
+              )}
+              {predictedBombVictim?.id === humanId && gameState.activeBomb && (
+                <span className="animate-pulse rounded-full border border-red-200 bg-red-600 px-2 py-0.5 text-[10px] font-black text-white">
+                  💣 Sắp nổ vào bạn ({gameState.activeBomb.fuse})
                 </span>
               )}
               <span className="rounded-full bg-white/10 px-2.5 py-0.5 text-xs font-bold text-amber-200">
@@ -747,26 +868,8 @@ export function Game3DScreen({ onBackToMenu }: Game3DScreenProps) {
               }`}
             >
               {(() => {
-                const base =
-                  gameState.pending?.kind === 'draw'
-                    ? gameState.pending.count
-                    : 1;
-                const bombExtra =
-                  isHumanTurn &&
-                  gameState.activeBomb &&
-                  gameState.activeBomb.fuse <= 1
-                    ? 4
-                    : 0;
-                const guaranteed = base + bombExtra;
-                if (guaranteed > 1) {
-                  const parts: string[] = [];
-                  if (gameState.pending?.kind === 'draw') {
-                    parts.push(`${gameState.pending.count} Xẻng`);
-                  } else {
-                    parts.push('1 rút');
-                  }
-                  if (bombExtra > 0) parts.push('4 Bom');
-                  return `📥 Nhận +${guaranteed} lá (${parts.join(' + ')})`;
+                if (gameState.pending?.kind === 'draw') {
+                  return `📥 Nhận +${gameState.pending.count} lá (${gameState.pending.count} Xẻng)`;
                 }
                 return '📥 Rút 1 lá (Space)';
               })()}
