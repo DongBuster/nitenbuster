@@ -1,4 +1,5 @@
 import { Component, Suspense, lazy, useState, type ReactNode } from 'react';
+import { AlertTriangle, ArrowLeft, Boxes, Home } from 'lucide-react';
 import { MainMenuScreen } from './screens/MainMenuScreen';
 import { Game3DScreen } from './screens/Game3DScreen';
 import { Showcase3D } from './screens/Showcase3D';
@@ -50,8 +51,10 @@ class BrawlErrorBoundary extends Component<
       return (
         <div className="flex min-h-screen flex-col items-center justify-center bg-[#0F1B2D] p-6 text-center text-white">
           <div className="max-w-md rounded-3xl border border-rose-300/40 bg-slate-900 p-6 shadow-2xl">
-            <div className="text-3xl">⚠️</div>
-            <h2 className="mt-2 font-display text-xl font-black text-rose-200">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-500/20 text-rose-300">
+              <AlertTriangle className="h-6 w-6" />
+            </div>
+            <h2 className="mt-3 font-display text-xl font-black text-rose-200">
               Không thể mở Brawl Arena 3D
             </h2>
             <p className="mt-2 text-xs text-slate-300">{this.state.message}</p>
@@ -61,9 +64,10 @@ class BrawlErrorBoundary extends Component<
                 this.setState({ hasError: false, message: '' });
                 this.props.onBack();
               }}
-              className="mt-5 cursor-pointer rounded-2xl bg-amber-400 px-5 py-2.5 text-sm font-black text-[#1B110B] hover:bg-amber-300"
+              className="btn-tactile-amber mt-5 inline-flex cursor-pointer items-center gap-1.5 rounded-2xl px-5 py-2.5 text-sm font-black text-[#1B110B]"
             >
-              ← Quay Lại Chọn Chế Độ
+              <ArrowLeft className="h-4 w-4" />
+              <span>Quay Lại Chọn Chế Độ</span>
             </button>
           </div>
         </div>
@@ -82,23 +86,25 @@ export function App() {
       {screen === 'studio3d' && (
         <nav
           aria-label="Điều hướng ứng dụng"
-          className="fixed right-4 top-4 z-50 inline-flex items-center gap-1 rounded-full border border-amber-200/30 bg-[#2C1B11]/88 p-1 shadow-xl backdrop-blur-md"
+          className="fixed right-4 top-4 z-50 inline-flex items-center gap-1 rounded-full border border-amber-400/30 bg-[#2C1B11]/90 p-1 shadow-xl backdrop-blur-md"
         >
           <button
             type="button"
             onClick={() => setScreen('modeSelect')}
             aria-pressed={false}
-            className="cursor-pointer rounded-full px-3 py-1.5 text-xs font-extrabold text-amber-100/85 transition-all hover:bg-white/10 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300"
+            className="inline-flex cursor-pointer items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-black text-amber-100/90 transition-all hover:bg-white/10 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300"
           >
-            🏠 Chế Độ
+            <Home className="h-3.5 w-3.5 text-amber-300" />
+            <span>Chế Độ</span>
           </button>
           <button
             type="button"
             onClick={() => setScreen('studio3d')}
             aria-pressed={true}
-            className="cursor-pointer rounded-full bg-gradient-to-r from-amber-400 to-orange-400 px-3 py-1.5 text-xs font-extrabold text-[#2C1B11] shadow-sm transition-all focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300"
+            className="btn-tactile-amber inline-flex cursor-pointer items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-black text-[#2C1B11] shadow-sm transition-all focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300"
           >
-            ✨ 3D Studio
+            <Boxes className="h-3.5 w-3.5" />
+            <span>3D Studio</span>
           </button>
         </nav>
       )}

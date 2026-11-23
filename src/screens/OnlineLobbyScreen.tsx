@@ -1,4 +1,19 @@
 import { useMemo, useState } from 'react';
+import {
+  ArrowLeft,
+  Bot,
+  Check,
+  Clock,
+  Copy,
+  Crown,
+  Globe,
+  Minus,
+  Play,
+  Plus,
+  Settings,
+  Sparkles,
+  Users,
+} from 'lucide-react';
 import { ANIMALS, type AnimalId, type BotDifficulty, type GameDeckMode } from '../engine/types';
 import { normalizeRoomCode } from '../online/sanitize';
 import type { OnlineRoomController } from '../online/useOnlineRoom';
@@ -9,17 +24,6 @@ export interface OnlineLobbyScreenProps {
   room: OnlineRoomController;
   onBackToMenu: () => void;
 }
-
-const ANIMAL_EMOJI: Record<AnimalId, string> = {
-  dog: '🐶',
-  cat: '🐱',
-  duck: '🦆',
-  shark: '🦈',
-  dino: '🦖',
-  panda: '🐼',
-  chicken: '🐔',
-  bunny: '🐰',
-};
 
 const NAME_STORAGE_KEY = 'paws_online_display_name_v1';
 
@@ -109,11 +113,12 @@ export function OnlineLobbyScreen({
   // 1. Supabase Not Configured Setup Card
   if (!room.configured) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-[#2A1A11] via-[#1D120C] to-[#120B07] p-4 text-white">
-        <div className="w-full max-w-xl rounded-3xl border border-amber-300/30 bg-slate-900/90 p-6 shadow-2xl backdrop-blur-md sm:p-8">
+      <div className="flex min-h-screen items-center justify-center bg-[#1c120c] bg-[radial-gradient(circle_at_50%_0%,_#382419_0%,_#1a0f0a_70%)] p-4 text-white">
+        <div className="w-full max-w-xl rounded-3xl border-2 border-amber-900/40 bg-[#29170f] p-6 shadow-2xl sm:p-8">
           <div className="flex items-center justify-between">
-            <span className="rounded-full bg-sky-500/20 px-3 py-1 text-xs font-black uppercase tracking-wider text-sky-300">
-              🌐 PAWS Online Multiplayer
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-400/30 bg-sky-950/70 px-3 py-1 text-xs font-black tracking-wide text-sky-300">
+              <Globe className="h-3.5 w-3.5 text-sky-400" />
+              <span>PAWS Online Multiplayer</span>
             </span>
             <button
               type="button"
@@ -121,9 +126,10 @@ export function OnlineLobbyScreen({
                 playSfx('click');
                 onBackToMenu();
               }}
-              className="cursor-pointer rounded-xl border border-white/20 bg-white/10 px-3.5 py-1.5 text-xs font-black text-white transition hover:bg-white/20"
+              className="btn-tactile-wood inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-white/20 px-3.5 py-1.5 text-xs font-black text-white"
             >
-              ← Quay lại Menu
+              <ArrowLeft className="h-3.5 w-3.5 text-amber-300" />
+              <span>Menu</span>
             </button>
           </div>
 
@@ -131,14 +137,14 @@ export function OnlineLobbyScreen({
             Cần Cấu Hình Supabase Realtime
           </h1>
           <p className="mt-2 text-sm leading-relaxed text-slate-300">
-            Chế độ chơi Online dùng <strong>Supabase Realtime Free Tier</strong> (không cần cài SQL hay đăng nhập). Bạn chỉ cần thêm 2 biến môi trường sau vào file{' '}
+            Chế độ chơi Online dùng <strong>Supabase Realtime Free Tier</strong>. Bạn chỉ cần thêm 2 biến môi trường sau vào file{' '}
             <code className="rounded bg-white/10 px-1.5 py-0.5 text-amber-200">
               paws-game/.env.local
             </code>
             :
           </p>
 
-          <pre className="mt-4 overflow-x-auto rounded-2xl border border-white/15 bg-slate-950/90 p-4 text-xs font-mono text-emerald-300">
+          <pre className="mt-4 overflow-x-auto rounded-2xl border border-amber-900/40 bg-black/40 p-4 text-xs font-mono text-emerald-300">
 {`VITE_SUPABASE_URL=https://<your-project>.supabase.co
 VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
           </pre>
@@ -149,40 +155,31 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
               <span className="text-sky-300">supabase.com</span>.
             </li>
             <li>
-              <strong>Bước 2:</strong> Vào <em>Project Settings → API</em>, copy{' '}
-              <strong>Project URL</strong> và <strong>anon public key</strong> vào{' '}
-              <code className="rounded bg-white/10 px-1 text-amber-200">.env.local</code>.
+              <strong>Bước 2:</strong> Vào <em>Project Settings → API</em> sao chép URL và Anon Key dán vào <code className="text-amber-200">.env.local</code>.
             </li>
             <li>
-              <strong>Bước 3:</strong> Khởi động lại{' '}
-              <code className="rounded bg-white/10 px-1 text-amber-200">npm run dev</code>{' '}
-              và tạo mã phòng để mời bạn bè!
+              <strong>Bước 3:</strong> Khởi động lại server dev là sẵn sàng chơi Online cùng bạn bè!
             </li>
           </ol>
-
-          <p className="mt-4 text-xs text-slate-400">
-            Xem hướng dẫn chi tiết trong file <code>SUPABASE_SETUP.md</code>. Chế độ chơi offline với Bot vẫn hoạt động bình thường!
-          </p>
         </div>
       </div>
     );
   }
 
-  // 2. Idle Screen (Create or Join Room)
-  if (room.phase === 'idle') {
-    const cleanCode = normalizeRoomCode(joinCodeInput);
-    const canJoin = cleanCode.length >= 4 && room.connectionStatus !== 'connecting';
+  // 2. Idle State: Create or Join Room
+  const canJoin = normalizeRoomCode(joinCodeInput).length >= 4;
 
+  if (room.phase === 'idle') {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-[#2A1A11] via-[#1D120C] to-[#120B07] p-4 text-white sm:p-6">
+      <div className="min-h-screen bg-[#1c120c] bg-[radial-gradient(circle_at_50%_0%,_#382419_0%,_#1a0f0a_70%)] p-4 text-white sm:p-6 lg:p-8">
         <div className="mx-auto max-w-4xl">
-          {/* Header */}
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <span className="inline-block rounded-full bg-sky-500/20 px-3 py-1 text-xs font-black uppercase tracking-wider text-sky-300">
-                🌐 Phòng Chơi Online 3D
-              </span>
-              <h1 className="mt-1.5 text-2xl font-black text-amber-50 sm:text-3xl">
+              <div className="inline-flex items-center gap-1.5 rounded-full border border-sky-400/30 bg-sky-950/70 px-3.5 py-1 text-xs font-bold text-sky-200">
+                <Globe className="h-3.5 w-3.5 text-sky-400" />
+                <span>Winter Cabin · Sảnh Đấu Online</span>
+              </div>
+              <h1 className="mt-2 font-display text-2xl font-black text-[#FFFBF4] sm:text-3xl">
                 Chơi Cùng Bạn Bè Qua Mã Phòng
               </h1>
             </div>
@@ -192,27 +189,28 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
                 playSfx('click');
                 onBackToMenu();
               }}
-              className="cursor-pointer rounded-2xl border border-white/20 bg-white/10 px-4 py-2 text-sm font-black text-white transition hover:bg-white/20"
+              className="btn-tactile-wood inline-flex cursor-pointer items-center gap-1.5 rounded-2xl border border-amber-900/40 px-4 py-2 text-xs font-black text-amber-100 shadow-md"
             >
-              ← Quay lại Menu
+              <ArrowLeft className="h-3.5 w-3.5 text-amber-300" />
+              <span>Quay Lại Menu</span>
             </button>
           </div>
 
           {room.error && (
             <div className="mt-4 rounded-2xl border border-rose-400/50 bg-rose-500/20 px-4 py-3 text-sm font-bold text-rose-100">
-              ⚠️ {room.error}
+              {room.error}
             </div>
           )}
 
           <div className="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-5">
             {/* Profile & Animal Picker */}
-            <section className="rounded-3xl border border-amber-200/20 bg-slate-900/85 p-5 shadow-xl lg:col-span-3">
-              <h2 className="text-base font-black text-amber-200">
-                1. Chọn Tên &amp; Nhân Vật Thú Bông
+            <section className="rounded-3xl border-2 border-amber-900/40 bg-[#29170f] p-5 shadow-2xl lg:col-span-3">
+              <h2 className="text-xs font-black uppercase tracking-wider text-amber-300">
+                Hồ Sơ &amp; Nhân Vật Đại Diện
               </h2>
 
               <label className="mt-3 block">
-                <span className="text-xs font-bold text-slate-300">
+                <span className="text-xs font-bold text-amber-200/80">
                   Tên hiển thị trong phòng
                 </span>
                 <input
@@ -221,13 +219,13 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
                   value={displayName}
                   onChange={(e) => saveName(e.target.value)}
                   placeholder="Nhập tên của bạn..."
-                  className="mt-1.5 w-full rounded-2xl border border-white/20 bg-slate-950/75 px-4 py-2.5 text-sm font-bold text-white outline-none transition focus:border-amber-400"
+                  className="mt-1.5 w-full rounded-2xl border border-amber-900/40 bg-black/30 px-4 py-2.5 text-sm font-bold text-white outline-none transition focus:border-amber-400"
                 />
               </label>
 
-              <div className="mt-4">
-                <span className="text-xs font-bold text-slate-300">
-                  Chọn 1 trong 8 thú bông 3D
+              <div className="mt-5">
+                <span className="text-xs font-bold text-amber-200/80">
+                  Chọn thú bông 3D
                 </span>
                 <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
                   {ANIMALS.map((a) => {
@@ -242,27 +240,25 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
                         key={a.id}
                         type="button"
                         onClick={() => handleSelectAnimal(a.id)}
-                        className={`relative flex cursor-pointer flex-col items-center rounded-2xl border p-2.5 text-center transition ${
+                        className={`relative flex cursor-pointer flex-col items-center gap-1.5 rounded-2xl border p-3 text-center transition-all focus-visible:outline-2 focus-visible:outline-amber-300 ${
                           active
-                            ? 'border-amber-300 bg-amber-400/20 shadow-md'
-                            : 'border-white/10 bg-white/5 hover:bg-white/10'
+                            ? 'btn-tactile-amber border-amber-300'
+                            : 'border-amber-900/40 bg-black/25 text-amber-100 hover:bg-white/10'
                         }`}
                       >
                         <span
-                          className="flex h-10 w-10 items-center justify-center rounded-xl text-xl shadow-inner"
+                          className="h-7 w-7 rounded-full ring-2 ring-white/30 shadow-md"
                           style={{ backgroundColor: a.accentHex }}
-                        >
-                          {ANIMAL_EMOJI[a.id]}
-                        </span>
-                        <span className="mt-1.5 text-xs font-black text-white">
+                        />
+                        <span className={`text-xs font-black ${active ? 'text-[#26160b]' : 'text-white'}`}>
                           {a.name}
                         </span>
                         {eqItem && (
                           <span
                             title={eqItem.name}
-                            className="absolute top-1.5 right-1.5 text-xs"
+                            className="absolute top-1.5 right-1.5 rounded-full bg-amber-950/80 px-1 py-0.5 text-[10px] font-bold text-amber-300"
                           >
-                            {eqItem.icon}
+                            <Sparkles className="h-2.5 w-2.5 text-amber-400" />
                           </span>
                         )}
                       </button>
@@ -273,31 +269,34 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
             </section>
 
             {/* Create or Join Actions */}
-            <section className="flex flex-col justify-between gap-4 rounded-3xl border border-sky-300/25 bg-slate-900/85 p-5 shadow-xl lg:col-span-2">
+            <section className="flex flex-col justify-between gap-4 rounded-3xl border-2 border-sky-900/40 bg-[#162234] p-5 shadow-2xl lg:col-span-2">
               <div>
-                <h2 className="text-base font-black text-sky-200">
-                  2. Tạo Hoặc Vào Phòng
+                <h2 className="text-xs font-black uppercase tracking-wider text-sky-300">
+                  Tham Gia Phòng Đấu
                 </h2>
-                <p className="mt-1 text-xs text-slate-300">
-                  Tạo phòng mới để nhận mã 5 ký tự gửi bạn bè, hoặc nhập mã để tham gia ngay!
+                <p className="mt-1.5 text-xs text-sky-100/80">
+                  Tạo phòng mới để nhận mã chia sẻ cho bạn bè, hoặc nhập mã phòng để vào ngay!
                 </p>
 
                 <button
                   type="button"
                   disabled={room.connectionStatus === 'connecting'}
                   onClick={handleCreateRoom}
-                  className="mt-4 w-full cursor-pointer rounded-2xl bg-gradient-to-r from-amber-400 to-orange-500 px-5 py-3.5 text-base font-black text-slate-950 shadow-lg transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="btn-tactile-amber mt-5 inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-2xl px-5 py-3.5 text-sm font-black text-[#26160b] disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {room.connectionStatus === 'connecting'
-                    ? '⏳ Đang tạo phòng...'
-                    : '🏠 Tạo Phòng Mới'}
+                  <Plus className="h-4 w-4" />
+                  <span>
+                    {room.connectionStatus === 'connecting'
+                      ? 'Đang tạo phòng...'
+                      : 'Tạo Phòng Mới'}
+                  </span>
                 </button>
               </div>
 
-              <div className="border-t border-white/10 pt-4">
+              <div className="border-t border-sky-900/40 pt-4">
                 <label className="block">
-                  <span className="text-xs font-bold text-slate-300">
-                    🔑 Vào Phòng Bằng Mã (5 ký tự)
+                  <span className="text-xs font-bold text-sky-200/90">
+                    Vào phòng bằng mã (5 ký tự)
                   </span>
                   <div className="mt-2 flex gap-2">
                     <input
@@ -311,13 +310,13 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
                         if (e.key === 'Enter' && canJoin) handleJoinRoom();
                       }}
                       placeholder="VD: PAWS7"
-                      className="w-full rounded-2xl border border-white/20 bg-slate-950/75 px-3.5 py-2.5 text-center font-mono text-base font-black tracking-[0.22em] text-amber-200 uppercase outline-none focus:border-sky-400"
+                      className="w-full rounded-2xl border border-sky-900/40 bg-black/40 px-3.5 py-2.5 text-center font-mono text-base font-black tracking-[0.22em] text-amber-300 uppercase outline-none focus:border-sky-400"
                     />
                     <button
                       type="button"
                       disabled={!canJoin}
                       onClick={handleJoinRoom}
-                      className="shrink-0 cursor-pointer rounded-2xl bg-gradient-to-r from-sky-500 to-indigo-500 px-4 py-2.5 text-sm font-black text-white shadow-md transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="btn-tactile-sky shrink-0 cursor-pointer rounded-2xl px-4 py-2.5 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       Vào!
                     </button>
@@ -343,64 +342,77 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
 
   const connectionPill =
     room.connectionStatus === 'connected'
-      ? { label: '🟢 Đã kết nối', cls: 'border-emerald-400/40 bg-emerald-500/20 text-emerald-200' }
+      ? { label: 'Đã kết nối', cls: 'border-emerald-400/40 bg-emerald-500/20 text-emerald-200' }
       : room.connectionStatus === 'connecting'
-        ? { label: '🟡 Đang kết nối...', cls: 'border-amber-400/40 bg-amber-500/20 text-amber-200' }
-        : { label: '🔴 Mất kết nối', cls: 'border-rose-400/40 bg-rose-500/20 text-rose-200' };
+        ? { label: 'Đang kết nối...', cls: 'border-amber-400/40 bg-amber-500/20 text-amber-200' }
+        : { label: 'Mất kết nối', cls: 'border-rose-400/40 bg-rose-500/20 text-rose-200' };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#2A1A11] via-[#1D120C] to-[#120B07] p-4 text-white sm:p-6">
+    <div className="min-h-screen bg-[#1c120c] bg-[radial-gradient(circle_at_50%_0%,_#382419_0%,_#1a0f0a_70%)] p-4 text-white sm:p-6">
       <div className="mx-auto max-w-5xl">
         {/* Lobby Header */}
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-amber-200/20 bg-slate-900/90 p-4 shadow-xl">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-3xl border-2 border-amber-900/40 bg-[#29170f] p-4 shadow-xl">
           <div className="flex flex-wrap items-center gap-3">
             <button
               type="button"
               onClick={handleLeave}
-              className="cursor-pointer rounded-xl border border-white/20 bg-white/10 px-3.5 py-2 text-xs font-black text-white transition hover:bg-white/20"
+              className="btn-tactile-wood inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-white/20 px-3.5 py-2 text-xs font-black text-white"
             >
-              ← Rời Phòng
+              <ArrowLeft className="h-3.5 w-3.5 text-amber-300" />
+              <span>Rời Phòng</span>
             </button>
 
-            <div className="flex items-center gap-2 rounded-2xl border border-amber-300/45 bg-amber-400/15 px-3.5 py-1.5">
-              <span className="text-xs font-bold text-amber-200">MÃ PHÒNG:</span>
+            <div className="flex items-center gap-2 rounded-2xl border border-amber-400/40 bg-amber-950/70 px-3.5 py-1.5 shadow-md">
+              <span className="text-xs font-bold text-amber-300">MÃ PHÒNG:</span>
               <span className="font-mono text-lg font-black tracking-[0.2em] text-white">
                 {room.roomCode}
               </span>
               <button
                 type="button"
                 onClick={handleCopyCode}
-                className="cursor-pointer rounded-xl bg-amber-400 px-2.5 py-1 text-xs font-black text-slate-950 transition hover:bg-amber-300"
+                className="btn-tactile-amber inline-flex cursor-pointer items-center gap-1 rounded-xl px-2.5 py-1 text-xs font-black text-slate-950"
               >
-                {copied ? '✓ Đã sao chép!' : '📋 Sao chép mã'}
+                {copied ? (
+                  <>
+                    <Check className="h-3.5 w-3.5 text-emerald-950" />
+                    <span>Đã sao chép!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-3.5 w-3.5" />
+                    <span>Sao chép</span>
+                  </>
+                )}
               </button>
             </div>
           </div>
 
           <span
-            className={`rounded-full border px-3 py-1 text-xs font-extrabold ${connectionPill.cls}`}
+            className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-extrabold ${connectionPill.cls}`}
           >
-            {connectionPill.label}
+            <span className="h-2 w-2 rounded-full bg-current" />
+            <span>{connectionPill.label}</span>
           </span>
         </div>
 
         {room.error && (
           <div className="mt-4 rounded-2xl border border-rose-400/50 bg-rose-500/20 px-4 py-3 text-sm font-bold text-rose-100">
-            ⚠️ {room.error}
+            {room.error}
           </div>
         )}
 
         <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-5">
           {/* Live Presence Seats */}
-          <section className="rounded-3xl border border-white/15 bg-slate-900/85 p-5 shadow-xl lg:col-span-3">
+          <section className="rounded-3xl border-2 border-amber-900/40 bg-[#29170f] p-5 shadow-xl lg:col-span-3">
             <div className="flex items-center justify-between">
-              <h2 className="text-base font-black text-amber-200">
-                👥 Người Chơi Trong Phòng ({totalPlayers}/8 người)
+              <h2 className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-wider text-amber-300">
+                <Users className="h-4 w-4 text-amber-400" />
+                <span>Người Chơi Trong Phòng ({totalPlayers}/8)</span>
               </h2>
-              <span className="text-xs font-bold text-slate-400">
+              <span className="text-xs font-bold text-amber-200/70">
                 {effectiveBotCount > 0
                   ? `${humanCount} người thật + ${effectiveBotCount} Bot`
-                  : `${humanCount} người thật (0 Bot)`}
+                  : `${humanCount} người thật`}
               </span>
             </div>
 
@@ -416,19 +428,17 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
                 return (
                   <div
                     key={member.peerId}
-                    className={`flex items-center justify-between rounded-2xl border px-4 py-3 ${
+                    className={`flex items-center justify-between rounded-2xl border px-4 py-3 shadow-md ${
                       isMe
-                        ? 'border-sky-400/45 bg-sky-500/15'
-                        : 'border-white/10 bg-white/5'
+                        ? 'border-amber-400/50 bg-amber-950/40'
+                        : 'border-amber-900/40 bg-black/25'
                     }`}
                   >
                     <div className="flex items-center gap-3">
                       <span
-                        className="flex h-10 w-10 items-center justify-center rounded-xl text-xl shadow-md"
+                        className="h-8 w-8 rounded-full ring-2 ring-white/30 shadow-md"
                         style={{ backgroundColor: animalMeta.accentHex }}
-                      >
-                        {ANIMAL_EMOJI[member.animal]}
-                      </span>
+                      />
                       <div>
                         <div className="flex flex-wrap items-center gap-1.5">
                           <span className="text-sm font-black text-white">
@@ -440,35 +450,41 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
                             </span>
                           )}
                           {member.isHost && (
-                            <span className="rounded-full bg-amber-400/25 px-2 py-0.5 text-[10px] font-black text-amber-200">
-                              👑 Chủ phòng
+                            <span className="inline-flex items-center gap-1 rounded-full bg-amber-400/25 px-2 py-0.5 text-[10px] font-black text-amber-200">
+                              <Crown className="h-3 w-3 text-amber-300" />
+                              <span>Chủ phòng</span>
                             </span>
                           )}
                           {eqItem && (
                             <span
                               title={eqItem.name}
-                              className="rounded-full bg-white/10 px-1.5 py-0.5 text-xs"
+                              className="rounded-full bg-white/10 px-1.5 py-0.5 text-xs text-amber-200"
                             >
-                              {eqItem.icon}
+                              {eqItem.name}
                             </span>
                           )}
                         </div>
-                        <p className="text-xs text-slate-400">
+                        <p className="text-xs text-amber-200/70">
                           {animalMeta.name} · {animalMeta.personality}
                         </p>
                       </div>
                     </div>
 
                     <span
-                      className={`rounded-full px-2.5 py-1 text-xs font-black ${
+                      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-black ${
                         member.isHost || member.ready
                           ? 'bg-emerald-500/25 text-emerald-200'
                           : 'bg-white/10 text-slate-400'
                       }`}
                     >
-                      {member.isHost || member.ready
-                        ? '✓ Sẵn sàng'
-                        : 'Đang chờ...'}
+                      {member.isHost || member.ready ? (
+                        <>
+                          <Check className="h-3.5 w-3.5 text-emerald-300" />
+                          <span>Sẵn sàng</span>
+                        </>
+                      ) : (
+                        <span>Đang chờ...</span>
+                      )}
                     </span>
                   </div>
                 );
@@ -478,12 +494,13 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
                 Array.from({ length: effectiveBotCount }).map((_, idx) => (
                   <div
                     key={`bot-slot-${idx}`}
-                    className="flex items-center justify-between rounded-2xl border border-dashed border-white/15 bg-white/[0.02] px-4 py-3 text-slate-300"
+                    className="flex items-center justify-between rounded-2xl border border-dashed border-amber-900/50 bg-black/15 px-4 py-3 text-amber-200/70"
                   >
-                    <span className="text-xs font-bold">
-                      🤖 Bot AI #{idx + 1}
+                    <span className="inline-flex items-center gap-1.5 text-xs font-bold">
+                      <Bot className="h-4 w-4 text-amber-400" />
+                      <span>Bot AI #{idx + 1}</span>
                     </span>
-                    <span className="text-[11px] font-semibold text-slate-400">
+                    <span className="text-[11px] font-semibold text-amber-200/50">
                       Tự động tham gia khi bắt đầu
                     </span>
                   </div>
@@ -492,21 +509,23 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
           </section>
 
           {/* Host Settings / Guest Ready Panel */}
-          <section className="flex flex-col justify-between gap-4 rounded-3xl border border-amber-200/20 bg-slate-900/85 p-5 shadow-xl lg:col-span-2">
+          <section className="flex flex-col justify-between gap-4 rounded-3xl border-2 border-amber-900/40 bg-[#29170f] p-5 shadow-xl lg:col-span-2">
             {room.isHost ? (
               <div className="space-y-4">
-                <h2 className="text-base font-black text-amber-200">
-                  ⚙️ Cài Đặt Phòng (Chủ phòng)
+                <h2 className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-wider text-amber-300">
+                  <Settings className="h-4 w-4 text-amber-400" />
+                  <span>Cài Đặt Phòng (Chủ Phòng)</span>
                 </h2>
 
-                {/* Explicit Bot Count Control (0 to 8 - humans) */}
-                <div className="space-y-2 rounded-2xl border border-white/10 bg-white/5 p-3.5">
+                {/* Explicit Bot Count Control */}
+                <div className="space-y-2 rounded-2xl border border-amber-900/40 bg-black/25 p-3.5">
                   <div className="flex items-center justify-between gap-2">
                     <div>
-                      <div className="text-xs font-black text-white">
-                        🤖 Thêm Bot vào phòng
+                      <div className="inline-flex items-center gap-1.5 text-xs font-black text-white">
+                        <Bot className="h-3.5 w-3.5 text-amber-400" />
+                        <span>Thêm Bot vào phòng</span>
                       </div>
-                      <div className="text-[11px] text-slate-400">
+                      <div className="text-[11px] text-amber-200/60">
                         Tối đa 8 người ({humanCount} thật + {effectiveBotCount} Bot)
                       </div>
                     </div>
@@ -525,7 +544,7 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
                         aria-label="Giảm 1 Bot"
                         className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg bg-white/10 text-sm font-black text-white transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40"
                       >
-                        −
+                        <Minus className="h-3.5 w-3.5" />
                       </button>
                       <span className="min-w-[2rem] text-center text-sm font-black text-amber-300">
                         {effectiveBotCount}
@@ -544,7 +563,7 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
                         aria-label="Thêm 1 Bot"
                         className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg bg-amber-400 text-sm font-black text-slate-950 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
                       >
-                        +
+                        <Plus className="h-3.5 w-3.5" />
                       </button>
                     </div>
                   </div>
@@ -580,7 +599,7 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
 
                 {/* Bot Difficulty */}
                 <div>
-                  <span className="text-xs font-bold text-slate-300">
+                  <span className="text-xs font-bold text-amber-200/80">
                     Độ khó Bot
                   </span>
                   <div className="mt-1.5 grid grid-cols-3 gap-1.5">
@@ -600,7 +619,7 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
                         }}
                         className={`cursor-pointer rounded-xl py-1.5 text-xs font-black transition ${
                           room.roomSettings.difficulty === diff
-                            ? 'bg-amber-400 text-slate-950'
+                            ? 'btn-tactile-amber'
                             : 'bg-white/10 text-slate-200 hover:bg-white/20'
                         }`}
                       >
@@ -612,14 +631,14 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
 
                 {/* Deck Mode */}
                 <div>
-                  <span className="text-xs font-bold text-slate-300">
+                  <span className="text-xs font-bold text-amber-200/80">
                     Bộ bài
                   </span>
                   <div className="mt-1.5 grid grid-cols-2 gap-1.5">
                     {(
                       [
-                        ['mvp', 'MVP (6 loại)'],
-                        ['full', 'Full (11 loại)'],
+                        ['mvp', 'Cơ bản (6 loại)'],
+                        ['full', 'Đầy đủ (11 loại)'],
                       ] as Array<[GameDeckMode, string]>
                     ).map(([mode, label]) => (
                       <button
@@ -631,7 +650,7 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
                         }}
                         className={`cursor-pointer rounded-xl py-1.5 text-xs font-black transition ${
                           room.roomSettings.deckMode === mode
-                            ? 'bg-amber-400 text-slate-950'
+                            ? 'btn-tactile-amber'
                             : 'bg-white/10 text-slate-200 hover:bg-white/20'
                         }`}
                       >
@@ -643,8 +662,9 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
 
                 {/* Turn Timer */}
                 <div>
-                  <span className="text-xs font-bold text-slate-300">
-                    ⏱️ Thời gian mỗi lượt
+                  <span className="inline-flex items-center gap-1 text-xs font-bold text-amber-200/80">
+                    <Clock className="h-3 w-3 text-amber-400" />
+                    <span>Thời gian mỗi lượt</span>
                   </span>
                   <div className="mt-1.5 grid grid-cols-3 gap-1.5">
                     {[15, 20, 30].map((sec) => (
@@ -657,7 +677,7 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
                         }}
                         className={`cursor-pointer rounded-xl py-1.5 text-xs font-black transition ${
                           room.roomSettings.turnTimeSec === sec
-                            ? 'bg-amber-400 text-slate-950'
+                            ? 'btn-tactile-amber'
                             : 'bg-white/10 text-slate-200 hover:bg-white/20'
                         }`}
                       >
@@ -669,33 +689,33 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
               </div>
             ) : (
               <div className="space-y-4">
-                <h2 className="text-base font-black text-sky-200">
-                  📋 Thông Tin Phòng
+                <h2 className="text-xs font-black uppercase tracking-wider text-sky-300">
+                  Thông Tin Phòng
                 </h2>
-                <div className="space-y-2 rounded-2xl border border-white/10 bg-white/5 p-3.5 text-xs text-slate-200">
+                <div className="space-y-2 rounded-2xl border border-amber-900/40 bg-black/25 p-3.5 text-xs text-slate-200">
                   <div className="flex justify-between">
-                    <span className="text-slate-400">Tổng người chơi:</span>
+                    <span className="text-amber-200/70">Tổng người chơi:</span>
                     <strong>{totalPlayers}/8 người</strong>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-400">Số Bot thêm:</span>
+                    <span className="text-amber-200/70">Số Bot thêm:</span>
                     <strong>{effectiveBotCount} Bot</strong>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-400">Bộ bài:</span>
+                    <span className="text-amber-200/70">Bộ bài:</span>
                     <strong>
                       {room.roomSettings.deckMode === 'full'
-                        ? 'Full 11 loại'
-                        : 'MVP 6 loại'}
+                        ? 'Đầy đủ (11 loại)'
+                        : 'Cơ bản (6 loại)'}
                     </strong>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-400">Thời gian lượt:</span>
+                    <span className="text-amber-200/70">Thời gian lượt:</span>
                     <strong>{room.roomSettings.turnTimeSec} giây</strong>
                   </div>
                 </div>
-                <p className="text-xs text-slate-400">
-                  Chờ chủ phòng bấm <strong>Bắt Đầu Ván Online 3D</strong> sau khi mọi người sẵn sàng!
+                <p className="text-xs text-amber-200/60">
+                  Chờ chủ phòng bấm <strong>Bắt Đầu Trận Đấu</strong> sau khi mọi người đã sẵn sàng!
                 </p>
               </div>
             )}
@@ -705,7 +725,7 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
               <div className="space-y-2">
                 {!canHostStart && (
                   <p className="text-center text-xs font-bold text-amber-300">
-                    Cần ít nhất 2 người (mời thêm bạn hoặc tăng số Bot ở trên)
+                    Cần ít nhất 2 người (mời thêm bạn hoặc tăng số Bot)
                   </p>
                 )}
                 <button
@@ -715,9 +735,10 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
                     playSfx('click');
                     room.startOnlineMatch();
                   }}
-                  className="w-full cursor-pointer rounded-2xl bg-gradient-to-r from-amber-400 to-orange-500 px-5 py-3.5 text-base font-black text-slate-950 shadow-lg transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="btn-tactile-amber inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-2xl px-5 py-3.5 text-base font-black text-[#26160b] disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  🚀 Bắt Đầu Ván Online 3D!
+                  <Play className="h-5 w-5" />
+                  <span>Bắt Đầu Trận Đấu 3D</span>
                 </button>
               </div>
             ) : (
@@ -730,10 +751,10 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
                 className={`w-full cursor-pointer rounded-2xl px-5 py-3.5 text-base font-black shadow-lg transition ${
                   myMember?.ready
                     ? 'border border-emerald-400/50 bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/30'
-                    : 'bg-gradient-to-r from-emerald-400 to-teal-500 text-slate-950 hover:brightness-110'
+                    : 'btn-tactile-emerald'
                 }`}
               >
-                {myMember?.ready ? '✓ Đã Sẵn Sàng (Bấm để hủy)' : '✓ Sẵn Sàng'}
+                {myMember?.ready ? 'Đã Sẵn Sàng (Bấm để hủy)' : 'Sẵn Sàng'}
               </button>
             )}
           </section>

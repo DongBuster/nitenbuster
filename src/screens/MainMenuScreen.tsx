@@ -2,6 +2,25 @@ import { Suspense, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import {
+  ArrowLeft,
+  BookOpen,
+  Bot,
+  Boxes,
+  Compass,
+  Cookie,
+  Eye,
+  EyeOff,
+  Globe,
+  GraduationCap,
+  Music,
+  Settings as SettingsIcon,
+  ShoppingBag,
+  Sparkles,
+  Trophy,
+  Volume2,
+  VolumeX,
+} from 'lucide-react';
+import {
   ANIMALS,
   type BotDifficulty,
   type Emotion,
@@ -25,13 +44,13 @@ const BOT_COUNTS = [3, 4, 5, 6, 7] as const;
 
 const DIFFICULTIES: { id: BotDifficulty; label: string }[] = [
   { id: 'easy', label: 'Dễ' },
-  { id: 'medium', label: 'Trung bình' },
+  { id: 'medium', label: 'Vừa' },
   { id: 'hard', label: 'Khó' },
 ];
 
 const DECK_MODES: { id: GameDeckMode; label: string; desc: string }[] = [
-  { id: 'mvp', label: 'MVP (6 loại)', desc: '112 lá cơ bản' },
-  { id: 'full', label: 'Full (11 loại)', desc: '122 lá đủ bài' },
+  { id: 'mvp', label: 'Cơ Bản', desc: '112 lá MVP (6 loại hiệu ứng)' },
+  { id: 'full', label: 'Đầy Đủ', desc: '122 lá Full (11 loại hiệu ứng)' },
 ];
 
 const PREVIEW_EMOTIONS: { id: Emotion; label: string }[] = [
@@ -83,9 +102,9 @@ export function MainMenuScreen({
   };
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(ellipse_at_top,_#4a3528_0%,_#2a1c14_55%,_#180f0b_100%)] text-[#FFF9F0] selection:bg-amber-300 selection:text-[#2C1B11]">
-      <div className="mx-auto flex min-h-screen max-w-7xl flex-col justify-between px-4 pb-8 pt-16 sm:px-6 lg:px-8">
-        {/* Top Hero Header */}
+    <div className="min-h-screen bg-[#1c120c] bg-[radial-gradient(circle_at_50%_0%,_#382419_0%,_#1a0f0a_70%)] text-[#FFF9F0] selection:bg-amber-300 selection:text-[#2C1B11]">
+      <div className="mx-auto flex min-h-screen max-w-7xl flex-col justify-between px-4 pb-8 pt-12 sm:px-6 lg:px-8">
+        {/* Top Header */}
         <header className="mb-6 flex flex-wrap items-center justify-between gap-4">
           <div className="flex flex-wrap items-center gap-3">
             {onBackToModeSelect && (
@@ -95,29 +114,30 @@ export function MainMenuScreen({
                   playSfx('click');
                   onBackToModeSelect();
                 }}
-                className="cursor-pointer rounded-xl border border-white/15 bg-[#26170F]/80 px-3 py-2 text-xs font-extrabold text-amber-100 shadow-lg transition-colors hover:bg-[#3A2417] focus-visible:outline-2 focus-visible:outline-amber-300"
+                className="btn-tactile-wood inline-flex cursor-pointer items-center gap-2 rounded-2xl border border-amber-900/50 px-3.5 py-2 text-xs font-extrabold text-amber-100 shadow-md transition-colors focus-visible:outline-2 focus-visible:outline-amber-300"
               >
-                ← Đổi Chế Độ
+                <ArrowLeft className="h-3.5 w-3.5 text-amber-300" />
+                <span>Đổi Chế Độ</span>
               </button>
             )}
             <div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-amber-300/30 bg-amber-400/10 px-3 py-1 text-[11px] font-extrabold tracking-wide text-amber-200">
-                <span>❄️</span>
-                <span>WINTER CABIN · GAME BÀI 3D</span>
+              <div className="inline-flex items-center gap-2 rounded-full border border-amber-400/25 bg-amber-950/70 px-3.5 py-1 text-xs font-bold tracking-wide text-amber-200">
+                <Sparkles className="h-3.5 w-3.5 text-amber-400" />
+                <span>Winter Cabin · PAWS Cards 3D</span>
               </div>
-              <h1 className="mt-1.5 font-display text-3xl font-black tracking-tight text-[#FFFBF4] drop-shadow-sm sm:text-4xl">
-                🐾 PAWS 3D
+              <h1 className="mt-1.5 font-display text-3xl font-black tracking-tight text-[#FFFBF4] sm:text-4xl">
+                Sảnh Chờ Đấu Bài
               </h1>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
-            <div className="inline-flex items-center gap-2 rounded-2xl border border-amber-300/30 bg-[#26170F]/80 px-4 py-2 text-sm font-black text-amber-200 shadow-lg backdrop-blur-md">
-              <span aria-hidden="true">🍪</span>
-              <span>{cookies} Cookies</span>
+            <div className="inline-flex items-center gap-2 rounded-2xl border border-amber-400/30 bg-[#29170f]/90 px-4 py-2 text-sm font-black text-amber-200 shadow-md">
+              <Cookie className="h-4 w-4 text-amber-400" />
+              <span>{cookies.toLocaleString()} Cookies</span>
             </div>
-            <div className="inline-flex items-center gap-2 rounded-2xl border border-white/15 bg-[#26170F]/80 px-4 py-2 text-xs font-bold text-amber-100/90 shadow-lg backdrop-blur-md">
-              <span aria-hidden="true">🏆</span>
+            <div className="inline-flex items-center gap-2 rounded-2xl border border-amber-900/50 bg-[#29170f]/90 px-4 py-2 text-xs font-bold text-amber-100/90 shadow-md">
+              <Trophy className="h-3.5 w-3.5 text-amber-400" />
               <span>
                 {gamesWon} thắng / {gamesPlayed} ván
               </span>
@@ -130,7 +150,7 @@ export function MainMenuScreen({
           {/* LEFT: Live 3D Character Stage */}
           <section
             aria-label="Xem trước nhân vật 3D"
-            className="relative flex min-h-[380px] flex-col overflow-hidden rounded-3xl border-2 border-amber-200/20 bg-[#24160F]/70 shadow-2xl backdrop-blur-sm lg:col-span-5"
+            className="relative flex min-h-[400px] flex-col overflow-hidden rounded-3xl border-2 border-amber-900/40 bg-[#24160f] shadow-2xl lg:col-span-5"
           >
             <div className="relative flex-1">
               <Canvas
@@ -143,7 +163,7 @@ export function MainMenuScreen({
                 }}
                 camera={{ position: [0, 1.9, 4.7], fov: 40 }}
               >
-                <color attach="background" args={['#261810']} />
+                <color attach="background" args={['#24160f']} />
                 <Suspense fallback={null}>
                   <WinterCabinStage mode="turntable" />
                   <Character3D
@@ -166,24 +186,23 @@ export function MainMenuScreen({
                 />
               </Canvas>
 
-              {/* Top-left character bio pill */}
+              {/* Character info overlay */}
               <div className="pointer-events-none absolute left-4 top-4 flex flex-col gap-1.5">
-                <div className="inline-flex items-center gap-2 rounded-2xl border border-amber-200/20 bg-[#26170F]/80 px-3 py-1.5 backdrop-blur-md">
+                <div className="inline-flex items-center gap-2 rounded-2xl border border-amber-400/30 bg-[#24160f]/90 px-3.5 py-1.5 shadow-md">
                   <span
-                    aria-hidden="true"
-                    className="h-3 w-3 rounded-full ring-2 ring-white/40"
+                    className="h-3.5 w-3.5 rounded-full ring-2 ring-white/40"
                     style={{ backgroundColor: selectedMeta.accentHex }}
                   />
-                  <span className="text-sm font-extrabold text-[#FFFBF4]">
+                  <span className="text-sm font-black text-[#FFFBF4]">
                     {selectedMeta.name}
                   </span>
                 </div>
-                <span className="text-xs font-semibold text-amber-100/80 drop-shadow-sm">
+                <span className="text-xs font-semibold text-amber-200/80 drop-shadow-sm">
                   {selectedMeta.personality}
                 </span>
                 {equippedItem && (
-                  <span className="inline-flex w-fit items-center gap-1 rounded-full border border-emerald-300/40 bg-emerald-950/80 px-2.5 py-0.5 text-[11px] font-bold text-emerald-200">
-                    <span>{equippedItem.icon}</span>
+                  <span className="inline-flex w-fit items-center gap-1.5 rounded-full border border-emerald-400/40 bg-emerald-950/85 px-3 py-1 text-[11px] font-bold text-emerald-200">
+                    <Sparkles className="h-3 w-3 text-emerald-400" />
                     <span>{equippedItem.name}</span>
                   </span>
                 )}
@@ -191,9 +210,10 @@ export function MainMenuScreen({
             </div>
 
             {/* Bottom preview emotion bar */}
-            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-white/10 bg-[#1D120C]/85 px-4 py-2.5">
-              <span className="text-[11px] font-bold text-amber-200/75">
-                Kéo xoay 360°
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-amber-900/40 bg-[#1c110a] px-4 py-2.5">
+              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-200/75">
+                <Compass className="h-3.5 w-3.5 text-amber-400" />
+                <span>Kéo để xoay 360°</span>
               </span>
               <div className="flex items-center gap-1.5">
                 {PREVIEW_EMOTIONS.map((em) => (
@@ -205,10 +225,10 @@ export function MainMenuScreen({
                       setPreviewEmotion(em.id);
                     }}
                     aria-pressed={previewEmotion === em.id}
-                    className={`cursor-pointer rounded-lg px-2.5 py-1 text-[11px] font-bold transition-colors focus-visible:outline-2 focus-visible:outline-amber-300 ${
+                    className={`cursor-pointer rounded-xl px-2.5 py-1 text-xs font-bold transition-all focus-visible:outline-2 focus-visible:outline-amber-300 ${
                       previewEmotion === em.id
-                        ? 'bg-amber-400 text-[#2C1B11]'
-                        : 'bg-white/10 text-amber-100 hover:bg-white/20'
+                        ? 'btn-tactile-amber'
+                        : 'bg-white/8 text-amber-100 hover:bg-white/16'
                     }`}
                   >
                     {em.label}
@@ -219,15 +239,15 @@ export function MainMenuScreen({
           </section>
 
           {/* RIGHT: Setup & Controls Panel */}
-          <section className="flex flex-col justify-between gap-5 rounded-3xl border-2 border-amber-200/20 bg-[#26170F]/82 p-5 shadow-2xl backdrop-blur-md sm:p-6 lg:col-span-7">
+          <section className="flex flex-col justify-between gap-5 rounded-3xl border-2 border-amber-900/40 bg-[#29170f] p-5 shadow-2xl sm:p-6 lg:col-span-7">
             <div className="space-y-5">
-              {/* Character Selection (all 8 plush animals) */}
+              {/* Character Selection */}
               <div>
                 <div className="mb-2.5 flex items-center justify-between">
-                  <h2 className="text-sm font-extrabold uppercase tracking-wider text-amber-200">
-                    1. Chọn Nhân Vật Plush 3D (8 loài)
+                  <h2 className="text-xs font-black uppercase tracking-wider text-amber-300">
+                    Chọn Nhân Vật Đại Diện
                   </h2>
-                  <span className="text-xs font-semibold text-amber-100/70">
+                  <span className="text-xs font-semibold text-amber-200/70">
                     Đang chọn: {selectedMeta.name}
                   </span>
                 </div>
@@ -243,15 +263,14 @@ export function MainMenuScreen({
                           selectAnimal(animal.id);
                         }}
                         aria-pressed={active}
-                        className={`flex cursor-pointer items-center gap-2 rounded-2xl border px-3 py-2.5 text-left text-xs font-extrabold transition-all focus-visible:outline-2 focus-visible:outline-amber-300 ${
+                        className={`flex cursor-pointer items-center gap-2.5 rounded-2xl border px-3 py-2.5 text-left text-xs font-black transition-all focus-visible:outline-2 focus-visible:outline-amber-300 ${
                           active
-                            ? 'border-amber-300 bg-amber-400 text-[#2C1B11] shadow-md'
-                            : 'border-white/12 bg-white/6 text-amber-50 hover:bg-white/14'
+                            ? 'btn-tactile-amber border-amber-300'
+                            : 'border-amber-900/40 bg-black/20 text-amber-50 hover:bg-white/10'
                         }`}
                       >
                         <span
-                          aria-hidden="true"
-                          className="h-3 w-3 shrink-0 rounded-full ring-1 ring-black/25"
+                          className="h-3.5 w-3.5 shrink-0 rounded-full ring-2 ring-black/30"
                           style={{ backgroundColor: animal.accentHex }}
                         />
                         <span className="truncate">{animal.name}</span>
@@ -261,11 +280,11 @@ export function MainMenuScreen({
                 </div>
               </div>
 
-              {/* Match Setup Grid */}
+              {/* Match Setup Controls */}
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 {/* Bot count */}
-                <div className="space-y-2 rounded-2xl border border-white/10 bg-black/20 p-3">
-                  <span className="block text-[11px] font-extrabold uppercase tracking-wider text-amber-200/80">
+                <div className="space-y-2 rounded-2xl border border-amber-900/40 bg-black/25 p-3.5">
+                  <span className="block text-[11px] font-black uppercase tracking-wider text-amber-300/80">
                     Số Bot ({settings.botCount + 1} người)
                   </span>
                   <div className="flex flex-wrap gap-1.5">
@@ -278,10 +297,10 @@ export function MainMenuScreen({
                           updateSettings({ botCount: cnt });
                         }}
                         aria-pressed={settings.botCount === cnt}
-                        className={`cursor-pointer rounded-lg px-2.5 py-1 text-xs font-extrabold transition-colors focus-visible:outline-2 focus-visible:outline-amber-300 ${
+                        className={`cursor-pointer rounded-xl px-2.5 py-1 text-xs font-black transition-all focus-visible:outline-2 focus-visible:outline-amber-300 ${
                           settings.botCount === cnt
-                            ? 'bg-amber-400 text-[#2C1B11]'
-                            : 'bg-white/10 text-amber-100 hover:bg-white/20'
+                            ? 'btn-tactile-amber'
+                            : 'bg-white/8 text-amber-100 hover:bg-white/16'
                         }`}
                       >
                         {cnt}
@@ -291,8 +310,8 @@ export function MainMenuScreen({
                 </div>
 
                 {/* Difficulty */}
-                <div className="space-y-2 rounded-2xl border border-white/10 bg-black/20 p-3">
-                  <span className="block text-[11px] font-extrabold uppercase tracking-wider text-amber-200/80">
+                <div className="space-y-2 rounded-2xl border border-amber-900/40 bg-black/25 p-3.5">
+                  <span className="block text-[11px] font-black uppercase tracking-wider text-amber-300/80">
                     Độ khó Bot
                   </span>
                   <div className="flex flex-wrap gap-1.5">
@@ -305,10 +324,10 @@ export function MainMenuScreen({
                           updateSettings({ difficulty: diff.id });
                         }}
                         aria-pressed={settings.difficulty === diff.id}
-                        className={`cursor-pointer rounded-lg px-2.5 py-1 text-xs font-extrabold transition-colors focus-visible:outline-2 focus-visible:outline-amber-300 ${
+                        className={`cursor-pointer rounded-xl px-2.5 py-1 text-xs font-black transition-all focus-visible:outline-2 focus-visible:outline-amber-300 ${
                           settings.difficulty === diff.id
-                            ? 'bg-amber-400 text-[#2C1B11]'
-                            : 'bg-white/10 text-amber-100 hover:bg-white/20'
+                            ? 'btn-tactile-amber'
+                            : 'bg-white/8 text-amber-100 hover:bg-white/16'
                         }`}
                       >
                         {diff.label}
@@ -318,8 +337,8 @@ export function MainMenuScreen({
                 </div>
 
                 {/* Deck mode */}
-                <div className="space-y-2 rounded-2xl border border-white/10 bg-black/20 p-3">
-                  <span className="block text-[11px] font-extrabold uppercase tracking-wider text-amber-200/80">
+                <div className="space-y-2 rounded-2xl border border-amber-900/40 bg-black/25 p-3.5">
+                  <span className="block text-[11px] font-black uppercase tracking-wider text-amber-300/80">
                     Bộ Bài
                   </span>
                   <div className="flex flex-wrap gap-1.5">
@@ -333,10 +352,10 @@ export function MainMenuScreen({
                         }}
                         aria-pressed={settings.deckMode === dm.id}
                         title={dm.desc}
-                        className={`cursor-pointer rounded-lg px-2.5 py-1 text-xs font-extrabold transition-colors focus-visible:outline-2 focus-visible:outline-amber-300 ${
+                        className={`cursor-pointer rounded-xl px-2.5 py-1 text-xs font-black transition-all focus-visible:outline-2 focus-visible:outline-amber-300 ${
                           settings.deckMode === dm.id
-                            ? 'bg-amber-400 text-[#2C1B11]'
-                            : 'bg-white/10 text-amber-100 hover:bg-white/20'
+                            ? 'btn-tactile-amber'
+                            : 'bg-white/8 text-amber-100 hover:bg-white/16'
                         }`}
                       >
                         {dm.label}
@@ -348,31 +367,42 @@ export function MainMenuScreen({
 
               {/* Expandable Settings Panel */}
               {showSettings && (
-                <div className="grid grid-cols-2 gap-2.5 rounded-2xl border border-amber-200/20 bg-black/30 p-3.5 sm:grid-cols-4">
+                <div className="grid grid-cols-2 gap-2.5 rounded-2xl border border-amber-900/40 bg-black/35 p-3.5 sm:grid-cols-4">
                   <button
                     type="button"
                     onClick={toggleSfx}
                     aria-pressed={settings.sfxEnabled}
-                    className={`cursor-pointer rounded-xl border px-3 py-2 text-xs font-bold transition-colors ${
+                    className={`inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-bold transition-colors ${
                       settings.sfxEnabled
-                        ? 'border-emerald-400/60 bg-emerald-500/20 text-emerald-100'
+                        ? 'border-emerald-400/60 bg-emerald-500/25 text-emerald-100'
                         : 'border-white/15 bg-white/5 text-white/60'
                     }`}
                   >
-                    {settings.sfxEnabled ? '🔊 SFX: Bật' : '🔇 SFX: Tắt'}
+                    {settings.sfxEnabled ? (
+                      <>
+                        <Volume2 className="h-3.5 w-3.5 text-emerald-400" />
+                        <span>SFX: Bật</span>
+                      </>
+                    ) : (
+                      <>
+                        <VolumeX className="h-3.5 w-3.5 text-white/50" />
+                        <span>SFX: Tắt</span>
+                      </>
+                    )}
                   </button>
 
                   <button
                     type="button"
                     onClick={toggleBgm}
                     aria-pressed={settings.bgmEnabled}
-                    className={`cursor-pointer rounded-xl border px-3 py-2 text-xs font-bold transition-colors ${
+                    className={`inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-bold transition-colors ${
                       settings.bgmEnabled
-                        ? 'border-emerald-400/60 bg-emerald-500/20 text-emerald-100'
+                        ? 'border-emerald-400/60 bg-emerald-500/25 text-emerald-100'
                         : 'border-white/15 bg-white/5 text-white/60'
                     }`}
                   >
-                    {settings.bgmEnabled ? '🎵 BGM: Bật' : '🎵 BGM: Tắt'}
+                    <Music className={`h-3.5 w-3.5 ${settings.bgmEnabled ? 'text-emerald-400' : 'text-white/50'}`} />
+                    <span>Nhạc: {settings.bgmEnabled ? 'Bật' : 'Tắt'}</span>
                   </button>
 
                   <button
@@ -384,13 +414,23 @@ export function MainMenuScreen({
                       });
                     }}
                     aria-pressed={settings.colorblindMode}
-                    className={`cursor-pointer rounded-xl border px-3 py-2 text-xs font-bold transition-colors ${
+                    className={`inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-bold transition-colors ${
                       settings.colorblindMode
                         ? 'border-sky-400/60 bg-sky-500/25 text-sky-100'
                         : 'border-white/15 bg-white/5 text-white/75'
                     }`}
                   >
-                    👁️ Mù màu: {settings.colorblindMode ? 'Bật' : 'Tắt'}
+                    {settings.colorblindMode ? (
+                      <>
+                        <Eye className="h-3.5 w-3.5 text-sky-400" />
+                        <span>Mù màu: Bật</span>
+                      </>
+                    ) : (
+                      <>
+                        <EyeOff className="h-3.5 w-3.5 text-white/60" />
+                        <span>Mù màu: Tắt</span>
+                      </>
+                    )}
                   </button>
 
                   <button
@@ -402,13 +442,14 @@ export function MainMenuScreen({
                       });
                     }}
                     aria-pressed={settings.reducedMotion}
-                    className={`cursor-pointer rounded-xl border px-3 py-2 text-xs font-bold transition-colors ${
+                    className={`inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-bold transition-colors ${
                       settings.reducedMotion
                         ? 'border-sky-400/60 bg-sky-500/25 text-sky-100'
                         : 'border-white/15 bg-white/5 text-white/75'
                     }`}
                   >
-                    ✨ Giảm hiệu ứng: {settings.reducedMotion ? 'Bật' : 'Tắt'}
+                    <Sparkles className={`h-3.5 w-3.5 ${settings.reducedMotion ? 'text-sky-400' : 'text-white/60'}`} />
+                    <span>Giảm FX: {settings.reducedMotion ? 'Bật' : 'Tắt'}</span>
                   </button>
                 </div>
               )}
@@ -423,32 +464,36 @@ export function MainMenuScreen({
                     playSfx('paws');
                     onStartGame();
                   }}
-                  className="flex w-full cursor-pointer flex-col items-center justify-center rounded-2xl bg-gradient-to-r from-amber-400 via-orange-400 to-amber-500 px-5 py-3.5 text-[#2C1B11] shadow-[0_8px_28px_rgba(251,191,36,0.38)] transition-transform hover:scale-[1.01] active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-200"
+                  className="btn-tactile-amber flex w-full cursor-pointer flex-col items-center justify-center rounded-2xl px-5 py-3.5 text-[#26160b] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300"
                 >
-                  <span className="font-display text-lg font-black leading-tight">
-                    🤖 Chơi với Bot
+                  <span className="inline-flex items-center gap-2 font-display text-lg font-black leading-tight">
+                    <Bot className="h-5 w-5" />
+                    <span>Chơi với Bot</span>
                   </span>
-                  <span className="mt-0.5 text-[11px] font-extrabold opacity-85">
-                    Đấu Offline ngay · {settings.botCount + 1} người
+                  <span className="mt-0.5 text-[11px] font-bold opacity-85">
+                    Đấu Offline · {settings.botCount + 1} người chơi
                   </span>
                 </button>
+
                 <button
                   type="button"
                   onClick={() => {
                     playSfx('click');
                     onOpenOnline();
                   }}
-                  className="flex w-full cursor-pointer flex-col items-center justify-center rounded-2xl bg-gradient-to-r from-sky-500 to-indigo-500 px-5 py-3.5 text-white shadow-[0_8px_28px_rgba(56,189,248,0.32)] transition-transform hover:scale-[1.01] active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-200"
+                  className="btn-tactile-sky flex w-full cursor-pointer flex-col items-center justify-center rounded-2xl px-5 py-3.5 text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-300"
                 >
-                  <span className="font-display text-lg font-black leading-tight">
-                    🌐 Chơi Online
+                  <span className="inline-flex items-center gap-2 font-display text-lg font-black leading-tight">
+                    <Globe className="h-5 w-5" />
+                    <span>Chơi Online</span>
                   </span>
                   <span className="mt-0.5 text-[11px] font-bold text-sky-100/90">
-                    Tạo / vào mã phòng · thêm Bot tùy chọn
+                    Mã phòng cá nhân · ghép bạn bè
                   </span>
                 </button>
               </div>
 
+              {/* Utility buttons */}
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
                 <button
                   type="button"
@@ -456,30 +501,36 @@ export function MainMenuScreen({
                     playSfx('click');
                     setShowTutorial(true);
                   }}
-                  className="cursor-pointer rounded-xl border border-emerald-300/30 bg-emerald-500/15 px-3 py-2.5 text-xs font-extrabold text-emerald-100 transition-colors hover:bg-emerald-500/25 focus-visible:outline-2 focus-visible:outline-amber-300"
+                  className="btn-tactile-wood inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-emerald-400/30 px-3 py-2.5 text-xs font-black text-emerald-200 transition-colors hover:bg-emerald-950/40 focus-visible:outline-2 focus-visible:outline-amber-300"
                 >
-                  🎓 Hướng Dẫn Tân Thủ
+                  <GraduationCap className="h-4 w-4 text-emerald-400" />
+                  <span>Hướng Dẫn</span>
                 </button>
+
                 <button
                   type="button"
                   onClick={() => {
                     playSfx('click');
                     setShowShop(true);
                   }}
-                  className="cursor-pointer rounded-xl border border-amber-200/20 bg-white/8 px-3 py-2.5 text-xs font-extrabold text-amber-100 transition-colors hover:bg-white/16 focus-visible:outline-2 focus-visible:outline-amber-300"
+                  className="btn-tactile-wood inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-amber-400/25 px-3 py-2.5 text-xs font-black text-amber-200 transition-colors hover:bg-amber-950/40 focus-visible:outline-2 focus-visible:outline-amber-300"
                 >
-                  🛍️ Cửa Hàng Cookies
+                  <ShoppingBag className="h-4 w-4 text-amber-400" />
+                  <span>Cửa Hàng</span>
                 </button>
+
                 <button
                   type="button"
                   onClick={() => {
                     playSfx('click');
                     setShowRules(true);
                   }}
-                  className="cursor-pointer rounded-xl border border-amber-200/20 bg-white/8 px-3 py-2.5 text-xs font-extrabold text-amber-100 transition-colors hover:bg-white/16 focus-visible:outline-2 focus-visible:outline-amber-300"
+                  className="btn-tactile-wood inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-amber-400/25 px-3 py-2.5 text-xs font-black text-amber-200 transition-colors hover:bg-amber-950/40 focus-visible:outline-2 focus-visible:outline-amber-300"
                 >
-                  📖 Luật Chơi
+                  <BookOpen className="h-4 w-4 text-amber-400" />
+                  <span>Luật Chơi</span>
                 </button>
+
                 <button
                   type="button"
                   onClick={() => {
@@ -487,23 +538,26 @@ export function MainMenuScreen({
                     setShowSettings((v) => !v);
                   }}
                   aria-expanded={showSettings}
-                  className={`cursor-pointer rounded-xl border px-3 py-2.5 text-xs font-extrabold transition-colors focus-visible:outline-2 focus-visible:outline-amber-300 ${
+                  className={`btn-tactile-wood inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-xl border px-3 py-2.5 text-xs font-black transition-colors focus-visible:outline-2 focus-visible:outline-amber-300 ${
                     showSettings
                       ? 'border-amber-300 bg-amber-400/20 text-amber-200'
-                      : 'border-amber-200/20 bg-white/8 text-amber-100 hover:bg-white/16'
+                      : 'border-amber-400/25 text-amber-100 hover:bg-amber-950/40'
                   }`}
                 >
-                  ⚙️ Cài Đặt
+                  <SettingsIcon className="h-4 w-4 text-amber-400" />
+                  <span>Cài Đặt</span>
                 </button>
+
                 <button
                   type="button"
                   onClick={() => {
                     playSfx('click');
                     onOpenStudio3D();
                   }}
-                  className="col-span-2 cursor-pointer rounded-xl border border-sky-300/25 bg-sky-500/12 px-3 py-2.5 text-xs font-extrabold text-sky-100 transition-colors hover:bg-sky-500/22 focus-visible:outline-2 focus-visible:outline-amber-300 sm:col-span-1"
+                  className="btn-tactile-wood col-span-2 inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-sky-400/30 px-3 py-2.5 text-xs font-black text-sky-200 transition-colors hover:bg-sky-950/40 focus-visible:outline-2 focus-visible:outline-amber-300 sm:col-span-1"
                 >
-                  ✨ 3D Studio
+                  <Boxes className="h-4 w-4 text-sky-300" />
+                  <span>3D Studio</span>
                 </button>
               </div>
             </div>

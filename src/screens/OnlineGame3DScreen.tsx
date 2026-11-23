@@ -1,5 +1,22 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  AlertTriangle,
+  ArrowLeft,
+  Bomb,
+  BookOpen,
+  Clock,
+  Download,
+  Flame,
+  Globe,
+  GraduationCap,
+  Layers,
+  Music,
+  RotateCcw,
+  RotateCw,
+  Volume2,
+  VolumeX,
+} from 'lucide-react';
+import {
   ANIMALS,
   getPredictedBombVictim,
   isPlayable,
@@ -352,17 +369,19 @@ export function OnlineGame3DScreen({
               room.leaveRoom();
               onBackToMenu();
             }}
-            className="cursor-pointer rounded-xl border border-white/20 bg-slate-900/85 px-3 py-1.5 text-xs font-black text-white shadow-lg backdrop-blur-md transition hover:bg-slate-800"
+            className="btn-tactile-wood inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-white/20 px-3 py-1.5 text-xs font-black text-white shadow-md transition"
           >
-            ← Rời Phòng
+            <ArrowLeft className="h-3.5 w-3.5 text-amber-300" />
+            <span>Rời Phòng</span>
           </button>
 
-          <span className="rounded-xl border border-sky-400/40 bg-sky-500/20 px-2.5 py-1.5 font-mono text-xs font-black text-sky-200 shadow-lg backdrop-blur-md">
-            🌐 Phòng: {room.roomCode}
+          <span className="inline-flex items-center gap-1 rounded-xl border border-sky-400/40 bg-sky-950/80 px-2.5 py-1.5 font-mono text-xs font-black text-sky-200 shadow-md">
+            <Globe className="h-3.5 w-3.5 text-sky-400" />
+            <span>Phòng: {room.roomCode}</span>
           </span>
 
           <div
-            className="flex items-center gap-1.5 rounded-xl border border-white/40 px-2.5 py-1.5 text-xs font-black shadow-lg"
+            className="flex items-center gap-1.5 rounded-xl border border-white/40 px-2.5 py-1.5 text-xs font-black shadow-md"
             style={{
               backgroundColor: activeTheme.primary,
               color: activeTheme.cornerText,
@@ -381,8 +400,8 @@ export function OnlineGame3DScreen({
                 ? `Số ${top.value ?? 0}`
                 : CARD_META[top.type].name;
             return (
-              <div className="inline-flex items-center gap-1.5 rounded-xl border border-amber-200/35 bg-slate-900/90 px-2.5 py-1.5 text-xs font-black text-amber-100 shadow-lg backdrop-blur-md">
-                <span aria-hidden="true">🃏</span>
+              <div className="inline-flex items-center gap-1.5 rounded-xl border border-amber-200/35 bg-[#26170F]/90 px-2.5 py-1.5 text-xs font-black text-amber-100 shadow-md">
+                <Layers className="h-3.5 w-3.5 text-amber-300" />
                 <span>Trên bàn: {label}</span>
                 <CardInfoButton
                   type={top.type}
@@ -395,8 +414,13 @@ export function OnlineGame3DScreen({
             );
           })()}
 
-          <span className="rounded-xl border border-white/15 bg-slate-900/85 px-2.5 py-1.5 text-xs font-bold text-slate-200 shadow-lg backdrop-blur-md">
-            {gameState.direction === 1 ? '↻ Thuận chiều' : '↺ Ngược chiều'}
+          <span className="inline-flex items-center gap-1 rounded-xl border border-amber-900/40 bg-[#26170F]/85 px-2.5 py-1.5 text-xs font-bold text-slate-200 shadow-md">
+            {gameState.direction === 1 ? (
+              <RotateCw className="h-3.5 w-3.5 text-amber-400" />
+            ) : (
+              <RotateCcw className="h-3.5 w-3.5 text-amber-400" />
+            )}
+            <span>{gameState.direction === 1 ? 'Thuận chiều' : 'Đảo chiều'}</span>
           </span>
         </div>
 
@@ -408,9 +432,13 @@ export function OnlineGame3DScreen({
               updateSettings({ sfxEnabled: !settings.sfxEnabled });
             }}
             title={settings.sfxEnabled ? 'Tắt hiệu ứng âm thanh' : 'Bật hiệu ứng âm thanh'}
-            className="cursor-pointer rounded-xl border border-white/20 bg-slate-900/85 px-2.5 py-1.5 text-xs font-black text-white shadow-lg backdrop-blur-md transition hover:bg-slate-800"
+            className="btn-tactile-wood cursor-pointer rounded-xl border border-white/20 p-2 text-white shadow-md transition"
           >
-            {settings.sfxEnabled ? '🔊' : '🔇'}
+            {settings.sfxEnabled ? (
+              <Volume2 className="h-4 w-4 text-amber-300" />
+            ) : (
+              <VolumeX className="h-4 w-4 text-white/50" />
+            )}
           </button>
 
           <button
@@ -420,13 +448,13 @@ export function OnlineGame3DScreen({
               updateSettings({ bgmEnabled: !settings.bgmEnabled });
             }}
             title={settings.bgmEnabled ? 'Tắt nhạc nền' : 'Bật nhạc nền'}
-            className={`cursor-pointer rounded-xl border px-2.5 py-1.5 text-xs font-black shadow-lg backdrop-blur-md transition ${
+            className={`btn-tactile-wood cursor-pointer rounded-xl border p-2 shadow-md transition ${
               settings.bgmEnabled
-                ? 'border-amber-300/60 bg-amber-400/25 text-amber-200'
-                : 'border-white/20 bg-slate-900/85 text-slate-300 hover:bg-slate-800'
+                ? 'border-emerald-400/50 bg-emerald-950/80 text-emerald-300'
+                : 'border-white/20 text-white/50'
             }`}
           >
-            🎵
+            <Music className="h-4 w-4" />
           </button>
 
           <button
@@ -435,9 +463,10 @@ export function OnlineGame3DScreen({
               playSfx('click');
               setShowRules(true);
             }}
-            className="cursor-pointer rounded-xl border border-white/20 bg-slate-900/85 px-3 py-1.5 text-xs font-black text-white shadow-lg backdrop-blur-md transition hover:bg-slate-800"
+            className="btn-tactile-wood inline-flex cursor-pointer items-center gap-1 rounded-xl border border-white/20 px-3 py-1.5 text-xs font-black text-white shadow-md transition"
           >
-            📖 Luật
+            <BookOpen className="h-3.5 w-3.5 text-amber-300" />
+            <span>Luật</span>
           </button>
 
           <button
@@ -446,9 +475,10 @@ export function OnlineGame3DScreen({
               playSfx('click');
               setShowTutorial(true);
             }}
-            className="cursor-pointer rounded-xl border border-amber-300/40 bg-amber-500/20 px-3 py-1.5 text-xs font-black text-amber-200 shadow-lg backdrop-blur-md transition hover:bg-amber-500/30"
+            className="btn-tactile-wood inline-flex cursor-pointer items-center gap-1 rounded-xl border border-emerald-400/30 px-3 py-1.5 text-xs font-black text-emerald-200 shadow-md transition"
           >
-            🎓 Hướng Dẫn
+            <GraduationCap className="h-3.5 w-3.5 text-emerald-400" />
+            <span>Hướng Dẫn</span>
           </button>
         </div>
       </header>
@@ -489,7 +519,7 @@ export function OnlineGame3DScreen({
               <div className="flex items-center justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-1.5">
                   <span className="truncate text-xs font-black tracking-wide text-white sm:text-sm">
-                    {isHumanTurn ? '✨ Lượt của bạn!' : `⏳ Lượt: ${currentPlayer?.name ?? '...'}`}
+                    {isHumanTurn ? 'Lượt của bạn!' : `Lượt: ${currentPlayer?.name ?? '...'}`}
                   </span>
                   {isLowTimer && (
                     <span className="shrink-0 rounded-full bg-rose-500 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-white">
@@ -497,8 +527,9 @@ export function OnlineGame3DScreen({
                     </span>
                   )}
                 </div>
-                <span className={`shrink-0 font-mono text-xl font-black leading-none tabular-nums sm:text-2xl ${timeTextColor}`}>
-                  ⏱️ {room.turnSecondsLeft}s
+                <span className={`inline-flex items-center gap-1 shrink-0 font-mono text-xl font-black leading-none tabular-nums sm:text-2xl ${timeTextColor}`}>
+                  <Clock className="h-5 w-5" />
+                  <span>{room.turnSecondsLeft}s</span>
                 </span>
               </div>
               <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-white/15">
@@ -512,21 +543,25 @@ export function OnlineGame3DScreen({
         })()}
 
         {gameState.pending?.kind === 'draw' && (
-          <div className="rounded-full border border-rose-300/70 bg-rose-600/95 px-4 py-1 text-xs font-black text-white shadow-lg">
-            ⛏️ Đang cộng dồn phạt +{gameState.pending.count} lá! (Đánh Xẻng / Tàng Hình hoặc Rút)
+          <div className="inline-flex items-center gap-1.5 rounded-full border border-rose-300/70 bg-rose-600/95 px-4 py-1 text-xs font-black text-white shadow-lg">
+            <Download className="h-3.5 w-3.5" />
+            <span>Đang cộng dồn phạt +{gameState.pending.count} lá! (Đánh Xẻng / Tàng Hình hoặc Rút)</span>
           </div>
         )}
 
         {gameState.activeBomb && (
           <div
-            className={`rounded-full border px-3.5 py-1 text-xs font-black text-white shadow-lg ${
+            className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1 text-xs font-black text-white shadow-lg ${
               predictedBombVictim?.id === humanPlayer.id
                 ? 'animate-pulse border-red-200 bg-red-600/95'
                 : 'border-orange-300/70 bg-orange-600/90'
             }`}
           >
-            💣 Bom Kẹo: còn {gameState.activeBomb.fuse} lượt → dự kiến nổ vào{' '}
-            {predictedBombVictim?.name ?? '...'} (+4 lá)!
+            <Bomb className="h-3.5 w-3.5 text-white" />
+            <span>
+              Bom Kẹo: còn {gameState.activeBomb.fuse} lượt → dự kiến nổ vào{' '}
+              {predictedBombVictim?.name ?? '...'} (+4 lá)!
+            </span>
           </div>
         )}
 
@@ -551,8 +586,9 @@ export function OnlineGame3DScreen({
           aria-live="polite"
           className="pointer-events-none fixed inset-x-0 bottom-20 z-30 flex justify-center px-4"
         >
-          <div className="rounded-2xl border-2 border-rose-300/80 bg-rose-950/95 px-4 py-2 text-xs font-black text-rose-100 shadow-[0_10px_30px_rgba(225,29,72,0.45)] backdrop-blur-md sm:text-sm">
-            ⚠️ {penaltyNotice}
+          <div className="inline-flex items-center gap-2 rounded-2xl border-2 border-rose-300/80 bg-rose-950/95 px-4 py-2 text-xs font-black text-rose-100 shadow-[0_10px_30px_rgba(225,29,72,0.45)] backdrop-blur-md sm:text-sm">
+            <AlertTriangle className="h-4 w-4 text-rose-300" />
+            <span>{penaltyNotice}</span>
           </div>
         </div>
       )}
@@ -568,19 +604,21 @@ export function OnlineGame3DScreen({
           <div>
             <div className="flex items-center gap-1.5 text-xs font-black text-white">
               <span>{humanPlayer.name}</span>
-              <span className="rounded-full bg-white/15 px-1.5 py-0.5 text-[10px]">
-                🎴 {humanPlayer.hand.length}
+              <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-0.5 text-[10px]">
+                <Layers className="h-3 w-3" />
+                <span>{humanPlayer.hand.length} lá</span>
               </span>
               {predictedBombVictim?.id === humanPlayer.id && gameState.activeBomb && (
-                <span className="animate-pulse rounded-full border border-red-200 bg-red-600 px-1.5 py-0.5 text-[10px] font-black text-white">
-                  💣 Tầm nổ ({gameState.activeBomb.fuse})
+                <span className="animate-pulse inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-600 px-1.5 py-0.5 text-[10px] font-black text-white">
+                  <Bomb className="h-3 w-3" />
+                  <span>Tầm nổ ({gameState.activeBomb.fuse})</span>
                 </span>
               )}
             </div>
             <div className="text-[11px] font-bold text-amber-300">
               {isHumanTurn
-                ? '✨ Đến lượt của bạn!'
-                : `⏳ Lượt của ${currentPlayer?.name ?? '...'}`}
+                ? 'Đến lượt của bạn!'
+                : `Lượt của ${currentPlayer?.name ?? '...'}`}
             </div>
           </div>
         </div>
@@ -609,31 +647,35 @@ export function OnlineGame3DScreen({
             type="button"
             disabled={!canCallPaws}
             onClick={handleCallPaws}
-            className={`rounded-2xl px-4 py-2.5 text-xs font-black shadow-lg transition sm:text-sm ${
+            className={`inline-flex items-center gap-1.5 rounded-2xl px-4 py-2.5 text-xs font-black shadow-lg transition sm:text-sm ${
               canCallPaws
-                ? 'cursor-pointer animate-pulse bg-gradient-to-r from-amber-400 to-orange-500 text-slate-950 hover:brightness-110'
+                ? 'btn-tactile-amber cursor-pointer'
                 : 'cursor-not-allowed border border-white/15 bg-slate-900/75 text-slate-500'
             }`}
           >
-            🐾 Hô PAWS!
+            <Flame className={`h-4 w-4 ${canCallPaws ? 'text-amber-950' : 'text-slate-500'}`} />
+            <span>Hô PAWS!</span>
           </button>
 
           <button
             type="button"
             disabled={!isHumanTurn}
             onClick={handleDrawCard}
-            className={`rounded-2xl px-4 py-2.5 text-xs font-black shadow-lg transition sm:text-sm ${
+            className={`inline-flex items-center gap-1.5 rounded-2xl px-4 py-2.5 text-xs font-black shadow-lg transition sm:text-sm ${
               isHumanTurn
-                ? 'cursor-pointer border border-amber-300/60 bg-sky-500 text-white hover:bg-sky-400'
+                ? 'btn-tactile-sky cursor-pointer text-white'
                 : 'cursor-not-allowed border border-white/15 bg-slate-900/75 text-slate-500'
             }`}
           >
-            {(() => {
-              if (gameState.pending?.kind === 'draw') {
-                return `📥 Nhận +${gameState.pending.count} lá (${gameState.pending.count} Xẻng)`;
-              }
-              return '📥 Rút 1 lá (Space)';
-            })()}
+            <Download className="h-4 w-4" />
+            <span>
+              {(() => {
+                if (gameState.pending?.kind === 'draw') {
+                  return `Nhận +${gameState.pending.count} lá`;
+                }
+                return 'Rút 1 lá (Space)';
+              })()}
+            </span>
           </button>
         </div>
       </footer>

@@ -1,7 +1,22 @@
 import { useState } from 'react';
+import {
+  AlertTriangle,
+  ArrowLeft,
+  Clock,
+  HelpCircle,
+  Pause,
+  Play,
+  RotateCcw,
+  Shield,
+  ShieldAlert,
+  Swords,
+  Users,
+  Volume2,
+  VolumeX,
+  Zap,
+} from 'lucide-react';
 import { playSfx } from '../../audio/soundEngine';
 import { ITEM_META } from '../sim/combat';
-import { BRAWL_ANIMAL_EMOJI } from '../sim/constants';
 import { getSortedStandings } from '../sim/matchStore';
 import type { HudSnapshot, MatchState } from '../sim/types';
 
@@ -44,37 +59,48 @@ export function BrawlHud({
               playSfx('click');
               onExit();
             }}
-            className="cursor-pointer rounded-xl border border-white/20 bg-slate-950/80 px-3 py-1.5 text-xs font-extrabold text-amber-100 shadow-lg backdrop-blur-md hover:bg-slate-800 focus-visible:outline-2 focus-visible:outline-amber-300"
+            className="btn-tactile-wood inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-white/20 px-3 py-1.5 text-xs font-black text-amber-100 shadow-md transition-colors focus-visible:outline-2 focus-visible:outline-amber-300"
           >
-            ← Thoát
+            <ArrowLeft className="h-3.5 w-3.5 text-amber-300" />
+            <span>Thoát</span>
           </button>
 
-          <div className="rounded-xl border border-amber-300/40 bg-slate-950/80 px-3 py-1.5 text-xs font-black text-amber-200 shadow-lg backdrop-blur-md">
-            🥊 Hiệp {match.round}/{match.totalRounds}
+          <div className="inline-flex items-center gap-1.5 rounded-xl border border-amber-400/40 bg-slate-950/85 px-3 py-1.5 text-xs font-black text-amber-200 shadow-md">
+            <Swords className="h-3.5 w-3.5 text-amber-400" />
+            <span>Hiệp {match.round}/{match.totalRounds}</span>
           </div>
 
-          <div className="rounded-xl border border-emerald-300/35 bg-slate-950/80 px-3 py-1.5 text-xs font-black text-emerald-200 shadow-lg backdrop-blur-md">
-            🐾 Còn sống: {hud.aliveCount}/{hud.totalFighters}
+          <div className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-400/35 bg-slate-950/85 px-3 py-1.5 text-xs font-black text-emerald-200 shadow-md">
+            <Users className="h-3.5 w-3.5 text-emerald-400" />
+            <span>Còn sống: {hud.aliveCount}/{hud.totalFighters}</span>
           </div>
 
           {hud.nextCollapseRing !== null && hud.nextCollapseInSec !== null && (
             <div
-              className={`rounded-xl border px-3 py-1.5 text-xs font-black shadow-lg backdrop-blur-md transition-colors ${
+              className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-black shadow-md transition-colors ${
                 hud.isRingWarning
                   ? 'animate-pulse border-rose-300 bg-rose-600/90 text-white'
-                  : 'border-sky-300/35 bg-slate-950/80 text-sky-200'
+                  : 'border-sky-300/35 bg-slate-950/85 text-sky-200'
               }`}
             >
-              {hud.isRingWarning
-                ? `⚠️ Sàn vòng ${hud.nextCollapseRing} SỤP!`
-                : `⏳ Sàn vòng ${hud.nextCollapseRing} sụp sau ${Math.ceil(hud.nextCollapseInSec)}s`}
+              {hud.isRingWarning ? (
+                <>
+                  <AlertTriangle className="h-3.5 w-3.5 text-white" />
+                  <span>Sàn vòng {hud.nextCollapseRing} SỤP!</span>
+                </>
+              ) : (
+                <>
+                  <Clock className="h-3.5 w-3.5 text-sky-300" />
+                  <span>Sàn vòng {hud.nextCollapseRing} sụp ({Math.ceil(hud.nextCollapseInSec)}s)</span>
+                </>
+              )}
             </div>
           )}
         </div>
 
         {/* Top-right: Mini Standings + Controls */}
         <div className="pointer-events-auto flex items-start gap-2" data-brawl-ui="true">
-          <div className="hidden rounded-2xl border border-white/15 bg-slate-950/80 px-3 py-2 text-xs shadow-xl backdrop-blur-md sm:block">
+          <div className="hidden rounded-2xl border border-white/15 bg-slate-950/85 px-3 py-2 text-xs shadow-xl sm:block">
             <div className="mb-1 text-[10px] font-black uppercase tracking-wider text-sky-200">
               Bảng Điểm
             </div>
@@ -82,7 +108,7 @@ export function BrawlHud({
               {topScores.map((s, idx) => (
                 <div key={s.id} className="flex items-center justify-between gap-4 font-bold">
                   <span className={s.id === 'human' ? 'text-amber-300' : 'text-slate-200'}>
-                    #{idx + 1} {BRAWL_ANIMAL_EMOJI[s.animal]} {s.name}
+                    #{idx + 1} {s.name}
                   </span>
                   <span className="font-mono font-black text-amber-200">{s.points}đ</span>
                 </div>
@@ -94,25 +120,32 @@ export function BrawlHud({
             type="button"
             onClick={onToggleSfx}
             aria-label={sfxEnabled ? 'Tắt âm thanh' : 'Bật âm thanh'}
-            className="cursor-pointer rounded-xl border border-white/20 bg-slate-950/80 px-2.5 py-2 text-xs font-bold text-amber-100 shadow-lg backdrop-blur-md hover:bg-slate-800"
+            className="btn-tactile-wood cursor-pointer rounded-xl border border-white/20 p-2 text-amber-100 shadow-md"
           >
-            {sfxEnabled ? '🔊' : '🔇'}
+            {sfxEnabled ? (
+              <Volume2 className="h-4 w-4 text-amber-300" />
+            ) : (
+              <VolumeX className="h-4 w-4 text-white/50" />
+            )}
           </button>
 
           <button
             type="button"
             onClick={() => setShowHelp((v) => !v)}
-            className="cursor-pointer rounded-xl border border-white/20 bg-slate-950/80 px-2.5 py-2 text-xs font-extrabold text-amber-100 shadow-lg backdrop-blur-md hover:bg-slate-800"
+            aria-label="Xem phím điều khiển"
+            className="btn-tactile-wood inline-flex cursor-pointer items-center gap-1 rounded-xl border border-white/20 px-2.5 py-2 text-xs font-black text-amber-100 shadow-md"
           >
-            ❓ Phím
+            <HelpCircle className="h-4 w-4 text-amber-300" />
+            <span>Phím</span>
           </button>
 
           <button
             type="button"
             onClick={onTogglePause}
-            className="cursor-pointer rounded-xl border border-white/20 bg-slate-950/80 px-2.5 py-2 text-xs font-extrabold text-amber-100 shadow-lg backdrop-blur-md hover:bg-slate-800"
+            aria-label="Tạm dừng"
+            className="btn-tactile-wood cursor-pointer rounded-xl border border-white/20 p-2 text-amber-100 shadow-md"
           >
-            ⏸
+            <Pause className="h-4 w-4 text-amber-300" />
           </button>
         </div>
       </header>
@@ -184,7 +217,7 @@ export function BrawlHud({
         <div className="pointer-events-none fixed inset-0 z-30 flex items-center justify-center p-4">
           <div className="w-full max-w-md rounded-3xl border-2 border-amber-300/70 bg-slate-950/92 p-6 text-white shadow-2xl backdrop-blur-md">
             <h2 className="text-center font-display text-2xl font-black text-amber-300">
-              🏁 Hết Hiệp {match.round}/{match.totalRounds}!
+              Hết Hiệp {match.round}/{match.totalRounds}!
             </h2>
             <p className="mt-1 text-center text-xs text-slate-300">
               Chuẩn bị sang {match.round < match.totalRounds ? `Hiệp ${match.round + 1}` : 'Tổng Kết'}...
@@ -200,7 +233,7 @@ export function BrawlHud({
                   }`}
                 >
                   <span>
-                    Hạng #{r.rank} · {BRAWL_ANIMAL_EMOJI[r.animal]} {r.name}
+                    Hạng #{r.rank} · {r.name}
                   </span>
                   <span className="font-mono font-black">
                     {r.pointsAwarded > 0 ? `+${r.pointsAwarded}đ` : '0đ'} (Tổng: {r.totalPoints}đ)
@@ -220,7 +253,7 @@ export function BrawlHud({
         >
           <div className="w-full max-w-sm rounded-3xl border border-white/20 bg-slate-900 p-6 text-center text-white shadow-2xl">
             <h2 className="font-display text-2xl font-black text-amber-300">
-              ⏸ Tạm Dừng
+              Tạm Dừng
             </h2>
             <p className="mt-2 text-xs text-slate-300">
               WASD + Shift chạy · Space nhảy · J đấm (trên không: đá bay) · E húc đầu · K nắm ném · L lăn né
@@ -229,16 +262,18 @@ export function BrawlHud({
               <button
                 type="button"
                 onClick={onTogglePause}
-                className="cursor-pointer rounded-2xl bg-amber-400 px-5 py-3 text-sm font-black text-[#1B110B] hover:bg-amber-300"
+                className="btn-tactile-amber inline-flex cursor-pointer items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-black text-[#1B110B]"
               >
-                ▶ Tiếp Tục
+                <Play className="h-4 w-4" />
+                <span>Tiếp Tục</span>
               </button>
               <button
                 type="button"
                 onClick={onExit}
-                className="cursor-pointer rounded-2xl border border-white/20 bg-white/10 px-5 py-2.5 text-xs font-bold text-slate-200 hover:bg-white/20"
+                className="btn-tactile-wood inline-flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-white/20 px-5 py-2.5 text-xs font-bold text-slate-200"
               >
-                ← Rời Đấu Trường
+                <ArrowLeft className="h-3.5 w-3.5 text-slate-400" />
+                <span>Rời Đấu Trường</span>
               </button>
             </div>
           </div>
@@ -248,21 +283,22 @@ export function BrawlHud({
       {/* BOTTOM PLAYER STATUS DOCK */}
       <footer className="flex flex-col items-center gap-2">
         {!hud.playerAlive && match.phase === 'fighting' && (
-          <div className="rounded-full border border-rose-300/60 bg-rose-950/90 px-4 py-1.5 text-xs font-black text-rose-100 shadow-xl">
-            💀 Bạn đã rơi khỏi sàn! Đang theo dõi các bot còn lại...
+          <div className="inline-flex items-center gap-2 rounded-full border border-rose-300/60 bg-rose-950/90 px-4 py-1.5 text-xs font-black text-rose-100 shadow-xl">
+            <ShieldAlert className="h-4 w-4 text-rose-400" />
+            <span>Bạn đã rơi khỏi sàn! Đang theo dõi các đối thủ còn lại...</span>
           </div>
         )}
 
-        <div className="flex flex-wrap items-center justify-center gap-2.5 rounded-2xl border border-white/15 bg-slate-950/85 px-4 py-2.5 text-xs text-white shadow-2xl backdrop-blur-md">
+        <div className="flex flex-wrap items-center justify-center gap-3 rounded-2xl border border-white/15 bg-slate-950/90 px-4 py-2.5 text-xs text-white shadow-2xl backdrop-blur-md">
           {/* Balance / Stun Meter */}
           <div className="flex flex-col gap-1">
             <div className="flex items-center justify-between gap-3 text-[11px] font-black">
               <span>
                 {hud.playerFrozen
-                  ? '🧊 ĐÓNG BĂNG!'
+                  ? 'ĐÓNG BĂNG!'
                   : hud.playerStunned
-                    ? '💫 CHOÁNG NGÃ!'
-                    : '⚖️ Thăng Bằng'}
+                    ? 'CHOÁNG NGÃ!'
+                    : 'Thăng Bằng'}
               </span>
               <span className="font-mono text-amber-200">{Math.round(balancePct)}%</span>
             </div>
@@ -298,14 +334,14 @@ export function BrawlHud({
           <div className="flex items-center gap-1.5">
             {hud.playerGrabbingName ? (
               <span className="font-black text-amber-300">
-                🤜 Đang giữ {hud.playerGrabbingName} (Nhả K để ném!)
+                Đang giữ {hud.playerGrabbingName} (Nhả K để ném!)
               </span>
             ) : heldMeta ? (
               <span className="font-black text-amber-200">
-                {heldMeta.emoji} {heldMeta.label} ×{hud.playerHeldAmmo} (J)
+                {heldMeta.label} ×{hud.playerHeldAmmo} (J)
               </span>
             ) : (
-              <span className="text-slate-300">✊ J đấm / đá bay · E húc đầu · K nắm/ném · Shift chạy nhanh</span>
+              <span className="text-slate-300">J đấm / đá bay · E húc đầu · K nắm/ném · Shift chạy nhanh</span>
             )}
           </div>
 
@@ -315,18 +351,21 @@ export function BrawlHud({
               <div className="h-7 w-px bg-white/15" />
               <div className="flex items-center gap-2 font-black">
                 {hud.playerSpeedLeft > 0 && (
-                  <span className="rounded-full bg-cyan-500/25 px-2 py-0.5 text-cyan-200">
-                    ⛸️ {hud.playerSpeedLeft.toFixed(1)}s
+                  <span className="inline-flex items-center gap-1 rounded-full bg-cyan-500/25 px-2 py-0.5 text-cyan-200">
+                    <Zap className="h-3 w-3" />
+                    <span>{hud.playerSpeedLeft.toFixed(1)}s</span>
                   </span>
                 )}
                 {hud.playerShieldLeft > 0 && (
-                  <span className="rounded-full bg-amber-500/25 px-2 py-0.5 text-amber-200">
-                    🛡️ {hud.playerShieldLeft.toFixed(1)}s
+                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/25 px-2 py-0.5 text-amber-200">
+                    <Shield className="h-3 w-3" />
+                    <span>{hud.playerShieldLeft.toFixed(1)}s</span>
                   </span>
                 )}
                 {hud.playerInverted && (
-                  <span className="rounded-full bg-purple-500/35 px-2 py-0.5 text-purple-200">
-                    🪃 Đảo phím!
+                  <span className="inline-flex items-center gap-1 rounded-full bg-purple-500/35 px-2 py-0.5 text-purple-200">
+                    <RotateCcw className="h-3 w-3" />
+                    <span>Đảo phím!</span>
                   </span>
                 )}
               </div>

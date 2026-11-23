@@ -1,5 +1,22 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ArrowLeft,
+  Bomb,
+  BookOpen,
+  Clock,
+  Download,
+  Flame,
+  GraduationCap,
+  Layers,
+  Music,
+  RotateCcw,
+  RotateCw,
+  Sparkles,
+  Trophy,
+  Volume2,
+  VolumeX,
+} from 'lucide-react';
+import {
   ANIMALS,
   callPaws,
   catchMissedPaws,
@@ -551,14 +568,15 @@ export function Game3DScreen({ onBackToMenu }: Game3DScreenProps) {
             <button
               type="button"
               onClick={handleSafeBackToMenu}
-              className="cursor-pointer rounded-xl border border-amber-200/25 bg-[#26170F]/85 px-3 py-1.5 text-xs font-extrabold text-amber-100 shadow-lg backdrop-blur-md transition-colors hover:bg-[#3A2417] focus-visible:outline-2 focus-visible:outline-amber-300"
+              className="btn-tactile-wood inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-amber-900/40 px-3 py-1.5 text-xs font-black text-amber-100 shadow-md transition-colors focus-visible:outline-2 focus-visible:outline-amber-300"
             >
-              ← Menu
+              <ArrowLeft className="h-3.5 w-3.5 text-amber-300" />
+              <span>Menu</span>
             </button>
 
             {/* Active Color Badge */}
             <div
-              className="inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-extrabold shadow-lg backdrop-blur-md"
+              className="inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-black shadow-md backdrop-blur-md"
               style={{
                 backgroundColor: activeTheme.pillBg,
                 borderColor: activeTheme.light,
@@ -579,8 +597,8 @@ export function Game3DScreen({ onBackToMenu }: Game3DScreenProps) {
                   ? `Số ${top.value ?? 0}`
                   : CARD_META[top.type].name;
               return (
-                <div className="inline-flex items-center gap-1.5 rounded-xl border border-amber-200/35 bg-[#26170F]/88 px-3 py-1.5 text-xs font-black text-amber-100 shadow-lg backdrop-blur-md">
-                  <span aria-hidden="true">🃏</span>
+                <div className="inline-flex items-center gap-1.5 rounded-xl border border-amber-400/30 bg-[#26170F]/90 px-3 py-1.5 text-xs font-black text-amber-100 shadow-md">
+                  <Layers className="h-3.5 w-3.5 text-amber-300" />
                   <span>Trên bàn: {label}</span>
                   <CardInfoButton
                     type={top.type}
@@ -594,11 +612,14 @@ export function Game3DScreen({ onBackToMenu }: Game3DScreenProps) {
             })()}
 
             {/* Direction Pill */}
-            <div className="inline-flex items-center gap-1.5 rounded-xl border border-white/15 bg-[#26170F]/80 px-3 py-1.5 text-xs font-bold text-amber-100 shadow-lg backdrop-blur-md">
+            <div className="inline-flex items-center gap-1.5 rounded-xl border border-amber-900/40 bg-[#26170F]/85 px-3 py-1.5 text-xs font-bold text-amber-100 shadow-md">
+              {gameState.direction === 1 ? (
+                <RotateCw className="h-3.5 w-3.5 text-amber-400" />
+              ) : (
+                <RotateCcw className="h-3.5 w-3.5 text-amber-400" />
+              )}
               <span>
-                {gameState.direction === 1
-                  ? '↻ Theo chiều kim đồng hồ'
-                  : '↺ Ngược chiều'}
+                {gameState.direction === 1 ? 'Thuận chiều' : 'Đảo chiều'}
               </span>
             </div>
           </div>
@@ -606,17 +627,28 @@ export function Game3DScreen({ onBackToMenu }: Game3DScreenProps) {
           {/* Right: Turn indicator + Sound + Rules + Restart */}
           <div className="pointer-events-auto flex flex-wrap items-center gap-2">
             <div
-              className={`rounded-xl border px-3 py-1.5 text-xs font-extrabold shadow-lg backdrop-blur-md ${
+              className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-black shadow-md ${
                 isHumanTurn
-                  ? 'border-amber-300 bg-amber-400 text-[#2C1B11]'
-                  : 'border-white/15 bg-[#26170F]/80 text-amber-100'
+                  ? 'btn-tactile-amber border-amber-300'
+                  : 'border-amber-900/40 bg-[#26170F]/90 text-amber-100'
               }`}
             >
-              {gameState.winnerId
-                ? '🏆 Ván đấu kết thúc'
-                : isHumanTurn
-                  ? '✨ Lượt của bạn!'
-                  : `⏳ Lượt: ${currentPlayer?.name ?? '...'}`}
+              {gameState.winnerId ? (
+                <>
+                  <Trophy className="h-3.5 w-3.5 text-amber-400" />
+                  <span>Ván đấu kết thúc</span>
+                </>
+              ) : isHumanTurn ? (
+                <>
+                  <Sparkles className="h-3.5 w-3.5 text-amber-950" />
+                  <span>Lượt của bạn!</span>
+                </>
+              ) : (
+                <>
+                  <Clock className="h-3.5 w-3.5 text-amber-400" />
+                  <span>Lượt: {currentPlayer?.name ?? '...'}</span>
+                </>
+              )}
             </div>
 
             <button
@@ -626,9 +658,13 @@ export function Game3DScreen({ onBackToMenu }: Game3DScreenProps) {
               }}
               aria-label={settings.sfxEnabled ? 'Tắt âm thanh' : 'Bật âm thanh'}
               title={settings.sfxEnabled ? 'Tắt SFX' : 'Bật SFX'}
-              className="cursor-pointer rounded-xl border border-white/15 bg-[#26170F]/85 px-2.5 py-1.5 text-xs font-bold text-amber-100 shadow-lg backdrop-blur-md hover:bg-[#3A2417] focus-visible:outline-2 focus-visible:outline-amber-300"
+              className="btn-tactile-wood cursor-pointer rounded-xl border border-amber-900/40 p-2 text-amber-100 shadow-md transition-colors focus-visible:outline-2 focus-visible:outline-amber-300"
             >
-              {settings.sfxEnabled ? '🔊' : '🔇'}
+              {settings.sfxEnabled ? (
+                <Volume2 className="h-4 w-4 text-amber-300" />
+              ) : (
+                <VolumeX className="h-4 w-4 text-white/50" />
+              )}
             </button>
 
             <button
@@ -639,14 +675,14 @@ export function Game3DScreen({ onBackToMenu }: Game3DScreenProps) {
               }}
               aria-pressed={settings.bgmEnabled}
               aria-label={settings.bgmEnabled ? 'Tắt nhạc nền' : 'Bật nhạc nền'}
-              title={settings.bgmEnabled ? 'Tắt nhạc nền (BGM)' : 'Bật nhạc nền (BGM)'}
-              className={`cursor-pointer rounded-xl border px-2.5 py-1.5 text-xs font-bold shadow-lg backdrop-blur-md transition-colors focus-visible:outline-2 focus-visible:outline-amber-300 ${
+              title={settings.bgmEnabled ? 'Tắt nhạc nền' : 'Bật nhạc nền'}
+              className={`btn-tactile-wood cursor-pointer rounded-xl border p-2 shadow-md transition-colors focus-visible:outline-2 focus-visible:outline-amber-300 ${
                 settings.bgmEnabled
-                  ? 'border-emerald-300/60 bg-emerald-600/80 text-white'
-                  : 'border-white/15 bg-[#26170F]/85 text-amber-100/70 hover:bg-[#3A2417]'
+                  ? 'border-emerald-400/50 bg-emerald-950/80 text-emerald-300'
+                  : 'border-amber-900/40 text-white/50'
               }`}
             >
-              🎵
+              <Music className="h-4 w-4" />
             </button>
 
             <button
@@ -655,9 +691,10 @@ export function Game3DScreen({ onBackToMenu }: Game3DScreenProps) {
                 playSfx('click');
                 setShowTutorial(true);
               }}
-              className="cursor-pointer rounded-xl border border-emerald-300/30 bg-emerald-900/75 px-3 py-1.5 text-xs font-extrabold text-emerald-100 shadow-lg backdrop-blur-md hover:bg-emerald-800/85 focus-visible:outline-2 focus-visible:outline-amber-300"
+              className="btn-tactile-wood inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-emerald-400/30 px-3 py-1.5 text-xs font-black text-emerald-200 shadow-md hover:bg-emerald-950/50 focus-visible:outline-2 focus-visible:outline-amber-300"
             >
-              🎓 Hướng Dẫn
+              <GraduationCap className="h-3.5 w-3.5 text-emerald-400" />
+              <span>Hướng Dẫn</span>
             </button>
 
             <button
@@ -666,18 +703,19 @@ export function Game3DScreen({ onBackToMenu }: Game3DScreenProps) {
                 playSfx('click');
                 setShowRules(true);
               }}
-              className="cursor-pointer rounded-xl border border-white/15 bg-[#26170F]/85 px-3 py-1.5 text-xs font-extrabold text-amber-100 shadow-lg backdrop-blur-md hover:bg-[#3A2417] focus-visible:outline-2 focus-visible:outline-amber-300"
+              className="btn-tactile-wood inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-amber-900/40 px-3 py-1.5 text-xs font-black text-amber-100 shadow-md hover:bg-amber-950/50 focus-visible:outline-2 focus-visible:outline-amber-300"
             >
-              📖 Luật
+              <BookOpen className="h-3.5 w-3.5 text-amber-400" />
+              <span>Luật</span>
             </button>
 
             <button
               type="button"
               onClick={handleRestartMatch}
               title="Chia lại ván mới"
-              className="cursor-pointer rounded-xl border border-white/15 bg-[#26170F]/85 px-2.5 py-1.5 text-xs font-bold text-amber-100 shadow-lg backdrop-blur-md hover:bg-[#3A2417] focus-visible:outline-2 focus-visible:outline-amber-300"
+              className="btn-tactile-wood cursor-pointer rounded-xl border border-amber-900/40 p-2 text-amber-100 shadow-md transition-colors focus-visible:outline-2 focus-visible:outline-amber-300"
             >
-              🔄
+              <RotateCcw className="h-4 w-4 text-amber-400" />
             </button>
           </div>
         </div>
@@ -733,9 +771,10 @@ export function Game3DScreen({ onBackToMenu }: Game3DScreenProps) {
                     )}
                   </div>
                   <span
-                    className={`shrink-0 font-mono text-xl font-black leading-none tabular-nums sm:text-2xl ${timeTextColor}`}
+                    className={`inline-flex items-center gap-1 shrink-0 font-mono text-xl font-black leading-none tabular-nums sm:text-2xl ${timeTextColor}`}
                   >
-                    ⏱️ {turnSecondsLeft}s
+                    <Clock className="h-5 w-5" />
+                    <span>{turnSecondsLeft}s</span>
                   </span>
                 </div>
                 <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-white/15">
@@ -749,21 +788,25 @@ export function Game3DScreen({ onBackToMenu }: Game3DScreenProps) {
           })()}
 
           {gameState.pending?.kind === 'draw' && (
-            <div className="rounded-full border border-rose-300/60 bg-rose-950/90 px-4 py-1 text-xs font-extrabold text-rose-100 shadow-lg backdrop-blur-md">
-              ❄️ Xẻng Tuyết cộng dồn: +{gameState.pending.count} lá! (Đánh Xẻng / Thuốc Tàng Hình hoặc bấm Rút)
+            <div className="inline-flex items-center gap-1.5 rounded-full border border-rose-300/60 bg-rose-950/90 px-4 py-1 text-xs font-black text-rose-100 shadow-md">
+              <Download className="h-3.5 w-3.5 text-rose-300" />
+              <span>Xẻng Tuyết cộng dồn: +{gameState.pending.count} lá! (Đánh Xẻng / Thuốc Tàng Hình hoặc bấm Rút)</span>
             </div>
           )}
 
           {gameState.activeBomb && (
             <div
-              className={`rounded-full border px-4 py-1 text-xs font-extrabold shadow-lg backdrop-blur-md ${
+              className={`inline-flex items-center gap-1.5 rounded-full border px-4 py-1 text-xs font-black shadow-md ${
                 predictedBombVictim?.id === humanId
                   ? 'animate-pulse border-red-300 bg-red-950/92 text-red-100'
-                  : 'border-amber-300/60 bg-amber-950/90 text-amber-200'
+                  : 'border-amber-400/60 bg-amber-950/90 text-amber-200'
               }`}
             >
-              💣 Bom Kẹo: còn {gameState.activeBomb.fuse} lượt → dự kiến nổ vào{' '}
-              <strong>{predictedBombVictim?.name ?? '...'}</strong> (+4 lá)!
+              <Bomb className="h-3.5 w-3.5 text-red-400" />
+              <span>
+                Bom Kẹo: còn {gameState.activeBomb.fuse} lượt → dự kiến nổ vào{' '}
+                <strong>{predictedBombVictim?.name ?? '...'}</strong> (+4 lá)!
+              </span>
               <span className="hidden opacity-85 sm:inline">
                 {' '}· Đảo chiều / Đóng băng để đổi mục tiêu
               </span>
@@ -771,17 +814,15 @@ export function Game3DScreen({ onBackToMenu }: Game3DScreenProps) {
           )}
 
           {(gameState.lastEffectBanner || latestLog) && (
-            <div className="max-w-xl truncate rounded-full border border-white/10 bg-[#1B110B]/75 px-4 py-1 text-xs font-semibold text-amber-100/90 backdrop-blur-md">
+            <div className="max-w-xl truncate rounded-full border border-amber-900/40 bg-[#1B110B]/80 px-4 py-1 text-xs font-semibold text-amber-100/90 shadow-md">
               {gameState.lastEffectBanner ?? latestLog?.text}
             </div>
           )}
 
           {gamesPlayed === 0 && !dismissedTip && gameState.winnerId === null && (
-            <div className="pointer-events-auto flex max-w-2xl items-center gap-2 rounded-2xl border border-sky-300/35 bg-sky-950/85 px-3.5 py-1.5 text-xs font-semibold text-sky-100 shadow-lg backdrop-blur-md">
+            <div className="pointer-events-auto flex max-w-2xl items-center gap-2 rounded-2xl border border-sky-400/40 bg-sky-950/90 px-3.5 py-1.5 text-xs font-semibold text-sky-100 shadow-md">
               <span>
-                💡 <strong>Mẹo nhanh:</strong> Bấm trực tiếp lá bài 3D sáng ở
-                trước mặt để đánh · Nhấn <strong>Space</strong> (hoặc chồng bài)
-                để rút · Khi còn 1 lá nhớ bấm <strong>🐾 Hô PAWS!</strong>
+                <strong>Mẹo nhanh:</strong> Bấm lá bài 3D sáng để đánh · Nhấn <strong>Space</strong> để rút · Khi còn 1 lá nhớ bấm <strong>Hô PAWS!</strong>
               </span>
               <button
                 type="button"
@@ -803,15 +844,16 @@ export function Game3DScreen({ onBackToMenu }: Game3DScreenProps) {
           aria-live="polite"
           className="pointer-events-none fixed inset-x-0 bottom-20 z-30 flex justify-center px-4"
         >
-          <div className="rounded-2xl border-2 border-rose-300/80 bg-rose-950/95 px-4 py-2 text-xs font-black text-rose-100 shadow-[0_10px_30px_rgba(225,29,72,0.45)] backdrop-blur-md sm:text-sm">
-            ⚠️ {penaltyNotice}
+          <div className="inline-flex items-center gap-2 rounded-2xl border-2 border-rose-400/80 bg-rose-950/95 px-4 py-2 text-xs font-black text-rose-100 shadow-[0_10px_30px_rgba(225,29,72,0.45)] sm:text-sm">
+            <Bomb className="h-4 w-4 text-rose-300" />
+            <span>{penaltyNotice}</span>
           </div>
         </div>
       )}
 
       {/* ================= COMPACT NON-BLOCKING BOTTOM HUD BAR ================= */}
       <div className="pointer-events-none fixed inset-x-0 bottom-3 z-30 flex justify-center px-3 sm:px-6">
-        <div className="pointer-events-auto flex w-full max-w-3xl flex-wrap items-center justify-between gap-2.5 rounded-2xl border border-amber-200/20 bg-[#26170F]/82 px-3.5 py-2 shadow-2xl backdrop-blur-md">
+        <div className="pointer-events-auto flex w-full max-w-3xl flex-wrap items-center justify-between gap-2.5 rounded-2xl border-2 border-amber-900/40 bg-[#24160f]/90 px-4 py-2.5 shadow-2xl backdrop-blur-md">
           {/* Human Player Animal Badge + Card Count */}
           <div className="flex items-center gap-2.5">
             <span
@@ -820,8 +862,8 @@ export function Game3DScreen({ onBackToMenu }: Game3DScreenProps) {
               style={{ backgroundColor: humanAnimalMeta.accentHex }}
             />
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs font-extrabold text-[#FFFBF4] sm:text-sm">
-                {humanPlayer.name} · {humanAnimalMeta.name}
+              <span className="text-xs font-black text-[#FFFBF4] sm:text-sm">
+                {humanPlayer.name} ({humanAnimalMeta.name})
               </span>
               {humanPlayer.calledPaws && (
                 <span className="rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-black text-[#2C1B11]">
@@ -829,14 +871,16 @@ export function Game3DScreen({ onBackToMenu }: Game3DScreenProps) {
                 </span>
               )}
               {predictedBombVictim?.id === humanId && gameState.activeBomb && (
-                <span className="animate-pulse rounded-full border border-red-200 bg-red-600 px-2 py-0.5 text-[10px] font-black text-white">
-                  💣 Sắp nổ vào bạn ({gameState.activeBomb.fuse})
+                <span className="animate-pulse inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-600 px-2 py-0.5 text-[10px] font-black text-white">
+                  <Bomb className="h-3 w-3" />
+                  <span>Sắp nổ ({gameState.activeBomb.fuse})</span>
                 </span>
               )}
-              <span className="rounded-full bg-white/10 px-2.5 py-0.5 text-xs font-bold text-amber-200">
-                🎴 {humanPlayer.hand.length} lá
+              <span className="inline-flex items-center gap-1 rounded-xl bg-white/10 px-2.5 py-0.5 text-xs font-black text-amber-200">
+                <Layers className="h-3.5 w-3.5" />
+                <span>{humanPlayer.hand.length} lá</span>
               </span>
-              <span className="hidden text-[11px] font-semibold text-amber-100/70 sm:inline">
+              <span className="hidden text-[11px] font-semibold text-amber-200/70 sm:inline">
                 Chồng rút: {gameState.drawPile.length}
               </span>
             </div>
@@ -848,31 +892,35 @@ export function Game3DScreen({ onBackToMenu }: Game3DScreenProps) {
               type="button"
               onClick={handleCallPaws}
               disabled={!canCallPaws}
-              className={`rounded-xl border-2 px-3.5 py-1.5 text-xs font-black transition-all focus-visible:outline-2 focus-visible:outline-amber-300 ${
+              className={`inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-black transition-all focus-visible:outline-2 focus-visible:outline-amber-300 ${
                 canCallPaws
-                  ? 'cursor-pointer border-amber-200 bg-gradient-to-r from-amber-400 to-orange-500 text-[#2C1B11] shadow-[0_0_20px_rgba(251,191,36,0.6)] hover:scale-105'
-                  : 'cursor-not-allowed border-white/10 bg-white/5 text-white/35'
+                  ? 'btn-tactile-amber cursor-pointer'
+                  : 'cursor-not-allowed border border-white/10 bg-white/5 text-white/35'
               }`}
             >
-              🐾 Hô PAWS!
+              <Flame className={`h-4 w-4 ${canCallPaws ? 'text-amber-950' : 'text-white/35'}`} />
+              <span>Hô PAWS!</span>
             </button>
 
             <button
               type="button"
               onClick={handleHumanDraw}
               disabled={!isHumanTurn}
-              className={`rounded-xl border-2 px-3.5 py-1.5 text-xs font-extrabold transition-all focus-visible:outline-2 focus-visible:outline-amber-300 ${
+              className={`inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-black transition-all focus-visible:outline-2 focus-visible:outline-amber-300 ${
                 isHumanTurn
-                  ? 'cursor-pointer border-sky-300/70 bg-sky-600/90 text-white shadow-lg hover:bg-sky-500'
-                  : 'cursor-not-allowed border-white/10 bg-white/5 text-white/40'
+                  ? 'btn-tactile-sky cursor-pointer'
+                  : 'cursor-not-allowed border border-white/10 bg-white/5 text-white/40'
               }`}
             >
-              {(() => {
-                if (gameState.pending?.kind === 'draw') {
-                  return `📥 Nhận +${gameState.pending.count} lá (${gameState.pending.count} Xẻng)`;
-                }
-                return '📥 Rút 1 lá (Space)';
-              })()}
+              <Download className="h-4 w-4" />
+              <span>
+                {(() => {
+                  if (gameState.pending?.kind === 'draw') {
+                    return `Nhận +${gameState.pending.count} lá`;
+                  }
+                  return 'Rút 1 lá (Space)';
+                })()}
+              </span>
             </button>
           </div>
         </div>

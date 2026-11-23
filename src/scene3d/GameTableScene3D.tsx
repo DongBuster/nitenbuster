@@ -1,6 +1,7 @@
 import { memo, Suspense, useMemo, useRef, useState, type MutableRefObject } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
+import { Bomb, Crosshair, Download, Flame, Layers, ShieldAlert } from 'lucide-react';
 import * as THREE from 'three';
 import type {
   AnimalId,
@@ -647,22 +648,25 @@ export function GameTableScene3D({
               type="button"
               disabled={!resolvedIsHumanTurn || !onDrawCard}
               onClick={() => resolvedIsHumanTurn && onDrawCard?.()}
-              className={`whitespace-nowrap rounded-full border px-2.5 py-0.5 text-[11px] font-extrabold shadow-md transition ${
+              className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2.5 py-0.5 text-[11px] font-extrabold shadow-md transition ${
                 resolvedIsHumanTurn
                   ? 'pointer-events-auto cursor-pointer border-amber-300 bg-amber-500/95 text-slate-950 hover:bg-amber-400'
                   : 'pointer-events-none border-white/25 bg-slate-900/80 text-slate-200'
               }`}
             >
-              {(() => {
-                if (!resolvedIsHumanTurn) {
-                  return `📥 Chồng bài (${state.drawPile.length})`;
-                }
-                const guaranteed =
-                  state.pending?.kind === 'draw' ? state.pending.count : 1;
-                return guaranteed > 1
-                  ? `📥 Nhận +${guaranteed} lá (${state.drawPile.length})`
-                  : `📥 Rút 1 lá (${state.drawPile.length})`;
-              })()}
+              <Download className="h-3 w-3" />
+              <span>
+                {(() => {
+                  if (!resolvedIsHumanTurn) {
+                    return `Chồng bài (${state.drawPile.length})`;
+                  }
+                  const guaranteed =
+                    state.pending?.kind === 'draw' ? state.pending.count : 1;
+                  return guaranteed > 1
+                    ? `Nhận +${guaranteed} lá (${state.drawPile.length})`
+                    : `Rút 1 lá (${state.drawPile.length})`;
+                })()}
+              </span>
             </button>
           </div>
 
@@ -674,13 +678,13 @@ export function GameTableScene3D({
               style={{ opacity: 0 }}
             >
               <div
-                className="flex items-center gap-1 whitespace-nowrap rounded-full border-2 border-white px-2.5 py-0.5 text-[11px] font-black shadow-lg"
+                className="flex items-center gap-1.5 whitespace-nowrap rounded-full border-2 border-white px-2.5 py-0.5 text-[11px] font-black shadow-lg"
                 style={{
                   backgroundColor: activeColorTheme.primary,
                   color: activeColorTheme.cornerText,
                 }}
               >
-                <span>🍌 Vỏ Chuối →</span>
+                <span>Vỏ Chuối →</span>
                 <span>{activeColorTheme.shapeSymbol}</span>
                 <span>{activeColorTheme.label}</span>
               </div>
@@ -695,14 +699,17 @@ export function GameTableScene3D({
               style={{ opacity: 0 }}
             >
               <div
-                className={`whitespace-nowrap rounded-full border px-2.5 py-0.5 text-xs font-extrabold text-white shadow-lg ${
+                className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2.5 py-0.5 text-xs font-extrabold text-white shadow-lg ${
                   state.activeBomb.fuse <= 1
                     ? 'animate-pulse border-amber-200 bg-red-600'
                     : 'border-red-300/80 bg-red-600/95'
                 }`}
               >
-                💣 Nổ sau {state.activeBomb.fuse} lượt
-                {predictedBombVictim ? ` → ${predictedBombVictim.name} (+4)` : ' (+4)'}
+                <Bomb className="h-3 w-3 text-white" />
+                <span>
+                  Nổ sau {state.activeBomb.fuse} lượt
+                  {predictedBombVictim ? ` → ${predictedBombVictim.name} (+4)` : ' (+4)'}
+                </span>
               </div>
             </div>
           )}
@@ -753,8 +760,9 @@ export function GameTableScene3D({
                   )}
 
                   {isBombVictim && (
-                    <span className="animate-pulse whitespace-nowrap rounded-full border border-red-200 bg-red-600/95 px-2 py-0.5 text-[10px] font-black text-white shadow-md">
-                      💣 Tầm nổ (+4)
+                    <span className="animate-pulse inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-red-200 bg-red-600/95 px-2 py-0.5 text-[10px] font-black text-white shadow-md">
+                      <Bomb className="h-3 w-3 text-white" />
+                      <span>Tầm nổ (+4)</span>
                     </span>
                   )}
 
@@ -762,14 +770,16 @@ export function GameTableScene3D({
                     <button
                       type="button"
                       onClick={() => onCatchPaws(seat.player.id)}
-                      className="pointer-events-auto cursor-pointer whitespace-nowrap rounded-full border-2 border-white bg-rose-600 px-2.5 py-0.5 text-[11px] font-black text-white shadow-lg transition hover:scale-105 hover:bg-rose-500"
+                      className="pointer-events-auto inline-flex cursor-pointer items-center gap-1 whitespace-nowrap rounded-full border-2 border-white bg-rose-600 px-2.5 py-0.5 text-[11px] font-black text-white shadow-lg transition hover:scale-105 hover:bg-rose-500"
                     >
-                      🚨 Bắt lỗi PAWS! (+2)
+                      <ShieldAlert className="h-3 w-3 text-white" />
+                      <span>Bắt lỗi PAWS! (+2)</span>
                     </button>
                   ) : (
                     hasPaws && (
-                      <span className="rounded-full border border-amber-200 bg-gradient-to-r from-amber-400 to-orange-500 px-2 py-0.5 text-[10px] font-black tracking-wide text-slate-950 shadow-md">
-                        🐾 PAWS!
+                      <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-gradient-to-r from-amber-400 to-orange-500 px-2.5 py-0.5 text-[10px] font-black tracking-wide text-slate-950 shadow-md">
+                        <Flame className="h-3 w-3 text-amber-950" />
+                        <span>PAWS!</span>
                       </span>
                     )
                   )}
@@ -786,8 +796,9 @@ export function GameTableScene3D({
                     }`}
                   >
                     <span>{seat.player.name}</span>
-                    <span className="rounded-full bg-black/25 px-1.5 py-0.2 text-[11px]">
-                      🎴 {seat.player.hand.length}
+                    <span className="inline-flex items-center gap-0.5 rounded-full bg-black/25 px-1.5 py-0.2 text-[11px]">
+                      <Layers className="h-2.5 w-2.5" />
+                      <span>{seat.player.hand.length}</span>
                     </span>
                   </div>
 
@@ -795,9 +806,10 @@ export function GameTableScene3D({
                     <button
                       type="button"
                       onClick={() => onSelectTarget(seat.player.id)}
-                      className="pointer-events-auto cursor-pointer whitespace-nowrap rounded-full border-2 border-white bg-rose-500 px-3 py-1 text-xs font-black text-white shadow-lg transition hover:scale-105 hover:bg-rose-400"
+                      className="pointer-events-auto inline-flex cursor-pointer items-center gap-1 whitespace-nowrap rounded-full border-2 border-white bg-rose-500 px-3 py-1 text-xs font-black text-white shadow-lg transition hover:scale-105 hover:bg-rose-400"
                     >
-                      🎯 Bắn Nỏ Thần!
+                      <Crosshair className="h-3.5 w-3.5 text-white" />
+                      <span>Bắn Nỏ Thần!</span>
                     </button>
                   )}
                 </div>

@@ -1,5 +1,11 @@
+import {
+  ArrowLeft,
+  Cookie,
+  RotateCcw,
+  Settings,
+  Trophy,
+} from 'lucide-react';
 import { playSfx } from '../../audio/soundEngine';
-import { BRAWL_ANIMAL_EMOJI } from '../sim/constants';
 import { getHumanFinalRank, getSortedStandings } from '../sim/matchStore';
 import type { MatchState } from '../sim/types';
 
@@ -23,23 +29,25 @@ export function BrawlResult({
   const champion = standings[0];
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-[radial-gradient(ellipse_at_top,_rgba(30,58,95,0.92)_0%,_rgba(11,20,34,0.97)_100%)] p-4 text-white backdrop-blur-md">
-      <div className="w-full max-w-xl rounded-3xl border-2 border-amber-300/60 bg-slate-900/95 p-6 shadow-2xl sm:p-8">
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/75 p-4 text-white backdrop-blur-md">
+      <div className="w-full max-w-xl rounded-3xl border-2 border-amber-400/50 bg-[#132032] p-6 shadow-2xl sm:p-8">
         <div className="text-center">
-          <div className="text-4xl">{humanRank === 1 ? '🏆' : humanRank <= 3 ? '🥈' : '🐾'}</div>
-          <h2 className="mt-2 font-display text-3xl font-black text-amber-300">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-amber-400/30 bg-amber-400/15 text-amber-300 shadow-inner">
+            <Trophy className="h-8 w-8 text-amber-400" />
+          </div>
+          <h2 className="mt-3 font-display text-3xl font-black text-amber-300">
             {humanRank === 1
               ? 'NHÀ VÔ ĐỊCH ĐẤU TRƯỜNG!'
-              : `Hạng #${humanRank} Chung Cuộc!`}
+              : `Hạng #${humanRank} Chung Cuộc`}
           </h2>
           {champion && (
             <p className="mt-1 text-sm font-semibold text-slate-300">
-              Quán quân: {BRAWL_ANIMAL_EMOJI[champion.animal]} <strong>{champion.name}</strong> ({champion.points} điểm)
+              Quán quân: <strong>{champion.name}</strong> ({champion.points} điểm)
             </p>
           )}
-          <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-amber-300/40 bg-amber-400/15 px-4 py-1 text-sm font-black text-amber-200">
-            <span>🍪</span>
-            <span>+{cookiesEarned} Cookies đã lưu vào hồ sơ!</span>
+          <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-amber-400/40 bg-amber-400/15 px-4 py-1 text-sm font-black text-amber-200">
+            <Cookie className="h-4 w-4 text-amber-400" />
+            <span>+{cookiesEarned} Cookies đã cộng vào ví!</span>
           </div>
         </div>
 
@@ -50,7 +58,7 @@ export function BrawlResult({
               key={entry.id}
               className={`flex items-center justify-between rounded-2xl border px-4 py-2.5 text-sm font-bold ${
                 entry.id === 'human'
-                  ? 'border-amber-300/70 bg-amber-400/15 text-amber-100'
+                  ? 'border-amber-400/60 bg-amber-400/15 text-amber-100'
                   : 'border-white/10 bg-white/5 text-slate-200'
               }`}
             >
@@ -58,7 +66,6 @@ export function BrawlResult({
                 <span className="w-6 text-center font-mono text-base font-black text-amber-300">
                   #{idx + 1}
                 </span>
-                <span className="text-xl">{BRAWL_ANIMAL_EMOJI[entry.animal]}</span>
                 <span>{entry.name}</span>
               </div>
 
@@ -85,9 +92,10 @@ export function BrawlResult({
               playSfx('roundStart');
               onPlayAgain();
             }}
-            className="cursor-pointer rounded-2xl bg-gradient-to-r from-amber-400 to-orange-400 px-4 py-3 text-sm font-black text-[#1B110B] shadow-lg hover:brightness-105"
+            className="btn-tactile-amber inline-flex cursor-pointer items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-black text-[#1B110B]"
           >
-            🔄 Chơi Lại
+            <RotateCcw className="h-4 w-4" />
+            <span>Chơi Lại</span>
           </button>
           <button
             type="button"
@@ -95,9 +103,10 @@ export function BrawlResult({
               playSfx('click');
               onChangeSettings();
             }}
-            className="cursor-pointer rounded-2xl border border-white/20 bg-white/10 px-4 py-3 text-sm font-bold text-white hover:bg-white/20"
+            className="btn-tactile-wood inline-flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-white/20 px-4 py-3 text-sm font-bold text-white"
           >
-            ⚙️ Đổi Cài Đặt
+            <Settings className="h-4 w-4 text-amber-300" />
+            <span>Đổi Cài Đặt</span>
           </button>
           <button
             type="button"
@@ -105,9 +114,10 @@ export function BrawlResult({
               playSfx('click');
               onBackToModeSelect();
             }}
-            className="cursor-pointer rounded-2xl border border-white/20 bg-white/10 px-4 py-3 text-sm font-bold text-slate-200 hover:bg-white/20"
+            className="btn-tactile-wood inline-flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-white/20 px-4 py-3 text-sm font-bold text-slate-200"
           >
-            ← Chọn Chế Độ
+            <ArrowLeft className="h-4 w-4 text-slate-400" />
+            <span>Chọn Chế Độ</span>
           </button>
         </div>
       </div>

@@ -615,12 +615,9 @@ export function Showcase3D() {
 
       {/* ================= TOP-LEFT STUDIO HEADER & MODE SWITCHER ================= */}
       <div className="pointer-events-none fixed left-4 top-4 z-40 flex max-w-[calc(100vw-13rem)] flex-col gap-2.5 sm:max-w-[calc(100vw-14rem)] sm:pr-4">
-        <div className="pointer-events-auto inline-flex flex-wrap items-center gap-2 rounded-2xl border border-amber-200/20 bg-[#26170F]/80 px-3.5 py-2 shadow-xl backdrop-blur-md">
+        <div className="pointer-events-auto inline-flex flex-wrap items-center gap-2 rounded-2xl border border-amber-900/40 bg-[#26170F]/90 px-3.5 py-2 shadow-xl backdrop-blur-md">
           <div className="flex items-center gap-2 pr-1">
-            <span aria-hidden="true" className="text-lg">
-              🐾
-            </span>
-            <span className="font-display text-base font-extrabold tracking-tight text-[#FFFBF4]">
+            <span className="font-display text-base font-black tracking-tight text-[#FFFBF4]">
               PAWS 3D Studio
             </span>
           </div>
@@ -628,14 +625,14 @@ export function Showcase3D() {
           <div
             role="tablist"
             aria-label="Chế độ 3D Studio"
-            className="inline-flex rounded-xl bg-black/30 p-1"
+            className="inline-flex rounded-xl bg-black/40 p-1"
           >
             {(
               [
-                { id: 'lineup', label: '👥 Đội Hình 8 Con' },
-                { id: 'table', label: '🪵 Bàn Chơi 3D' },
-                { id: 'character', label: '🐻 Soi Nhân Vật 3D' },
-                { id: 'card', label: '🃏 Soi Thẻ Bài 3D' },
+                { id: 'lineup', label: 'Đội Hình 8 Con' },
+                { id: 'table', label: 'Bàn Chơi 3D' },
+                { id: 'character', label: 'Soi Nhân Vật' },
+                { id: 'card', label: 'Soi Thẻ Bài' },
               ] as { id: StudioMode; label: string }[]
             ).map((tab) => {
               const active = mode === tab.id;
