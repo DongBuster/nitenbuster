@@ -315,16 +315,6 @@ export function OnlineGame3DScreen({
             🌐 Phòng: {room.roomCode}
           </span>
 
-          <span
-            className={`rounded-xl border px-2.5 py-1.5 text-xs font-black shadow-lg backdrop-blur-md ${
-              isLowTimer
-                ? 'animate-pulse border-rose-300 bg-rose-600/90 text-white'
-                : 'border-white/20 bg-slate-900/85 text-amber-200'
-            }`}
-          >
-            ⏱️ {room.turnSecondsLeft}s
-          </span>
-
           <div
             className="flex items-center gap-1.5 rounded-xl border border-white/40 px-2.5 py-1.5 text-xs font-black shadow-lg"
             style={{
@@ -410,8 +400,64 @@ export function OnlineGame3DScreen({
         </div>
       </header>
 
-      {/* Center Status Banners (Log ticker, Pending Shovel, Bomb, Emote) */}
-      <div className="pointer-events-none fixed inset-x-0 top-16 z-20 flex flex-col items-center gap-1.5 px-4">
+      {/* Center Status Banners (Turn Timer, Pending Shovel, Bomb, Emote) */}
+      <div className="pointer-events-none fixed inset-x-0 top-14 z-20 flex flex-col items-center gap-1.5 px-4 sm:top-16">
+        {gameState.winnerId === null && (() => {
+          const totalSec = Math.max(1, room.roomSettings.turnTimeSec);
+          const pct = Math.max(0, Math.min(100, (room.turnSecondsLeft / totalSec) * 100));
+          const isWarning = !isLowTimer && room.turnSecondsLeft <= 10;
+
+          const cardStyle = isLowTimer
+            ? 'animate-pulse border-rose-300/90 bg-rose-950/90 shadow-rose-500/30'
+            : isWarning
+              ? 'border-amber-300/80 bg-slate-950/90 shadow-amber-500/20'
+              : isHumanTurn
+                ? 'border-emerald-300/75 bg-slate-950/90 shadow-emerald-500/20'
+                : 'border-white/25 bg-slate-950/85 shadow-black/40';
+
+          const barColor = isLowTimer
+            ? 'bg-gradient-to-r from-rose-500 to-red-400'
+            : isWarning
+              ? 'bg-gradient-to-r from-amber-500 to-orange-400'
+              : isHumanTurn
+                ? 'bg-gradient-to-r from-emerald-400 to-teal-300'
+                : 'bg-gradient-to-r from-sky-400 to-cyan-300';
+
+          const timeTextColor = isLowTimer
+            ? 'text-rose-200'
+            : isWarning
+              ? 'text-amber-300'
+              : isHumanTurn
+                ? 'text-emerald-300'
+                : 'text-sky-200';
+
+          return (
+            <div className={`w-full max-w-xs rounded-2xl border px-3.5 py-2 shadow-2xl backdrop-blur-md transition-colors sm:max-w-sm ${cardStyle}`}>
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-1.5">
+                  <span className="truncate text-xs font-black tracking-wide text-white sm:text-sm">
+                    {isHumanTurn ? '✨ Lượt của bạn!' : `⏳ Lượt: ${currentPlayer?.name ?? '...'}`}
+                  </span>
+                  {isLowTimer && (
+                    <span className="shrink-0 rounded-full bg-rose-500 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-white">
+                      Nhanh tay!
+                    </span>
+                  )}
+                </div>
+                <span className={`shrink-0 font-mono text-xl font-black leading-none tabular-nums sm:text-2xl ${timeTextColor}`}>
+                  ⏱️ {room.turnSecondsLeft}s
+                </span>
+              </div>
+              <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-white/15">
+                <div
+                  className={`h-full rounded-full transition-all duration-500 ease-linear ${barColor}`}
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+            </div>
+          );
+        })()}
+
         {gameState.pending?.kind === 'draw' && (
           <div className="rounded-full border border-rose-300/70 bg-rose-600/95 px-4 py-1 text-xs font-black text-white shadow-lg">
             ⛏️ Đang cộng dồn phạt +{gameState.pending.count} lá! (Đánh Xẻng / Tàng Hình hoặc Rút)
