@@ -20,6 +20,10 @@ import {
 import { RulesModal } from '../components/Modals/RulesModal';
 import { TutorialOverlay } from '../components/Modals/TutorialOverlay';
 import {
+  PawsShoutOverlay,
+  type PawsShoutInfo,
+} from '../components/Modals/PawsShoutOverlay';
+import {
   playSfx,
   setAudioPreferences,
   startBgm,
@@ -66,6 +70,30 @@ export function OnlineGame3DScreen({
   const [showRules, setShowRules] = useState<boolean>(false);
   const [showTutorial, setShowTutorial] = useState<boolean>(false);
   const [cookiesEarned, setCookiesEarned] = useState<number>(0);
+  const [pawsShout, setPawsShout] = useState<PawsShoutInfo | null>(null);
+  const prevCalledPawsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!gameState) return;
+    const currentSet = new Set(
+      gameState.players.filter((p) => p.calledPaws).map((p) => p.id),
+    );
+    const newlyCalled = gameState.players.find(
+      (p) => p.calledPaws && !prevCalledPawsRef.current.has(p.id),
+    );
+    prevCalledPawsRef.current = currentSet;
+
+    if (newlyCalled && gameState.winnerId === null) {
+      playSfx('paws');
+      setPawsShout({
+        key: `${gameState.turnCount}-${newlyCalled.id}-${Date.now()}`,
+        playerName: newlyCalled.name,
+        animal: newlyCalled.animal,
+      });
+      const timer = window.setTimeout(() => setPawsShout(null), 1700);
+      return () => window.clearTimeout(timer);
+    }
+  }, [gameState]);
 
   const recordedWinnerRef = useRef<string | null>(null);
   const lastTurnCountRef = useRef<number>(-1);
@@ -237,8 +265,7 @@ export function OnlineGame3DScreen({
 
   const canCallPaws =
     gameState.winnerId === null &&
-    humanPlayer.hand.length >= 1 &&
-    humanPlayer.hand.length <= 2 &&
+    humanPlayer.hand.length === 1 &&
     !humanPlayer.calledPaws;
 
   const isLowTimer = room.turnSecondsLeft <= 5 && gameState.winnerId === null;
@@ -551,6 +578,7 @@ export function OnlineGame3DScreen({
         isOpen={showTutorial}
         onClose={() => setShowTutorial(false)}
       />
+      <PawsShoutOverlay shout={pawsShout} />
     </div>
   );
 }

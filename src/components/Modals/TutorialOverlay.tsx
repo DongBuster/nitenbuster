@@ -81,7 +81,7 @@ const TUTORIAL_STEPS: TutorialStep[] = [
     summary:
       'Ai đánh hết bài trên tay đầu tiên sẽ thắng và nhận +50 Cookies 🍪 (tham gia vẫn nhận +15 🍪)!',
     bullets: [
-      'Khi còn 1–2 lá bài, bấm ngay nút 🐾 Hô PAWS! ở thanh dưới để khỏi bị đối thủ bắt lỗi.',
+      'Khi còn đúng 1 lá bài, bấm ngay nút 🐾 Hô PAWS! ở thanh dưới để khỏi bị đối thủ bắt lỗi.',
       'Nếu quên hô khi còn 1 lá, bot (mức Vừa/Khó) sẽ phạt bạn rút +2 lá!',
       'Thấy bot chỉ còn 1 lá mà quên hô? Bấm ngay nút 🚨 Bắt lỗi PAWS! (+2) phía trên đầu bot để phạt chúng!',
     ],

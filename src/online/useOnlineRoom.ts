@@ -777,7 +777,7 @@ export function useOnlineRoom() {
       const updatedActive = nextState.players.find((p) => p.id === active.id);
       if (
         updatedActive &&
-        updatedActive.hand.length <= 2 &&
+        updatedActive.hand.length === 1 &&
         !updatedActive.calledPaws &&
         shouldBotCallPaws(updatedActive, nextState.difficulty)
       ) {

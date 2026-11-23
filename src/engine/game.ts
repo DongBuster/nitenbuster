@@ -941,7 +941,7 @@ export function callPaws(state: GameState, playerId: string): GameState {
   if (idx === -1) return state;
 
   const player = state.players[idx];
-  if (player.hand.length > 2 || player.calledPaws) {
+  if (player.hand.length !== 1 || player.calledPaws) {
     return state;
   }
 

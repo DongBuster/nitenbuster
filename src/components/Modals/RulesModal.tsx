@@ -167,7 +167,7 @@ export function RulesModal({ isOpen, onClose }: RulesModalProps) {
                     🐾 Luật Hô &quot;PAWS!&quot; &amp; Hỗ Trợ Mù Màu
                   </h3>
                   <p className="mt-2 text-sm text-slate-200">
-                    Khi chỉ còn <strong>1–2 lá bài</strong>, hãy bấm nút{' '}
+                    Khi chỉ còn <strong>1 lá bài</strong>, hãy bấm nút{' '}
                     <strong className="text-amber-300">🐾 Hô PAWS!</strong> để báo hiệu sắp về nhất!
                   </p>
                   <div className="mt-3 grid grid-cols-2 gap-2">

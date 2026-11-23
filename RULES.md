@@ -34,7 +34,7 @@ Mỗi màu đi kèm 1 hình khối cố định ở góc lá bài để người
    - Là **lá Wild** (đánh lên bất kỳ lá nào khi không bị phạt Xẻng Tuyết).
 2. Nếu không có lá hợp lệ (hoặc muốn giữ bài), nhấn **Rút Bài** (`Space`) để rút 1 lá từ chồng rút rồi qua lượt.
 3. Khi chồng rút cạn, hệ thống tự động giữ lại lá trên cùng của chồng bỏ và xáo toàn bộ phần còn lại làm chồng rút mới.
-4. **Quy tắc Hô "PAWS!":** Khi trên tay còn **1–2 lá bài**, nhấn nút **🐾 Hô PAWS!** để báo hiệu sắp về đích.
+4. **Quy tắc Hô "PAWS!":** Khi trên tay chỉ còn **1 lá bài**, nhấn nút **🐾 Hô PAWS!** để báo hiệu sắp về đích (quên hô có thể bị bắt lỗi phạt rút **+2 lá**).
 
 ---
 

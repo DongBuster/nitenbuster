@@ -261,5 +261,5 @@ export function shouldBotCallPaws(
   _seed?: number
 ): boolean {
   if (player.calledPaws) return false;
-  return player.hand.length >= 1 && player.hand.length <= 2;
+  return player.hand.length === 1;
 }

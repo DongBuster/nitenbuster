@@ -26,6 +26,10 @@ import {
 import { RulesModal } from '../components/Modals/RulesModal';
 import { TutorialOverlay } from '../components/Modals/TutorialOverlay';
 import {
+  PawsShoutOverlay,
+  type PawsShoutInfo,
+} from '../components/Modals/PawsShoutOverlay';
+import {
   playSfx,
   setAudioPreferences,
   startBgm,
@@ -127,11 +131,33 @@ export function Game3DScreen({ onBackToMenu }: Game3DScreenProps) {
       ? gameState.logs[gameState.logs.length - 1]
       : null;
 
+  const [pawsShout, setPawsShout] = useState<PawsShoutInfo | null>(null);
+  const prevCalledPawsRef = useRef<Set<string>>(new Set());
+
   const canCallPaws =
     gameState.winnerId === null &&
-    humanPlayer.hand.length >= 1 &&
-    humanPlayer.hand.length <= 2 &&
+    humanPlayer.hand.length === 1 &&
     !humanPlayer.calledPaws;
+
+  useEffect(() => {
+    const currentSet = new Set(
+      gameState.players.filter((p) => p.calledPaws).map((p) => p.id),
+    );
+    const newlyCalled = gameState.players.find(
+      (p) => p.calledPaws && !prevCalledPawsRef.current.has(p.id),
+    );
+    prevCalledPawsRef.current = currentSet;
+
+    if (newlyCalled && gameState.winnerId === null) {
+      setPawsShout({
+        key: `${gameState.turnCount}-${newlyCalled.id}-${Date.now()}`,
+        playerName: newlyCalled.name,
+        animal: newlyCalled.animal,
+      });
+      const timer = window.setTimeout(() => setPawsShout(null), 1700);
+      return () => window.clearTimeout(timer);
+    }
+  }, [gameState.players, gameState.turnCount, gameState.winnerId]);
 
   const playableCardIds = useMemo(() => {
     if (!isHumanTurn) return [];
@@ -538,7 +564,7 @@ export function Game3DScreen({ onBackToMenu }: Game3DScreenProps) {
               <span>
                 💡 <strong>Mẹo nhanh:</strong> Bấm trực tiếp lá bài 3D sáng ở
                 trước mặt để đánh · Nhấn <strong>Space</strong> (hoặc chồng bài)
-                để rút · Khi còn 1–2 lá nhớ bấm <strong>🐾 Hô PAWS!</strong>
+                để rút · Khi còn 1 lá nhớ bấm <strong>🐾 Hô PAWS!</strong>
               </span>
               <button
                 type="button"
@@ -661,6 +687,7 @@ export function Game3DScreen({ onBackToMenu }: Game3DScreenProps) {
 
       <RulesModal isOpen={showRules} onClose={() => setShowRules(false)} />
       <TutorialOverlay isOpen={showTutorial} onClose={handleCloseTutorial} />
+      <PawsShoutOverlay shout={pawsShout} />
     </div>
   );
 }
