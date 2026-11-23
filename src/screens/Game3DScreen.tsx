@@ -38,6 +38,8 @@ import {
 } from '../audio/soundEngine';
 import { useProfileStore } from '../store/profileStore';
 
+const OFFLINE_TURN_TIME_SEC = 20;
+
 export interface Game3DScreenProps {
   onBackToMenu: () => void;
 }
@@ -96,6 +98,9 @@ export function Game3DScreen({ onBackToMenu }: Game3DScreenProps) {
   });
   const [cookiesEarned, setCookiesEarned] = useState<number>(0);
   const [dismissedTip, setDismissedTip] = useState<boolean>(false);
+  const [turnSecondsLeft, setTurnSecondsLeft] = useState<number>(
+    OFFLINE_TURN_TIME_SEC,
+  );
 
   const handleCloseTutorial = useCallback(() => {
     setShowTutorial(false);
@@ -159,6 +164,8 @@ export function Game3DScreen({ onBackToMenu }: Game3DScreenProps) {
     }
   }, [gameState.players, gameState.turnCount, gameState.winnerId]);
 
+  const isLowTimer = turnSecondsLeft <= 5 && gameState.winnerId === null;
+
   const playableCardIds = useMemo(() => {
     if (!isHumanTurn) return [];
     return humanPlayer.hand
@@ -188,6 +195,7 @@ export function Game3DScreen({ onBackToMenu }: Game3DScreenProps) {
     setCookiesEarned(0);
     setPendingColorCard(null);
     setPendingTargetCard(null);
+    setTurnSecondsLeft(OFFLINE_TURN_TIME_SEC);
     setGameState(
       dealGame({
         humanAnimal: selectedAnimal,
@@ -304,6 +312,48 @@ export function Game3DScreen({ onBackToMenu }: Game3DScreenProps) {
     showTutorial,
     gameState.winnerId,
     handleHumanDraw,
+  ]);
+
+  // Reset turn countdown whenever the active turn changes
+  useEffect(() => {
+    setTurnSecondsLeft(OFFLINE_TURN_TIME_SEC);
+  }, [gameState.turnCount, gameState.currentIndex]);
+
+  // Turn countdown tick (pauses while rules/tutorial modals are open or game over)
+  useEffect(() => {
+    if (gameState.winnerId !== null || showRules || showTutorial) {
+      return;
+    }
+
+    const interval = window.setInterval(() => {
+      setTurnSecondsLeft((prev) => Math.max(0, prev - 1));
+    }, 1000);
+
+    return () => window.clearInterval(interval);
+  }, [gameState.winnerId, showRules, showTutorial]);
+
+  // Auto-draw 1 card when time expires on human turn
+  useEffect(() => {
+    if (
+      turnSecondsLeft !== 0 ||
+      !isHumanTurn ||
+      gameState.winnerId !== null ||
+      showRules ||
+      showTutorial
+    ) {
+      return;
+    }
+    setPendingColorCard(null);
+    setPendingTargetCard(null);
+    playSfx('draw');
+    setGameState((curr) => drawTurnAction(curr, humanId));
+  }, [
+    turnSecondsLeft,
+    isHumanTurn,
+    gameState.winnerId,
+    showRules,
+    showTutorial,
+    humanId,
   ]);
 
   // Bot Turn Loop
@@ -539,8 +589,72 @@ export function Game3DScreen({ onBackToMenu }: Game3DScreenProps) {
           </div>
         </div>
 
-        {/* Warning Banners (Shovel Pending / Active Bomb) & Action Log Ticker */}
+        {/* Turn Countdown + Warning Banners (Shovel Pending / Active Bomb) & Action Log Ticker */}
         <div className="flex flex-col items-center gap-1.5">
+          {gameState.winnerId === null && (() => {
+            const pct = Math.max(
+              0,
+              Math.min(100, (turnSecondsLeft / OFFLINE_TURN_TIME_SEC) * 100),
+            );
+            const isWarning = !isLowTimer && turnSecondsLeft <= 10;
+
+            const cardStyle = isLowTimer
+              ? 'animate-pulse border-rose-300/90 bg-rose-950/90 shadow-rose-500/30'
+              : isWarning
+                ? 'border-amber-300/80 bg-[#1F120C]/90 shadow-amber-500/20'
+                : isHumanTurn
+                  ? 'border-emerald-300/75 bg-[#1F120C]/90 shadow-emerald-500/20'
+                  : 'border-white/25 bg-[#1F120C]/85 shadow-black/40';
+
+            const barColor = isLowTimer
+              ? 'bg-gradient-to-r from-rose-500 to-red-400'
+              : isWarning
+                ? 'bg-gradient-to-r from-amber-500 to-orange-400'
+                : isHumanTurn
+                  ? 'bg-gradient-to-r from-emerald-400 to-teal-300'
+                  : 'bg-gradient-to-r from-sky-400 to-cyan-300';
+
+            const timeTextColor = isLowTimer
+              ? 'text-rose-200'
+              : isWarning
+                ? 'text-amber-300'
+                : isHumanTurn
+                  ? 'text-emerald-300'
+                  : 'text-sky-200';
+
+            return (
+              <div
+                className={`w-full max-w-xs rounded-2xl border px-3.5 py-2 shadow-2xl backdrop-blur-md transition-colors sm:max-w-sm ${cardStyle}`}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-1.5">
+                    <span className="truncate text-xs font-black tracking-wide text-white sm:text-sm">
+                      {isHumanTurn
+                        ? '✨ Lượt của bạn!'
+                        : `⏳ Lượt: ${currentPlayer?.name ?? '...'}`}
+                    </span>
+                    {isLowTimer && (
+                      <span className="shrink-0 rounded-full bg-rose-500 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-white">
+                        Nhanh tay!
+                      </span>
+                    )}
+                  </div>
+                  <span
+                    className={`shrink-0 font-mono text-xl font-black leading-none tabular-nums sm:text-2xl ${timeTextColor}`}
+                  >
+                    ⏱️ {turnSecondsLeft}s
+                  </span>
+                </div>
+                <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-white/15">
+                  <div
+                    className={`h-full rounded-full transition-all duration-500 ease-linear ${barColor}`}
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+              </div>
+            );
+          })()}
+
           {gameState.pending?.kind === 'draw' && (
             <div className="rounded-full border border-rose-300/60 bg-rose-950/90 px-4 py-1 text-xs font-extrabold text-rose-100 shadow-lg backdrop-blur-md">
               ❄️ Xẻng Tuyết cộng dồn: +{gameState.pending.count} lá! (Đánh Xẻng / Thuốc Tàng Hình hoặc bấm Rút)
