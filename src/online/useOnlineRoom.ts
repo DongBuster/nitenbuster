@@ -2,6 +2,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { AnimalId, CardData, GameState, PlayOptions } from '../engine/types';
 import {
+  normalizeAccessories,
+  type AccessorySelection,
+} from '../scene3d/accessoryCatalog';
+import {
   callPaws,
   catchMissedPaws,
   dealOnlineGame,
@@ -76,7 +80,7 @@ function parsePresenceMembers(
         peerId: m.peerId,
         name: m.name,
         animal: (m.animal ?? 'dog') as AnimalId,
-        accessory: m.accessory ?? null,
+        accessory: normalizeAccessories(m.accessory as AccessorySelection),
         isHost: Boolean(m.isHost),
         ready: Boolean(m.ready),
         joinedAt: typeof m.joinedAt === 'number' ? m.joinedAt : Date.now(),
@@ -107,7 +111,7 @@ export function useOnlineRoom() {
     DEFAULT_ROOM_SETTINGS.turnTimeSec,
   );
   const [roomAccessories, setRoomAccessories] = useState<
-    Partial<Record<AnimalId, string | null>>
+    Partial<Record<AnimalId, string[]>>
   >({});
   const [lastEmote, setLastEmote] = useState<EmoteEvent | null>(null);
 
@@ -122,7 +126,7 @@ export function useOnlineRoom() {
   const hostIdRef = useRef<string>('');
   const roomSettingsRef = useRef<RoomSettings>(DEFAULT_ROOM_SETTINGS);
   const phaseRef = useRef<RoomPhase>('idle');
-  const roomAccessoriesRef = useRef<Partial<Record<AnimalId, string | null>>>(
+  const roomAccessoriesRef = useRef<Partial<Record<AnimalId, string[]>>>(
     {},
   );
   const autoTimeoutFiredTurnRef = useRef<number>(-1);
@@ -320,7 +324,7 @@ export function useOnlineRoom() {
   const connectToRoom = useCallback(
     (
       rawCode: string,
-      profile: { name: string; animal: AnimalId; accessory: string | null },
+      profile: { name: string; animal: AnimalId; accessory: AccessorySelection },
       asHost: boolean,
     ) => {
       const client = getSupabaseClient();
@@ -349,7 +353,7 @@ export function useOnlineRoom() {
         peerId: myPeerId,
         name: trimmedName,
         animal: profile.animal,
-        accessory: profile.accessory,
+        accessory: normalizeAccessories(profile.accessory),
         isHost: asHost,
         ready: asHost,
         joinedAt: Date.now(),
@@ -384,9 +388,9 @@ export function useOnlineRoom() {
           }
 
           // Sync accessories map from current lobby presence
-          const accMap: Partial<Record<AnimalId, string | null>> = {};
+          const accMap: Partial<Record<AnimalId, string[]>> = {};
           for (const m of parsed) {
-            if (m.accessory) {
+            if (m.accessory.length > 0) {
               accMap[m.animal] = m.accessory;
             }
           }
@@ -423,8 +427,17 @@ export function useOnlineRoom() {
           }
           lastSnapshotRef.current = evt;
           turnDeadlineRef.current = evt.turnDeadlineMs;
-          setRoomAccessories(evt.accessories ?? {});
-          roomAccessoriesRef.current = evt.accessories ?? {};
+          const normalizedEvtAcc: Partial<Record<AnimalId, string[]>> = {};
+          if (evt.accessories) {
+            for (const [k, v] of Object.entries(evt.accessories)) {
+              const list = normalizeAccessories(v as AccessorySelection);
+              if (list.length > 0) {
+                normalizedEvtAcc[k as AnimalId] = list;
+              }
+            }
+          }
+          setRoomAccessories(normalizedEvtAcc);
+          roomAccessoriesRef.current = normalizedEvtAcc;
           setPhase('playing');
           setTurnSecondsLeft(
             evt.turnDeadlineMs > 0
@@ -500,7 +513,7 @@ export function useOnlineRoom() {
   );
 
   const createRoom = useCallback(
-    (profile: { name: string; animal: AnimalId; accessory: string | null }) => {
+    (profile: { name: string; animal: AnimalId; accessory: AccessorySelection }) => {
       const code = generateRoomCode(5);
       connectToRoom(code, profile, true);
     },
@@ -510,7 +523,7 @@ export function useOnlineRoom() {
   const joinRoom = useCallback(
     (
       code: string,
-      profile: { name: string; animal: AnimalId; accessory: string | null },
+      profile: { name: string; animal: AnimalId; accessory: AccessorySelection },
     ) => {
       connectToRoom(code, profile, false);
     },
@@ -522,7 +535,7 @@ export function useOnlineRoom() {
       patch: Partial<{
         name: string;
         animal: AnimalId;
-        accessory: string | null;
+        accessory: AccessorySelection;
         ready: boolean;
       }>,
     ) => {
@@ -532,6 +545,10 @@ export function useOnlineRoom() {
       const updated: LobbyPresenceMember = {
         ...current,
         ...patch,
+        accessory:
+          patch.accessory !== undefined
+            ? normalizeAccessories(patch.accessory)
+            : current.accessory,
         name:
           patch.name !== undefined
             ? patch.name.trim() || current.name
@@ -595,9 +612,9 @@ export function useOnlineRoom() {
 
     if (humans.length === 0) return;
 
-    const accMap: Partial<Record<AnimalId, string | null>> = {};
+    const accMap: Partial<Record<AnimalId, string[]>> = {};
     for (const m of currentMembers) {
-      if (m.accessory) {
+      if (m.accessory.length > 0) {
         accMap[m.animal] = m.accessory;
       }
     }

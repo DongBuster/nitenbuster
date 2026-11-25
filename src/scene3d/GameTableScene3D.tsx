@@ -1,4 +1,4 @@
-import { memo, Suspense, useMemo, useRef, useState, type MutableRefObject } from 'react';
+import { memo, Suspense, useCallback, useMemo, useRef, useState, type MutableRefObject } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import { Bomb, Crosshair, Download, Flame, Layers, ShieldAlert } from 'lucide-react';
@@ -15,6 +15,7 @@ import { CARD_META, COLOR_THEME, CardInfoButton } from '../components/Card';
 import { getPredictedBombVictim } from '../engine/rules';
 import { WinterCabinStage } from './WinterCabinStage';
 import { Character3D } from './Character3D';
+import type { AccessorySelection } from './accessoryCatalog';
 import { Card3D } from './Card3D';
 import { CardFan3D } from './CardFan3D';
 
@@ -24,7 +25,7 @@ export interface GameTableScene3DProps {
   isHumanTurn?: boolean;
   targetPickingMode?: boolean;
   playableCardIds?: string[];
-  equippedAccessory?: Partial<Record<AnimalId, string | null>>;
+  equippedAccessory?: Partial<Record<AnimalId, AccessorySelection>>;
   hideHtmlOverlays?: boolean;
   onDrawCard?: () => void;
   onPlayCard?: (card: CardData) => void;
@@ -300,14 +301,11 @@ const DiscardPile3D = memo(function DiscardPile3D({
  * Lightweight 60fps world-to-screen projector driving pure React DOM overlays
  * outside <Canvas> (zero drei <Html> portals, zero React 19 unmount crashes).
  */
-const HAND_POS: [number, number, number] = [0, 1.02, 3.65];
-const HAND_ROT_X = -0.36;
-const HAND_BASE_SCALE = 0.76;
-
 function OverlayProjector({
   botSeats,
   humanHand,
   badgeRefs,
+  cardAnchorRefs,
   handInfoRefs,
   drawBadgeRef,
   discardBadgeRef,
@@ -318,6 +316,7 @@ function OverlayProjector({
   botSeats: SeatTransform[];
   humanHand: CardData[];
   badgeRefs: MutableRefObject<Record<string, HTMLDivElement | null>>;
+  cardAnchorRefs: MutableRefObject<Record<string, THREE.Object3D | null>>;
   handInfoRefs: MutableRefObject<Record<string, HTMLDivElement | null>>;
   drawBadgeRef: MutableRefObject<HTMLDivElement | null>;
   discardBadgeRef: MutableRefObject<HTMLDivElement | null>;
@@ -364,40 +363,27 @@ function OverlayProjector({
       );
     }
 
-    // Project compact "!" info triggers onto the top-right corner of each card in the player's 3D hand
-    const handCount = humanHand.length;
-    if (handCount > 0) {
-      const rowStep = handCount <= 1 ? 0 : Math.min(1.06, 6.9 / (handCount - 1));
-      const effectiveScale =
-        handCount > 10
-          ? HAND_BASE_SCALE * Math.max(0.76, 1 - (handCount - 10) * 0.04)
-          : HAND_BASE_SCALE;
-      const mid = (handCount - 1) / 2;
-      const cosX = Math.cos(HAND_ROT_X);
-      const sinX = Math.sin(HAND_ROT_X);
-
-      for (let i = 0; i < handCount; i++) {
-        const card = humanHand[i];
-        const localX = (i - mid) * rowStep + 0.34;
-        const localY = 0.66;
-        const localZ = i * 0.04 + 0.03;
-
-        const sx = localX * effectiveScale;
-        const sy = localY * effectiveScale;
-        const sz = localZ * effectiveScale;
-
-        const wx = HAND_POS[0] + sx;
-        const wy = HAND_POS[1] + sy * cosX - sz * sinX;
-        const wz = HAND_POS[2] + sy * sinX + sz * cosX;
-
-        applyProjection(
-          handInfoRefs.current[card.id] ?? null,
-          wx,
-          wy,
-          wz,
-          'translate(-50%, -50%)',
-        );
+    // Project compact "!" info triggers using each 3D card's live world-space corner anchor
+    // so the badge tracks hover lift, selection, and scale smoothly at 60fps
+    for (let i = 0; i < humanHand.length; i++) {
+      const card = humanHand[i];
+      const anchor = cardAnchorRefs.current[card.id];
+      const el = handInfoRefs.current[card.id] ?? null;
+      if (!anchor) {
+        if (el) {
+          el.style.opacity = '0';
+          el.style.visibility = 'hidden';
+        }
+        continue;
       }
+      anchor.getWorldPosition(tempVec);
+      applyProjection(
+        el,
+        tempVec.x,
+        tempVec.y,
+        tempVec.z,
+        'translate(-50%, -50%)',
+      );
     }
 
     applyProjection(drawBadgeRef.current, -0.78, 0.34, 0.78);
@@ -440,16 +426,34 @@ export function GameTableScene3D({
   );
 
   const badgeRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const cardAnchorRefs = useRef<Record<string, THREE.Object3D | null>>({});
   const handInfoRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const drawBadgeRef = useRef<HTMLDivElement | null>(null);
   const discardBadgeRef = useRef<HTMLDivElement | null>(null);
   const bombBadgeRef = useRef<HTMLDivElement | null>(null);
+  const [hoveredInfoCardId, setHoveredInfoCardId] = useState<string | null>(null);
+
+  const handleCardInfoAnchorRef = useCallback(
+    (cardId: string, obj: THREE.Object3D | null) => {
+      if (obj) {
+        cardAnchorRefs.current[cardId] = obj;
+      } else {
+        delete cardAnchorRefs.current[cardId];
+      }
+    },
+    [],
+  );
 
   const predictedBombVictim = useMemo(
     () => getPredictedBombVictim(state),
     [state],
   );
   const humanHand = humanPlayer?.hand ?? [];
+  const activeHoveredInfoCardId = humanHand.some(
+    (c) => c.id === hoveredInfoCardId,
+  )
+    ? hoveredInfoCardId
+    : null;
 
   const topDiscard = state.discardPile[state.discardPile.length - 1];
   const showBananaColorBadge =
@@ -556,6 +560,10 @@ export function GameTableScene3D({
               layout="row"
               interactive={resolvedIsHumanTurn}
               playableIds={resolvedIsHumanTurn ? playableCardIds : undefined}
+              hoveredCardId={activeHoveredInfoCardId}
+              onCardInfoAnchorRef={
+                showOverlays ? handleCardInfoAnchorRef : undefined
+              }
               onSelectCard={(card) => {
                 if (resolvedIsHumanTurn && playableCardIds?.includes(card.id)) {
                   onPlayCard?.(card);
@@ -624,6 +632,7 @@ export function GameTableScene3D({
               botSeats={botSeats}
               humanHand={humanHand}
               badgeRefs={badgeRefs}
+              cardAnchorRefs={cardAnchorRefs}
               handInfoRefs={handInfoRefs}
               drawBadgeRef={drawBadgeRef}
               discardBadgeRef={discardBadgeRef}
@@ -721,7 +730,9 @@ export function GameTableScene3D({
               ref={(el) => {
                 handInfoRefs.current[card.id] = el;
               }}
-              className="absolute top-0 left-0 z-20 will-change-transform"
+              className={`absolute top-0 left-0 will-change-transform ${
+                activeHoveredInfoCardId === card.id ? 'z-40' : 'z-20'
+              }`}
               style={{ opacity: 0 }}
             >
               <CardInfoButton
@@ -730,6 +741,11 @@ export function GameTableScene3D({
                 value={card.value}
                 placement="top"
                 size="xs"
+                onHoverChange={(isOpen) =>
+                  setHoveredInfoCardId((prev) =>
+                    isOpen ? card.id : prev === card.id ? null : prev,
+                  )
+                }
               />
             </div>
           ))}

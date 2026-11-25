@@ -5,6 +5,7 @@ import {
   useAnimalMotion,
   type Animal3DProps,
 } from '../CharacterRig3D';
+import { Accessory3D } from '../Accessory3D';
 import { PlushMaterial, getPlushArmGeometry } from '../plushMaterial';
 import type { Emotion } from '../../engine/types';
 
@@ -130,7 +131,11 @@ function ChickenEye({
   );
 }
 
-export function Chicken3D({ emotion = 'idle', isActive = false }: Animal3DProps) {
+export function Chicken3D({
+  emotion = 'idle',
+  isActive = false,
+  accessory = null,
+}: Animal3DProps) {
   const root = useRef<THREE.Group | null>(null);
   const body = useRef<THREE.Group | null>(null);
   const head = useRef<THREE.Group | null>(null);
@@ -173,6 +178,7 @@ export function Chicken3D({ emotion = 'idle', isActive = false }: Animal3DProps)
 
       {/* Seamless warm-white pear-shaped hen/chick body */}
       <group ref={body} position={[0, 0.075, 0]}>
+        {accessory && <Accessory3D accessory={accessory} animal="chicken" slot="body" />}
         <mesh geometry={pearGeo} scale={[1.0, 1.0, 0.98]} castShadow receiveShadow>
           <PlushMaterial color="#FAF4E8" />
         </mesh>
@@ -225,6 +231,7 @@ export function Chicken3D({ emotion = 'idle', isActive = false }: Animal3DProps)
 
         {/* Lowered compact head anchor for 3-lobe coral comb, bead eyes & plump orange beak */}
         <group ref={head} position={[0, 0.95, 0]}>
+          {accessory && <Accessory3D accessory={accessory} animal="chicken" slot="head" />}
           {/* Bright coral-orange 3-lobed plump comb perched on top of head */}
           <group position={[0.02, 0.39, 0.02]} rotation={[0.05, 0, -0.08]}>
             <mesh

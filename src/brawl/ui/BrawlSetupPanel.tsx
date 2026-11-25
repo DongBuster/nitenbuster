@@ -8,12 +8,15 @@ import {
 } from 'lucide-react';
 import { ANIMALS, type AnimalId } from '../../engine/types';
 import { playSfx } from '../../audio/soundEngine';
-import { SHOP_ITEMS } from '../../store/profileStore';
+import {
+  formatEquippedSummary,
+  type AccessorySelection,
+} from '../../scene3d/accessoryCatalog';
 import type { BrawlDifficulty } from '../sim/types';
 
 export interface BrawlSetupPanelProps {
   selectedAnimal: AnimalId;
-  equippedAccessory: Partial<Record<AnimalId, string | null>>;
+  equippedAccessory: Partial<Record<AnimalId, AccessorySelection>>;
   cookies: number;
   botCount: number;
   difficulty: BrawlDifficulty;
@@ -45,8 +48,7 @@ export function BrawlSetupPanel({
   onBackToModeSelect,
 }: BrawlSetupPanelProps) {
   const selectedMeta = ANIMALS.find((a) => a.id === selectedAnimal) ?? ANIMALS[0];
-  const equippedId = equippedAccessory[selectedAnimal] ?? null;
-  const equippedItem = SHOP_ITEMS.find((i) => i.id === equippedId) ?? null;
+  const equippedSummary = formatEquippedSummary(equippedAccessory[selectedAnimal]);
 
   return (
     <div className="min-h-screen bg-[#0e1724] bg-[radial-gradient(circle_at_50%_0%,_#1e3650_0%,_#0a101a_70%)] text-[#F8FAFC] selection:bg-amber-300 selection:text-[#1B110B]">
@@ -91,10 +93,18 @@ export function BrawlSetupPanel({
                 <h2 className="text-xs font-black uppercase tracking-wider text-sky-300">
                   Chọn Chiến Binh Thú Cưng
                 </h2>
-                {equippedItem && (
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/40 bg-amber-950/80 px-2.5 py-0.5 text-xs font-bold text-amber-200">
+                {equippedSummary && (
+                  <span
+                    title={equippedSummary.fullNames.join(', ')}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/40 bg-amber-950/80 px-2.5 py-0.5 text-xs font-bold text-amber-200"
+                  >
                     <Sparkles className="h-3 w-3 text-amber-400" />
-                    <span>{equippedItem.name}</span>
+                    <span>
+                      {equippedSummary.primaryName}
+                      {equippedSummary.extraCount > 0
+                        ? ` +${equippedSummary.extraCount}`
+                        : ''}
+                    </span>
                   </span>
                 )}
               </div>

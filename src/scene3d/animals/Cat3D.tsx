@@ -5,6 +5,7 @@ import {
   useAnimalMotion,
   type Animal3DProps,
 } from '../CharacterRig3D';
+import { Accessory3D } from '../Accessory3D';
 import { PlushMaterial, getPearBodyGeometry, getPlushArmGeometry } from '../plushMaterial';
 
 let cachedCatOuterEar: THREE.ExtrudeGeometry | null = null;
@@ -81,7 +82,11 @@ function StarEye({ position }: { position: [number, number, number] }) {
   );
 }
 
-export function Cat3D({ emotion = 'idle', isActive = false }: Animal3DProps) {
+export function Cat3D({
+  emotion = 'idle',
+  isActive = false,
+  accessory = null,
+}: Animal3DProps) {
   const root = useRef<THREE.Group | null>(null);
   const body = useRef<THREE.Group | null>(null);
   const head = useRef<THREE.Group | null>(null);
@@ -107,6 +112,7 @@ export function Cat3D({ emotion = 'idle', isActive = false }: Animal3DProps) {
 
       {/* Stout chubby British Shorthair gray-and-white plush body */}
       <group ref={body} position={[0, 0.45, 0]}>
+        {accessory && <Accessory3D accessory={accessory} animal="cat" slot="body" />}
         {/* Sculpted smooth pear-shaped cool-gray plush body */}
         <mesh geometry={pearGeo} position={[0, -0.37, 0]} castShadow receiveShadow>
           <PlushMaterial color="#777A84" />
@@ -193,6 +199,7 @@ export function Cat3D({ emotion = 'idle', isActive = false }: Animal3DProps) {
 
         {/* Extra-plump British Shorthair round head */}
         <group ref={head} position={[0, 0.64, 0.02]}>
+          {accessory && <Accessory3D accessory={accessory} animal="cat" slot="head" />}
           {/* Main round gray head */}
           <mesh castShadow receiveShadow scale={[1.12, 0.9, 0.96]}>
             <sphereGeometry args={[0.48, 36, 32]} />

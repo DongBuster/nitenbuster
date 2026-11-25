@@ -139,7 +139,7 @@ export function BrawlScreen({ onBackToModeSelect }: BrawlScreenProps) {
     dispatch({
       type: 'START_MATCH',
       humanAnimal: selectedAnimal,
-      humanAccessory: equippedAccessory[selectedAnimal] ?? null,
+      humanAccessory: equippedAccessory[selectedAnimal] ?? [],
       botCount,
       difficulty,
     });

@@ -1,96 +1,21 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { AnimalId, BotDifficulty, GameDeckMode } from '../engine/types';
+import type { AnimalId } from '../engine/types';
 import { setAudioPreferences } from '../audio/soundEngine';
+import {
+  SHOP_ITEMS,
+  toggleSlotAccessory,
+  type ShopItem,
+} from '../scene3d/accessoryCatalog';
+import {
+  DEFAULT_PROFILE,
+  sanitizeProfileData,
+  type PlayerProfile,
+  type ProfileSettings,
+} from './profileSchema';
+
+export { SHOP_ITEMS, type PlayerProfile, type ProfileSettings, type ShopItem };
 
 const STORAGE_KEY = 'paws_3d_profile_v1';
-
-export interface ShopItem {
-  id: string;
-  name: string;
-  icon: string;
-  description: string;
-  price: number;
-}
-
-export const SHOP_ITEMS: ShopItem[] = [
-  {
-    id: 'scarf',
-    name: 'Khăn Len Mùa Đông',
-    icon: '🧣',
-    description: 'Khăn len ấm áp phong cách Winter Cabin cực dễ thương.',
-    price: 60,
-  },
-  {
-    id: 'glasses',
-    name: 'Kính Râm Siêu Ngầu',
-    icon: '🕶️',
-    description: 'Phong thái cao thủ đánh bài không để lộ cảm xúc.',
-    price: 80,
-  },
-  {
-    id: 'party_hat',
-    name: 'Mũ Tiệc Lễ Hội',
-    icon: '🥳',
-    description: 'Mũ chóp sặc sỡ mang lại may mắn khi rút bài.',
-    price: 90,
-  },
-  {
-    id: 'crown',
-    name: 'Vương Miện Quán Quân',
-    icon: '👑',
-    description: 'Vương miện vàng lấp lánh dành cho nhà vô địch PAWS.',
-    price: 150,
-  },
-];
-
-export interface ProfileSettings {
-  sfxEnabled: boolean;
-  bgmEnabled: boolean;
-  colorblindMode: boolean;
-  reducedMotion: boolean;
-  botCount: number;
-  difficulty: BotDifficulty;
-  deckMode: GameDeckMode;
-}
-
-export interface PlayerProfile {
-  cookies: number;
-  gamesPlayed: number;
-  gamesWon: number;
-  selectedAnimal: AnimalId;
-  unlockedAccessories: string[];
-  equippedAccessory: Partial<Record<AnimalId, string | null>>;
-  settings: ProfileSettings;
-}
-
-const DEFAULT_PROFILE: PlayerProfile = {
-  cookies: 100,
-  gamesPlayed: 0,
-  gamesWon: 0,
-  selectedAnimal: 'dog',
-  unlockedAccessories: [],
-  equippedAccessory: {},
-  settings: {
-    sfxEnabled: true,
-    bgmEnabled: false,
-    colorblindMode: false,
-    reducedMotion: false,
-    botCount: 3,
-    difficulty: 'medium',
-    deckMode: 'full',
-  },
-};
-
-const VALID_ANIMALS: AnimalId[] = [
-  'dog',
-  'cat',
-  'duck',
-  'shark',
-  'dino',
-  'panda',
-  'chicken',
-  'bunny',
-];
 
 function loadProfile(): PlayerProfile {
   if (typeof window === 'undefined' || !window.localStorage) {
@@ -99,38 +24,9 @@ function loadProfile(): PlayerProfile {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return DEFAULT_PROFILE;
-    const parsed = JSON.parse(raw) as Partial<PlayerProfile>;
-    const selectedAnimal =
-      parsed.selectedAnimal && VALID_ANIMALS.includes(parsed.selectedAnimal)
-        ? parsed.selectedAnimal
-        : DEFAULT_PROFILE.selectedAnimal;
-
-    return {
-      cookies:
-        typeof parsed.cookies === 'number' && Number.isFinite(parsed.cookies)
-          ? Math.max(0, Math.floor(parsed.cookies))
-          : DEFAULT_PROFILE.cookies,
-      gamesPlayed:
-        typeof parsed.gamesPlayed === 'number' && parsed.gamesPlayed >= 0
-          ? Math.floor(parsed.gamesPlayed)
-          : 0,
-      gamesWon:
-        typeof parsed.gamesWon === 'number' && parsed.gamesWon >= 0
-          ? Math.floor(parsed.gamesWon)
-          : 0,
-      selectedAnimal,
-      unlockedAccessories: Array.isArray(parsed.unlockedAccessories)
-        ? parsed.unlockedAccessories.filter((x): x is string => typeof x === 'string')
-        : [],
-      equippedAccessory:
-        parsed.equippedAccessory && typeof parsed.equippedAccessory === 'object'
-          ? parsed.equippedAccessory
-          : {},
-      settings: {
-        ...DEFAULT_PROFILE.settings,
-        ...(parsed.settings ?? {}),
-      },
-    };
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return DEFAULT_PROFILE;
+    return sanitizeProfileData(parsed as Record<string, unknown>);
   } catch {
     return DEFAULT_PROFILE;
   }
@@ -227,11 +123,26 @@ export function useProfileStore() {
     if (id !== null && !currentProfile.unlockedAccessories.includes(id)) {
       return;
     }
+    const nextLoadout =
+      id === null
+        ? []
+        : toggleSlotAccessory(currentProfile.equippedAccessory[animal], id);
+
     persistAndNotify({
       ...currentProfile,
       equippedAccessory: {
         ...currentProfile.equippedAccessory,
-        [animal]: id,
+        [animal]: nextLoadout,
+      },
+    });
+  }, []);
+
+  const clearAccessories = useCallback((animal: AnimalId) => {
+    persistAndNotify({
+      ...currentProfile,
+      equippedAccessory: {
+        ...currentProfile.equippedAccessory,
+        [animal]: [],
       },
     });
   }, []);
@@ -245,5 +156,6 @@ export function useProfileStore() {
     recordBrawlResult,
     buyAccessory,
     equipAccessory,
+    clearAccessories,
   };
 }

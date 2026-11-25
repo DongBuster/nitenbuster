@@ -5,6 +5,7 @@ import {
   useAnimalMotion,
   type Animal3DProps,
 } from '../CharacterRig3D';
+import { Accessory3D } from '../Accessory3D';
 import { PlushMaterial, getPearBodyGeometry, getPlushArmGeometry } from '../plushMaterial';
 
 function StarEye({ position }: { position: [number, number, number] }) {
@@ -34,7 +35,11 @@ function StarEye({ position }: { position: [number, number, number] }) {
   );
 }
 
-export function Rabbit3D({ emotion = 'idle', isActive = false }: Animal3DProps) {
+export function Rabbit3D({
+  emotion = 'idle',
+  isActive = false,
+  accessory = null,
+}: Animal3DProps) {
   const root = useRef<THREE.Group | null>(null);
   const body = useRef<THREE.Group | null>(null);
   const head = useRef<THREE.Group | null>(null);
@@ -59,6 +64,7 @@ export function Rabbit3D({ emotion = 'idle', isActive = false }: Animal3DProps) 
 
       {/* Ultra-fluffy snowy-white chubby pear bunny body */}
       <group ref={body} position={[0, 0.45, 0]}>
+        {accessory && <Accessory3D accessory={accessory} animal="bunny" slot="body" />}
         {/* Sculpted smooth pear-shaped plush body */}
         <mesh geometry={pearGeo} position={[0, -0.37, 0]} castShadow receiveShadow>
           <PlushMaterial color="#FAF5F0" />
@@ -111,6 +117,7 @@ export function Rabbit3D({ emotion = 'idle', isActive = false }: Animal3DProps) 
 
         {/* Fluffy rounded bunny head with seamless plump cheeks */}
         <group ref={head} position={[0, 0.56, 0.02]}>
+          {accessory && <Accessory3D accessory={accessory} animal="bunny" slot="head" />}
           {/* Upper crown of bunny head */}
           <mesh position={[0, 0.03, 0]} castShadow receiveShadow scale={[0.98, 0.96, 0.95]}>
             <sphereGeometry args={[0.45, 36, 32]} />

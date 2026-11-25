@@ -7,6 +7,7 @@ import type {
   Player,
   PlayOptions,
 } from '../engine/types.ts';
+import type { AccessorySelection } from '../scene3d/accessoryCatalog.ts';
 
 export type RoomPhase = 'idle' | 'lobby' | 'playing';
 
@@ -23,7 +24,7 @@ export interface LobbyPresenceMember {
   peerId: string;
   name: string;
   animal: AnimalId;
-  accessory: string | null;
+  accessory: string[];
   isHost: boolean;
   ready: boolean;
   joinedAt: number;
@@ -43,7 +44,7 @@ export interface GameSnapshotEvent {
   hostId: string;
   publicState: PublicGameState;
   turnDeadlineMs: number;
-  accessories: Partial<Record<AnimalId, string | null>>;
+  accessories: Partial<Record<AnimalId, AccessorySelection>>;
 }
 
 export interface HandSyncEvent {

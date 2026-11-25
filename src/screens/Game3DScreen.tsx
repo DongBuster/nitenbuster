@@ -43,10 +43,8 @@ import {
 } from '../components/Modals/WildModals';
 import { RulesModal } from '../components/Modals/RulesModal';
 import { TutorialOverlay } from '../components/Modals/TutorialOverlay';
-import {
-  PawsShoutOverlay,
-  type PawsShoutInfo,
-} from '../components/Modals/PawsShoutOverlay';
+import { PawsShoutOverlay } from '../components/Modals/PawsShoutOverlay';
+import { useMatchNotices } from './useMatchNotices';
 import {
   playSfx,
   setAudioPreferences,
@@ -154,11 +152,11 @@ export function Game3DScreen({ onBackToMenu }: Game3DScreenProps) {
       ? gameState.logs[gameState.logs.length - 1]
       : null;
 
-  const [pawsShout, setPawsShout] = useState<PawsShoutInfo | null>(null);
-  const prevCalledPawsRef = useRef<Set<string>>(new Set());
   const humanOneCardSinceRef = useRef<number | null>(null);
-  const prevHumanHandLenRef = useRef<number>(humanPlayer.hand.length);
-  const [penaltyNotice, setPenaltyNotice] = useState<string | null>(null);
+  const { penaltyNotice, pawsShout, clearNotices } = useMatchNotices({
+    gameState,
+    humanPlayer,
+  });
 
   const predictedBombVictim = useMemo(
     () => getPredictedBombVictim(gameState),
@@ -180,68 +178,10 @@ export function Game3DScreen({ onBackToMenu }: Game3DScreenProps) {
     }
   }, [humanPlayer.hand.length, humanPlayer.calledPaws, gameState.winnerId]);
 
-  // Surface a clear reason toast whenever the human receives penalty/extra cards
-  useEffect(() => {
-    const prevLen = prevHumanHandLenRef.current;
-    const currLen = humanPlayer.hand.length;
-    prevHumanHandLenRef.current = currLen;
-
-    if (
-      gameState.turnCount === 0 ||
-      gameState.winnerId !== null ||
-      currLen <= prevLen
-    ) {
-      return;
-    }
-
-    const delta = currLen - prevLen;
-    const reason = gameState.lastEffectBanner ?? latestLog?.text ?? '';
-    const isNotableEvent =
-      delta >= 2 ||
-      latestLog?.type === 'penalty' ||
-      reason.includes('Nỏ Thần') ||
-      reason.includes('PAWS') ||
-      reason.includes('Bom') ||
-      reason.includes('Vỏ Chuối') ||
-      reason.includes('Tia Chớp');
-
-    if (isNotableEvent && reason) {
-      setPenaltyNotice(`+${delta} lá — ${reason}`);
-      const timer = window.setTimeout(() => setPenaltyNotice(null), 2800);
-      return () => window.clearTimeout(timer);
-    }
-  }, [
-    humanPlayer.hand.length,
-    gameState.turnCount,
-    gameState.winnerId,
-    gameState.lastEffectBanner,
-    latestLog,
-  ]);
-
   const canCallPaws =
     gameState.winnerId === null &&
     humanPlayer.hand.length === 1 &&
     !humanPlayer.calledPaws;
-
-  useEffect(() => {
-    const currentSet = new Set(
-      gameState.players.filter((p) => p.calledPaws).map((p) => p.id),
-    );
-    const newlyCalled = gameState.players.find(
-      (p) => p.calledPaws && !prevCalledPawsRef.current.has(p.id),
-    );
-    prevCalledPawsRef.current = currentSet;
-
-    if (newlyCalled && gameState.winnerId === null) {
-      setPawsShout({
-        key: `${gameState.turnCount}-${newlyCalled.id}-${Date.now()}`,
-        playerName: newlyCalled.name,
-        animal: newlyCalled.animal,
-      });
-      const timer = window.setTimeout(() => setPawsShout(null), 1700);
-      return () => window.clearTimeout(timer);
-    }
-  }, [gameState.players, gameState.turnCount, gameState.winnerId]);
 
   const isLowTimer = turnSecondsLeft <= 5 && gameState.winnerId === null;
 
@@ -271,6 +211,7 @@ export function Game3DScreen({ onBackToMenu }: Game3DScreenProps) {
   const handleRestartMatch = useCallback(() => {
     playSfx('click');
     recordedMatchRef.current = false;
+    clearNotices();
     setCookiesEarned(0);
     setPendingColorCard(null);
     setPendingTargetCard(null);
@@ -284,7 +225,7 @@ export function Game3DScreen({ onBackToMenu }: Game3DScreenProps) {
         deckMode: settings.deckMode,
       }),
     );
-  }, [selectedAnimal, settings.botCount, settings.difficulty, settings.deckMode]);
+  }, [clearNotices, selectedAnimal, settings.botCount, settings.difficulty, settings.deckMode]);
 
   const executeHumanPlay = useCallback(
     (

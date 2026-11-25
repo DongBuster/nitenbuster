@@ -5,6 +5,7 @@ import {
   useAnimalMotion,
   type Animal3DProps,
 } from '../CharacterRig3D';
+import { Accessory3D } from '../Accessory3D';
 import { PlushMaterial, getPlushArmGeometry } from '../plushMaterial';
 import type { Emotion } from '../../engine/types';
 
@@ -143,7 +144,11 @@ function DinoEye({
   );
 }
 
-export function Dino3D({ emotion = 'idle', isActive = false }: Animal3DProps) {
+export function Dino3D({
+  emotion = 'idle',
+  isActive = false,
+  accessory = null,
+}: Animal3DProps) {
   const root = useRef<THREE.Group | null>(null);
   const body = useRef<THREE.Group | null>(null);
   const head = useRef<THREE.Group | null>(null);
@@ -189,6 +194,7 @@ export function Dino3D({ emotion = 'idle', isActive = false }: Animal3DProps) {
 
       {/* Body group */}
       <group ref={body} position={[0, 0.11, 0]}>
+        {accessory && <Accessory3D accessory={accessory} animal="dino" slot="body" />}
         {/* Smooth continuous avocado-green pear plush body */}
         <mesh geometry={bodyGeo} scale={[1.0, 1.0, 1.02]} castShadow receiveShadow>
           <PlushMaterial color="#86B850" />
@@ -292,6 +298,7 @@ export function Dino3D({ emotion = 'idle', isActive = false }: Animal3DProps) {
 
       {/* Head group with long rounded forward-sloping dino snout */}
       <group ref={head} position={[0, 1.15, 0.04]}>
+        {accessory && <Accessory3D accessory={accessory} animal="dino" slot="head" />}
         {/* Rounded cranium */}
         <mesh scale={[0.92, 0.96, 1.04]} castShadow receiveShadow>
           <sphereGeometry args={[0.39, 30, 26]} />

@@ -9,6 +9,7 @@ export interface CardInfoButtonProps {
   placement?: 'top' | 'bottom';
   size?: 'xs' | 'sm';
   className?: string;
+  onHoverChange?: (hovered: boolean) => void;
 }
 
 /**
@@ -22,9 +23,15 @@ export function CardInfoButton({
   placement = 'top',
   size = 'xs',
   className = '',
+  onHoverChange,
 }: CardInfoButtonProps) {
   const [open, setOpen] = useState(false);
   const tooltipId = useId();
+
+  const updateOpen = (next: boolean) => {
+    setOpen(next);
+    onHoverChange?.(next);
+  };
 
   const meta = CARD_META[type];
   const isWild = meta.isWild || !color;
@@ -43,18 +50,18 @@ export function CardInfoButton({
   return (
     <span
       className={`relative inline-flex items-center justify-center ${className}`}
-      onMouseEnter={() => setOpen(true)}
-      onMouseLeave={() => setOpen(false)}
+      onMouseEnter={() => updateOpen(true)}
+      onMouseLeave={() => updateOpen(false)}
     >
       <button
         type="button"
         aria-label={`Thông tin lá ${title}`}
         aria-describedby={open ? tooltipId : undefined}
-        onFocus={() => setOpen(true)}
-        onBlur={() => setOpen(false)}
+        onFocus={() => updateOpen(true)}
+        onBlur={() => updateOpen(false)}
         onClick={(e) => {
           e.stopPropagation();
-          setOpen((prev) => !prev);
+          updateOpen(!open);
         }}
         className={`pointer-events-auto inline-flex cursor-help items-center justify-center rounded-full border border-amber-200/80 bg-[#1F120C]/92 font-black leading-none text-amber-200 shadow-md transition hover:scale-110 hover:border-amber-300 hover:bg-amber-400 hover:text-[#2C1B11] focus-visible:outline-2 focus-visible:outline-amber-300 ${btnDims}`}
       >

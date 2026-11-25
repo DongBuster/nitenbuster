@@ -17,7 +17,8 @@ import {
 import { ANIMALS, type AnimalId, type BotDifficulty, type GameDeckMode } from '../engine/types';
 import { normalizeRoomCode } from '../online/sanitize';
 import type { OnlineRoomController } from '../online/useOnlineRoom';
-import { SHOP_ITEMS, useProfileStore } from '../store/profileStore';
+import { useProfileStore } from '../store/profileStore';
+import { formatEquippedSummary } from '../scene3d/accessoryCatalog';
 import { playSfx } from '../audio/soundEngine';
 
 export interface OnlineLobbyScreenProps {
@@ -45,7 +46,7 @@ export function OnlineLobbyScreen({
   const [joinCodeInput, setJoinCodeInput] = useState<string>('');
   const [copied, setCopied] = useState<boolean>(false);
 
-  const myAccessory = equippedAccessory[selectedAnimal] ?? null;
+  const myAccessory = equippedAccessory[selectedAnimal] ?? [];
   const myMember = useMemo(
     () => room.members.find((m) => m.peerId === room.myPeerId) ?? null,
     [room.members, room.myPeerId],
@@ -68,7 +69,7 @@ export function OnlineLobbyScreen({
     if (room.phase === 'lobby') {
       room.updateMyProfile({
         animal,
-        accessory: equippedAccessory[animal] ?? null,
+        accessory: equippedAccessory[animal] ?? [],
       });
     }
   };
@@ -230,10 +231,9 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
                 <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
                   {ANIMALS.map((a) => {
                     const active = selectedAnimal === a.id;
-                    const eqId = equippedAccessory[a.id];
-                    const eqItem = eqId
-                      ? SHOP_ITEMS.find((i) => i.id === eqId)
-                      : null;
+                    const eqSummary = formatEquippedSummary(
+                      equippedAccessory[a.id],
+                    );
 
                     return (
                       <button
@@ -253,9 +253,9 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
                         <span className={`text-xs font-black ${active ? 'text-[#26160b]' : 'text-white'}`}>
                           {a.name}
                         </span>
-                        {eqItem && (
+                        {eqSummary && (
                           <span
-                            title={eqItem.name}
+                            title={eqSummary.fullNames.join(', ')}
                             className="absolute top-1.5 right-1.5 rounded-full bg-amber-950/80 px-1 py-0.5 text-[10px] font-bold text-amber-300"
                           >
                             <Sparkles className="h-2.5 w-2.5 text-amber-400" />
@@ -420,9 +420,7 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
               {room.members.map((member) => {
                 const animalMeta =
                   ANIMALS.find((a) => a.id === member.animal) ?? ANIMALS[0];
-                const eqItem = member.accessory
-                  ? SHOP_ITEMS.find((i) => i.id === member.accessory)
-                  : null;
+                const eqSummary = formatEquippedSummary(member.accessory);
                 const isMe = member.peerId === room.myPeerId;
 
                 return (
@@ -455,12 +453,15 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
                               <span>Chủ phòng</span>
                             </span>
                           )}
-                          {eqItem && (
+                          {eqSummary && (
                             <span
-                              title={eqItem.name}
+                              title={eqSummary.fullNames.join(', ')}
                               className="rounded-full bg-white/10 px-1.5 py-0.5 text-xs text-amber-200"
                             >
-                              {eqItem.name}
+                              {eqSummary.primaryName}
+                              {eqSummary.extraCount > 0
+                                ? ` +${eqSummary.extraCount}`
+                                : ''}
                             </span>
                           )}
                         </div>

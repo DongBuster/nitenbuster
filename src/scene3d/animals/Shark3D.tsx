@@ -5,6 +5,7 @@ import {
   useAnimalMotion,
   type Animal3DProps,
 } from '../CharacterRig3D';
+import { Accessory3D } from '../Accessory3D';
 import { PlushMaterial, getPlushArmGeometry } from '../plushMaterial';
 import type { Emotion } from '../../engine/types';
 
@@ -130,7 +131,11 @@ function SharkSideEye({
   );
 }
 
-export function Shark3D({ emotion = 'idle', isActive = false }: Animal3DProps) {
+export function Shark3D({
+  emotion = 'idle',
+  isActive = false,
+  accessory = null,
+}: Animal3DProps) {
   const root = useRef<THREE.Group | null>(null);
   const body = useRef<THREE.Group | null>(null);
   const head = useRef<THREE.Group | null>(null);
@@ -179,6 +184,7 @@ export function Shark3D({ emotion = 'idle', isActive = false }: Animal3DProps) {
 
       {/* Main plush shark body + seamless hood */}
       <group ref={body} position={[0, 0.11, 0]}>
+        {accessory && <Accessory3D accessory={accessory} animal="shark" slot="body" />}
         <mesh
           geometry={hoodGeo}
           scale={[1.02, 1.0, 0.96]}
@@ -279,6 +285,7 @@ export function Shark3D({ emotion = 'idle', isActive = false }: Animal3DProps) {
 
         {/* Head & clearly visible arched shark mouth with 6 white triangular teeth */}
         <group ref={head} position={[0, 1.04, 0]}>
+          {accessory && <Accessory3D accessory={accessory} animal="shark" slot="head" />}
           <group ref={earLeft} position={[-0.18, 0.32, 0]} />
           <group ref={earRight} position={[0.18, 0.32, 0]} />
 

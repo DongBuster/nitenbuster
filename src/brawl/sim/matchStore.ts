@@ -1,5 +1,9 @@
 import { ANIMALS, type AnimalId } from '../../engine/types';
 import {
+  normalizeAccessories,
+  type AccessorySelection,
+} from '../../scene3d/accessoryCatalog';
+import {
   BOT_ANIMAL_TITLES,
   ROUND_POINTS,
   TOTAL_ROUNDS,
@@ -16,7 +20,7 @@ export type MatchAction =
   | {
       type: 'START_MATCH';
       humanAnimal: AnimalId;
-      humanAccessory: string | null;
+      humanAccessory: AccessorySelection;
       botCount: number;
       difficulty: BrawlDifficulty;
     }
@@ -46,7 +50,7 @@ export function createSetupMatchState(
 
 function buildRoster(
   humanAnimal: AnimalId,
-  humanAccessory: string | null,
+  humanAccessory: AccessorySelection,
   botCount: number,
 ): FighterConfig[] {
   const humanMeta = ANIMALS.find((a) => a.id === humanAnimal) ?? ANIMALS[0];
@@ -55,7 +59,7 @@ function buildRoster(
       id: 'human',
       name: 'Bạn',
       animal: humanMeta.id,
-      accessory: humanAccessory,
+      accessory: normalizeAccessories(humanAccessory),
       isBot: false,
       spawnIndex: 0,
       accentHex: humanMeta.accentHex,
@@ -75,7 +79,7 @@ function buildRoster(
       id: `bot_${i + 1}`,
       name,
       animal: meta.id,
-      accessory: null,
+      accessory: [],
       isBot: true,
       spawnIndex: i + 1,
       accentHex: meta.accentHex,

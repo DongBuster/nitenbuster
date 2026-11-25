@@ -3,6 +3,7 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { PartyMotionState } from '../brawl/sim/partyMotion';
 import type { Emotion } from '../engine/types';
+import type { AccessorySelection } from './accessoryCatalog';
 
 export const BrawlMotionContext =
   createContext<RefObject<PartyMotionState | null> | null>(null);
@@ -10,6 +11,7 @@ export const BrawlMotionContext =
 export interface Animal3DProps {
   emotion?: Emotion;
   isActive?: boolean;
+  accessory?: AccessorySelection;
 }
 
 export interface RigRefs {

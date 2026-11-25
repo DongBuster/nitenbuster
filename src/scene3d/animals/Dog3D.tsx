@@ -5,6 +5,7 @@ import {
   useAnimalMotion,
   type Animal3DProps,
 } from '../CharacterRig3D';
+import { Accessory3D } from '../Accessory3D';
 import { PlushMaterial, getPearBodyGeometry, getPlushArmGeometry } from '../plushMaterial';
 
 let cachedCorgiOuterEar: THREE.ExtrudeGeometry | null = null;
@@ -81,7 +82,11 @@ function StarEye({ position }: { position: [number, number, number] }) {
   );
 }
 
-export function Dog3D({ emotion = 'idle', isActive = false }: Animal3DProps) {
+export function Dog3D({
+  emotion = 'idle',
+  isActive = false,
+  accessory = null,
+}: Animal3DProps) {
   const root = useRef<THREE.Group | null>(null);
   const body = useRef<THREE.Group | null>(null);
   const head = useRef<THREE.Group | null>(null);
@@ -108,6 +113,7 @@ export function Dog3D({ emotion = 'idle', isActive = false }: Animal3DProps) {
 
       {/* Stout chubby orange-and-white Corgi plush body */}
       <group ref={body} position={[0, 0.45, 0]}>
+        {accessory && <Accessory3D accessory={accessory} animal="dog" slot="body" />}
         {/* Sculpted smooth pear-shaped orange plush body */}
         <mesh geometry={pearGeo} position={[0, -0.37, 0]} castShadow receiveShadow>
           <PlushMaterial color="#E89541" />
@@ -194,6 +200,7 @@ export function Dog3D({ emotion = 'idle', isActive = false }: Animal3DProps) {
 
         {/* Faithful Corgi plush head */}
         <group ref={head} position={[0, 0.65, 0.02]}>
+          {accessory && <Accessory3D accessory={accessory} animal="dog" slot="head" />}
           {/* Plump wide orange head */}
           <mesh castShadow receiveShadow scale={[1.08, 0.94, 0.96]}>
             <sphereGeometry args={[0.48, 36, 32]} />

@@ -12,12 +12,16 @@ import { useAnimations, useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
 import type { AnimalId, Emotion } from '../engine/types';
+import type { AccessorySelection } from './accessoryCatalog';
+import { Accessory3D } from './Accessory3D';
 import { TurnRing3D } from './CharacterRig3D';
 
 export interface GLBCharacter3DProps {
   url: string;
+  animal?: AnimalId;
   emotion?: Emotion;
   isActive?: boolean;
+  accessory?: AccessorySelection;
 }
 
 const TARGET_HEIGHT = 1.65;
@@ -49,8 +53,10 @@ function findClipName(names: string[], emotion: Emotion): string | null {
 
 export function GLBCharacter3D({
   url,
+  animal = 'dog',
   emotion = 'idle',
   isActive = false,
+  accessory = null,
 }: GLBCharacter3DProps) {
   const { scene, animations } = useGLTF(url);
   const motionGroupRef = useRef<THREE.Group>(null);
@@ -186,6 +192,7 @@ export function GLBCharacter3D({
         <group ref={modelGroupRef} position={normOffset} scale={normScale}>
           <primitive object={clonedScene} />
         </group>
+        {accessory && <Accessory3D accessory={accessory} animal={animal} slot="all" />}
       </group>
     </group>
   );

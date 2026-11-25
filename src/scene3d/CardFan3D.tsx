@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type * as THREE from 'three';
 import type { CardData, Color } from '../engine/types';
 import { Card3D } from './Card3D';
 
@@ -8,6 +9,8 @@ export interface CardFan3DProps {
   interactive?: boolean;
   layout?: 'fan' | 'row';
   selectedId?: string | null;
+  hoveredCardId?: string | null;
+  onCardInfoAnchorRef?: (cardId: string, obj: THREE.Object3D | null) => void;
   onSelectCard?: (card: CardData, index: number) => void;
   position?: [number, number, number];
   rotation?: [number, number, number];
@@ -29,6 +32,8 @@ export function CardFan3D({
   interactive = true,
   layout = 'fan',
   selectedId,
+  hoveredCardId,
+  onCardInfoAnchorRef,
   onSelectCard,
   position = [0, 0, 0],
   rotation = [0, 0, 0],
@@ -106,11 +111,17 @@ export function CardFan3D({
             faceDown={isFaceDown}
             playable={isPlayable}
             selected={isSelected}
+            forceHover={hoveredCardId === card.id}
             activeWildColor={activeWildColor}
             position={[x, y, z]}
             rotation={[0, 0, rotZ]}
             hoverLift={canInteract}
             hoverZBoost={hoverZBoost}
+            onInfoAnchorRef={
+              onCardInfoAnchorRef
+                ? (obj) => onCardInfoAnchorRef(card.id, obj)
+                : undefined
+            }
             onClick={
               canInteract
                 ? () => {

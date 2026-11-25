@@ -5,6 +5,7 @@ import {
   useAnimalMotion,
   type Animal3DProps,
 } from '../CharacterRig3D';
+import { Accessory3D } from '../Accessory3D';
 import { PlushMaterial, getPearBodyGeometry } from '../plushMaterial';
 import type { Emotion } from '../../engine/types';
 
@@ -110,7 +111,11 @@ function PandaEye({
   );
 }
 
-export function Panda3D({ emotion = 'idle', isActive = false }: Animal3DProps) {
+export function Panda3D({
+  emotion = 'idle',
+  isActive = false,
+  accessory = null,
+}: Animal3DProps) {
   const root = useRef<THREE.Group | null>(null);
   const body = useRef<THREE.Group | null>(null);
   const head = useRef<THREE.Group | null>(null);
@@ -155,6 +160,7 @@ export function Panda3D({ emotion = 'idle', isActive = false }: Animal3DProps) {
 
       {/* Wide ultra-fluffy pear-shaped body group */}
       <group ref={body} position={[0, 0.15, 0]}>
+        {accessory && <Accessory3D accessory={accessory} animal="panda" slot="body" />}
         <mesh geometry={pearGeo} scale={[1.02, 1.0, 0.96]} castShadow receiveShadow>
           <PlushMaterial color="#F6F3EC" />
         </mesh>
@@ -258,6 +264,7 @@ export function Panda3D({ emotion = 'idle', isActive = false }: Animal3DProps) {
 
       {/* Smooth round white panda head */}
       <group ref={head} position={[0, 1.15, 0.02]}>
+        {accessory && <Accessory3D accessory={accessory} animal="panda" slot="head" />}
         <mesh scale={[1.08, 0.94, 0.96]} castShadow receiveShadow>
           <sphereGeometry args={[0.47, 32, 28]} />
           <PlushMaterial color="#F6F3EC" />

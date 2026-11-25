@@ -5,6 +5,7 @@ import {
   useAnimalMotion,
   type Animal3DProps,
 } from '../CharacterRig3D';
+import { Accessory3D } from '../Accessory3D';
 import { PlushMaterial, getPearBodyGeometry, getPlushArmGeometry } from '../plushMaterial';
 
 function StarEye({ position }: { position: [number, number, number] }) {
@@ -34,7 +35,11 @@ function StarEye({ position }: { position: [number, number, number] }) {
   );
 }
 
-export function Duck3D({ emotion = 'idle', isActive = false }: Animal3DProps) {
+export function Duck3D({
+  emotion = 'idle',
+  isActive = false,
+  accessory = null,
+}: Animal3DProps) {
   const root = useRef<THREE.Group | null>(null);
   const body = useRef<THREE.Group | null>(null);
   const head = useRef<THREE.Group | null>(null);
@@ -60,6 +65,7 @@ export function Duck3D({ emotion = 'idle', isActive = false }: Animal3DProps) {
 
       {/* Ultra-plump seamless creamy-white pear duck */}
       <group ref={body} position={[0, 0.47, 0]}>
+        {accessory && <Accessory3D accessory={accessory} animal="duck" slot="body" />}
         {/* Continuous smooth pear silhouette flowing up into neck/head (NO neck pinch) */}
         <mesh geometry={pearGeo} position={[0, -0.39, 0]} castShadow receiveShadow>
           <PlushMaterial color="#FAF5EC" />
@@ -106,6 +112,7 @@ export function Duck3D({ emotion = 'idle', isActive = false }: Animal3DProps) {
 
         {/* Smoothly integrated, slightly tilted oval duck head */}
         <group ref={head} position={[0, 0.56, 0.02]} rotation={[0, 0, -0.06]}>
+          {accessory && <Accessory3D accessory={accessory} animal="duck" slot="head" />}
           {/* Seamless neck-head blend collar */}
           <mesh position={[0, -0.14, -0.01]} scale={[0.35, 0.28, 0.34]} castShadow receiveShadow>
             <sphereGeometry args={[1, 24, 20]} />

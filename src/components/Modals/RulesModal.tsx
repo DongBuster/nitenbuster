@@ -1,11 +1,12 @@
+import { useEffect, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import {
   BookOpen,
   Check,
   Cookie,
+  Eye,
   Flame,
   ShoppingBag,
-  Sparkles,
   Trophy,
   X,
 } from 'lucide-react';
@@ -22,7 +23,16 @@ import {
   WILD_CARD_TYPES,
 } from '../Card/cardMeta';
 import { SHOP_ITEMS, useProfileStore } from '../../store/profileStore';
+import {
+  EQUIP_CATEGORIES,
+  formatEquippedSummary,
+  getAccessoryMeta,
+  normalizeAccessories,
+  toggleSlotAccessory,
+  type EquipCategory,
+} from '../../scene3d/accessoryCatalog';
 import { playSfx } from '../../audio/soundEngine';
+import { ShopCharacterPreview } from './ShopCharacterPreview';
 
 const CARD_TYPE_EMOJI: Record<CardType, string> = {
   basic: '7',
@@ -104,14 +114,18 @@ export function RulesModal({ isOpen, onClose }: RulesModalProps) {
           aria-labelledby="rules-modal-title"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
+          exit={{ opacity: 0, transition: { duration: 0.14 } }}
           onClick={onClose}
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
         >
           <motion.div
             initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.94, y: 16 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.95, y: 12 }}
+            exit={
+              prefersReducedMotion
+                ? { opacity: 0, transition: { duration: 0.12 } }
+                : { opacity: 0, scale: 0.96, y: 8, transition: { duration: 0.14 } }
+            }
             transition={{ type: 'spring', stiffness: 340, damping: 28 }}
             onClick={(e) => e.stopPropagation()}
             className="flex max-h-[88vh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl border-2 border-amber-900/40 bg-[#24160f] text-white shadow-2xl"
@@ -288,12 +302,53 @@ export function CookieShopModal({ isOpen, onClose }: CookieShopModalProps) {
     selectAnimal,
     buyAccessory,
     equipAccessory,
+    clearAccessories,
   } = useProfileStore();
+
+  const [previewItemId, setPreviewItemId] = useState<string | null>(null);
+  const [activeCategory, setActiveCategory] = useState<'all' | EquipCategory>(
+    'all',
+  );
+
+  useEffect(() => {
+    if (!isOpen) {
+      setPreviewItemId(null);
+      return;
+    }
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   const currentAnimalMeta =
     ANIMALS.find((a) => a.id === selectedAnimal) ?? ANIMALS[0];
-  const currentEquippedId = equippedAccessory[selectedAnimal] ?? null;
-  const currentEquippedItem = SHOP_ITEMS.find((i) => i.id === currentEquippedId);
+  const currentEquippedList = normalizeAccessories(
+    equippedAccessory[selectedAnimal],
+  );
+  const previewMeta = previewItemId ? getAccessoryMeta(previewItemId) : null;
+  const isPreviewOnly =
+    previewMeta !== null && !currentEquippedList.includes(previewMeta.id);
+
+  // Merge previewed item into active multi-slot outfit (replacing only its own slot)
+  const displayedLoadout = isPreviewOnly
+    ? toggleSlotAccessory(currentEquippedList, previewMeta.id)
+    : currentEquippedList;
+
+  const equippedSummary = formatEquippedSummary(currentEquippedList);
+  const equippedLabel = equippedSummary
+    ? equippedSummary.extraCount > 0
+      ? `${equippedSummary.primaryName} +${equippedSummary.extraCount}`
+      : equippedSummary.primaryName
+    : null;
+
+  const visibleItems =
+    activeCategory === 'all'
+      ? SHOP_ITEMS
+      : SHOP_ITEMS.filter((item) => item.category === activeCategory);
 
   return (
     <AnimatePresence>
@@ -304,24 +359,28 @@ export function CookieShopModal({ isOpen, onClose }: CookieShopModalProps) {
           aria-labelledby="cookie-shop-title"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
+          exit={{ opacity: 0, transition: { duration: 0.14 } }}
           onClick={onClose}
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
         >
           <motion.div
             initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.94, y: 16 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.95, y: 12 }}
+            exit={
+              prefersReducedMotion
+                ? { opacity: 0, transition: { duration: 0.12 } }
+                : { opacity: 0, scale: 0.96, y: 8, transition: { duration: 0.14 } }
+            }
             transition={{ type: 'spring', stiffness: 340, damping: 28 }}
             onClick={(e) => e.stopPropagation()}
-            className="flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border-2 border-amber-900/40 bg-[#24160f] text-white shadow-2xl"
+            className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-3xl border-2 border-amber-900/40 bg-[#24160f] text-white shadow-2xl"
           >
             {/* Header */}
             <div className="flex items-center justify-between border-b border-amber-900/40 px-6 py-4">
               <div>
                 <span className="inline-flex items-center gap-1.5 text-xs font-black uppercase tracking-wider text-amber-300">
                   <ShoppingBag className="h-3.5 w-3.5 text-amber-400" />
-                  <span>Phụ Kiện Winter Cabin</span>
+                  <span>Phụ Kiện Winter Cabin · Phối 5 Vùng</span>
                 </span>
                 <h2
                   id="cookie-shop-title"
@@ -347,45 +406,93 @@ export function CookieShopModal({ isOpen, onClose }: CookieShopModalProps) {
             </div>
 
             {/* Body */}
-            <div className="space-y-5 overflow-y-auto px-6 py-5">
-              {/* Active Animal Preview + Selector */}
-              <div className="flex flex-col items-center gap-4 rounded-2xl border border-amber-900/40 bg-black/25 p-4 sm:flex-row">
-                <div className="relative flex shrink-0 items-center justify-center">
-                  <div
-                    className="flex h-16 w-16 items-center justify-center rounded-2xl border-2 border-amber-400 shadow-md"
-                    style={{ backgroundColor: currentAnimalMeta.accentHex }}
-                  />
-                  {currentEquippedItem && (
-                    <span
-                      title={`Đang đeo: ${currentEquippedItem.name}`}
-                      className="absolute -top-2 -right-2 flex h-8 w-8 items-center justify-center rounded-full border-2 border-amber-300 bg-[#29170f] text-sm shadow-md"
-                    >
-                      <Sparkles className="h-4 w-4 text-amber-300" />
+            <div className="grid grid-cols-1 gap-5 overflow-y-auto overscroll-contain px-6 py-5 lg:grid-cols-12">
+              {/* Left: Live 3D Preview + 5-Slot Loadout + Animal Selector */}
+              <div className="flex flex-col gap-3 lg:col-span-5">
+                <ShopCharacterPreview
+                  animal={selectedAnimal}
+                  animalName={currentAnimalMeta.name}
+                  accentHex={currentAnimalMeta.accentHex}
+                  accessories={displayedLoadout}
+                  equippedLabel={equippedLabel}
+                  previewItemName={isPreviewOnly ? previewMeta.name : null}
+                />
+
+                {/* 5-Slot Active Loadout Bar */}
+                <div className="rounded-2xl border border-amber-900/40 bg-black/30 p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[11px] font-black uppercase tracking-wider text-amber-300">
+                      Đang phối ({currentEquippedList.length}/5 vùng)
                     </span>
-                  )}
-                </div>
-                <div className="min-w-0 flex-1 text-center sm:text-left">
-                  <p className="text-xs font-bold text-amber-200/70">
-                    Đang chọn ({currentAnimalMeta.personality}):
-                  </p>
-                  <h3 className="text-base font-black text-amber-100">
-                    {currentAnimalMeta.name}
-                    {currentEquippedItem && (
-                      <span className="ml-2 text-xs font-bold text-amber-300">
-                        (Đeo: {currentEquippedItem.name})
-                      </span>
+                    {currentEquippedList.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          playSfx('click');
+                          setPreviewItemId(null);
+                          clearAccessories(selectedAnimal);
+                        }}
+                        className="cursor-pointer rounded-lg border border-rose-400/35 bg-rose-950/40 px-2 py-0.5 text-[11px] font-bold text-rose-200 transition hover:bg-rose-900/50"
+                      >
+                        Tháo hết
+                      </button>
                     )}
-                  </h3>
-                  <div className="mt-2.5 flex flex-wrap justify-center gap-1.5 sm:justify-start">
+                  </div>
+                  <div className="mt-2 grid grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-2">
+                    {EQUIP_CATEGORIES.map((cat) => {
+                      const equippedInSlot = currentEquippedList
+                        .map((id) => getAccessoryMeta(id))
+                        .find((m) => m?.category === cat.id);
+
+                      if (equippedInSlot) {
+                        return (
+                          <button
+                            key={cat.id}
+                            type="button"
+                            onClick={() => {
+                              playSfx('click');
+                              equipAccessory(selectedAnimal, equippedInSlot.id);
+                            }}
+                            title={`Bấm để tháo ${equippedInSlot.name}`}
+                            className="flex cursor-pointer items-center justify-between gap-1 rounded-xl border border-amber-400/45 bg-amber-950/45 px-2.5 py-1 text-left text-[11px] font-bold text-amber-100 transition hover:border-rose-400/60 hover:bg-rose-950/35"
+                          >
+                            <span className="truncate">
+                              <span className="text-amber-300">{cat.label}:</span>{' '}
+                              {equippedInSlot.name}
+                            </span>
+                            <X className="h-3 w-3 shrink-0 text-amber-300/80" />
+                          </button>
+                        );
+                      }
+
+                      return (
+                        <div
+                          key={cat.id}
+                          className="rounded-xl border border-dashed border-white/15 bg-white/5 px-2.5 py-1 text-[11px] font-medium text-white/45"
+                        >
+                          {cat.label}: Trống
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Animal Selector */}
+                <div className="rounded-2xl border border-amber-900/40 bg-black/25 p-3">
+                  <p className="text-[11px] font-bold text-amber-200/75">
+                    Chọn nhân vật ({currentAnimalMeta.personality}):
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
                     {ANIMALS.map((a) => (
                       <button
                         key={a.id}
                         type="button"
                         onClick={() => {
                           playSfx('click');
+                          setPreviewItemId(null);
                           selectAnimal(a.id);
                         }}
-                        className={`cursor-pointer rounded-full px-3 py-1 text-xs font-black transition ${
+                        className={`cursor-pointer rounded-full px-2.5 py-1 text-xs font-black transition ${
                           selectedAnimal === a.id
                             ? 'btn-tactile-amber'
                             : 'bg-white/8 text-slate-200 hover:bg-white/16'
@@ -398,95 +505,187 @@ export function CookieShopModal({ isOpen, onClose }: CookieShopModalProps) {
                 </div>
               </div>
 
-              {/* Shop Items Grid */}
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                {SHOP_ITEMS.map((item) => {
-                  const isUnlocked = unlockedAccessories.includes(item.id);
-                  const isEquipped = currentEquippedId === item.id;
-                  const canAfford = cookies >= item.price;
+              {/* Right: Category Filter + Shop Items Grid */}
+              <div className="flex flex-col gap-3 lg:col-span-7">
+                {/* Category Filter Tabs */}
+                <div
+                  role="tablist"
+                  aria-label="Lọc theo vùng phụ kiện"
+                  className="flex flex-wrap gap-1.5"
+                >
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={activeCategory === 'all'}
+                    onClick={() => {
+                      playSfx('click');
+                      setActiveCategory('all');
+                    }}
+                    className={`cursor-pointer rounded-full px-3 py-1.5 text-xs font-black transition ${
+                      activeCategory === 'all'
+                        ? 'btn-tactile-amber'
+                        : 'bg-white/8 text-amber-100 hover:bg-white/16'
+                    }`}
+                  >
+                    Tất cả ({SHOP_ITEMS.length})
+                  </button>
+                  {EQUIP_CATEGORIES.map((cat) => {
+                    const count = SHOP_ITEMS.filter(
+                      (i) => i.category === cat.id,
+                    ).length;
+                    const active = activeCategory === cat.id;
+                    return (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        role="tab"
+                        aria-selected={active}
+                        onClick={() => {
+                          playSfx('click');
+                          setActiveCategory(cat.id);
+                        }}
+                        className={`cursor-pointer rounded-full px-3 py-1.5 text-xs font-black transition ${
+                          active
+                            ? 'btn-tactile-amber'
+                            : 'bg-white/8 text-amber-100 hover:bg-white/16'
+                        }`}
+                      >
+                        {cat.label} ({count})
+                      </button>
+                    );
+                  })}
+                </div>
 
-                  return (
-                    <div
-                      key={item.id}
-                      className={`flex flex-col justify-between rounded-2xl border p-4 transition ${
-                        isEquipped
-                          ? 'border-amber-400 bg-amber-950/40'
-                          : isUnlocked
-                            ? 'border-emerald-400/35 bg-emerald-950/20'
-                            : 'border-amber-900/40 bg-black/25'
-                      }`}
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-amber-400/20 bg-black/40 text-xl shadow-inner">
-                          {item.icon}
+                {/* Items Grid */}
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {visibleItems.map((item) => {
+                    const isUnlocked =
+                      Boolean(item.isDefaultUnlocked) ||
+                      unlockedAccessories.includes(item.id);
+                    const isEquipped = currentEquippedList.includes(item.id);
+                    const isPreviewing = isPreviewOnly && previewItemId === item.id;
+                    const canAfford = cookies >= item.price;
+                    const catLabel =
+                      EQUIP_CATEGORIES.find((c) => c.id === item.category)
+                        ?.label ?? '';
+
+                    return (
+                      <div
+                        key={item.id}
+                        className={`flex flex-col justify-between rounded-2xl border p-4 transition ${
+                          isEquipped
+                            ? 'border-amber-400 bg-amber-950/40'
+                            : isPreviewing
+                              ? 'border-sky-400 bg-sky-950/30'
+                              : isUnlocked
+                                ? 'border-emerald-400/35 bg-emerald-950/20'
+                                : 'border-amber-900/40 bg-black/25'
+                        }`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-amber-400/20 bg-black/40 text-xl shadow-inner">
+                            {item.icon}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <h4 className="text-sm font-black text-white">
+                                {item.name}
+                              </h4>
+                              <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-bold text-amber-200">
+                                {catLabel}
+                              </span>
+                            </div>
+                            <p className="mt-1 text-xs leading-relaxed text-amber-100/75">
+                              {item.description}
+                            </p>
+                          </div>
                         </div>
-                        <div className="min-w-0">
-                          <h4 className="text-sm font-black text-white">
-                            {item.name}
-                          </h4>
-                          <p className="mt-1 text-xs leading-relaxed text-amber-100/75">
-                            {item.description}
-                          </p>
+
+                        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-white/5 pt-3">
+                          <span className="inline-flex items-center gap-1 text-xs font-black text-amber-300">
+                            {isUnlocked ? (
+                              <>
+                                <Check className="h-3.5 w-3.5 text-emerald-400" />
+                                <span>
+                                  {item.price === 0
+                                    ? 'Mặc định miễn phí'
+                                    : 'Đã sở hữu'}
+                                </span>
+                              </>
+                            ) : (
+                              <>
+                                <Cookie className="h-3.5 w-3.5 text-amber-400" />
+                                <span>{item.price.toLocaleString()}</span>
+                              </>
+                            )}
+                          </span>
+
+                          <div className="flex items-center gap-1.5">
+                            {!isEquipped && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  playSfx('click');
+                                  setPreviewItemId((prev) =>
+                                    prev === item.id ? null : item.id,
+                                  );
+                                }}
+                                aria-pressed={isPreviewing}
+                                title="Xem thử phối trên nhân vật 3D"
+                                className={`inline-flex cursor-pointer items-center gap-1 rounded-xl border px-2.5 py-1.5 text-xs font-bold transition ${
+                                  isPreviewing
+                                    ? 'border-sky-300 bg-sky-500/30 text-sky-100'
+                                    : 'border-white/15 bg-white/8 text-slate-200 hover:bg-white/16'
+                                }`}
+                              >
+                                <Eye className="h-3.5 w-3.5" />
+                                <span>{isPreviewing ? 'Tắt thử' : 'Thử'}</span>
+                              </button>
+                            )}
+
+                            {isUnlocked ? (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  playSfx('click');
+                                  setPreviewItemId(null);
+                                  equipAccessory(selectedAnimal, item.id);
+                                }}
+                                className={`cursor-pointer rounded-xl px-3.5 py-1.5 text-xs font-black transition ${
+                                  isEquipped
+                                    ? 'btn-tactile-wood border border-amber-400/40 text-amber-200'
+                                    : 'btn-tactile-emerald'
+                                }`}
+                              >
+                                {isEquipped ? 'Tháo ra' : 'Trang bị'}
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                disabled={!canAfford}
+                                onClick={() => {
+                                  const ok = buyAccessory(item.id);
+                                  if (ok) {
+                                    playSfx('win');
+                                    setPreviewItemId(null);
+                                    equipAccessory(selectedAnimal, item.id);
+                                  }
+                                }}
+                                className={`rounded-xl px-3.5 py-1.5 text-xs font-black transition ${
+                                  canAfford
+                                    ? 'btn-tactile-amber cursor-pointer'
+                                    : 'cursor-not-allowed bg-white/10 text-white/40'
+                                }`}
+                              >
+                                {canAfford ? 'Mua ngay' : 'Chưa đủ'}
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
-
-                      <div className="mt-4 flex items-center justify-between gap-2 border-t border-white/5 pt-3">
-                        <span className="inline-flex items-center gap-1 text-xs font-black text-amber-300">
-                          {isUnlocked ? (
-                            <>
-                              <Check className="h-3.5 w-3.5 text-emerald-400" />
-                              <span>Đã sở hữu</span>
-                            </>
-                          ) : (
-                            <>
-                              <Cookie className="h-3.5 w-3.5 text-amber-400" />
-                              <span>{item.price.toLocaleString()}</span>
-                            </>
-                          )}
-                        </span>
-
-                        {isUnlocked ? (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              playSfx('click');
-                              equipAccessory(
-                                selectedAnimal,
-                                isEquipped ? null : item.id,
-                              );
-                            }}
-                            className={`cursor-pointer rounded-xl px-3.5 py-1.5 text-xs font-black transition ${
-                              isEquipped
-                                ? 'btn-tactile-wood border border-amber-400/40 text-amber-200'
-                                : 'btn-tactile-emerald'
-                            }`}
-                          >
-                            {isEquipped ? 'Tháo ra' : 'Trang bị'}
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            disabled={!canAfford}
-                            onClick={() => {
-                              const ok = buyAccessory(item.id);
-                              if (ok) {
-                                playSfx('win');
-                                equipAccessory(selectedAnimal, item.id);
-                              }
-                            }}
-                            className={`rounded-xl px-3.5 py-1.5 text-xs font-black transition ${
-                              canAfford
-                                ? 'btn-tactile-amber cursor-pointer'
-                                : 'cursor-not-allowed bg-white/10 text-white/40'
-                            }`}
-                          >
-                            {canAfford ? 'Mua ngay' : 'Chưa đủ Cookie'}
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
             </div>
           </motion.div>

@@ -1,12 +1,12 @@
 import { Suspense, type ComponentType } from 'react';
 import type { AnimalId, Emotion } from '../engine/types';
+import type { AccessorySelection } from './accessoryCatalog';
 import type { Animal3DProps } from './CharacterRig3D';
 import {
   GLBCharacter3D,
   GLBErrorBoundary,
   useGlbAvailability,
 } from './GLBCharacter3D';
-import { Accessory3D } from './Accessory3D';
 import { Dog3D } from './animals/Dog3D';
 import { Cat3D } from './animals/Cat3D';
 import { Duck3D } from './animals/Duck3D';
@@ -21,7 +21,7 @@ export interface Character3DProps {
   emotion?: Emotion;
   isActive?: boolean;
   modelUrl?: string | null;
-  accessory?: string | null;
+  accessory?: AccessorySelection;
   position?: [number, number, number];
   rotation?: [number, number, number];
   scale?: number;
@@ -55,7 +55,11 @@ export function Character3D({
 
   const resolvedGlbUrl = modelUrl || (hasBundledGlb ? `/models/${animal}.glb` : null);
   const proceduralFallback = (
-    <AnimalComponent emotion={emotion} isActive={isActive} />
+    <AnimalComponent
+      emotion={emotion}
+      isActive={isActive}
+      accessory={accessory}
+    />
   );
 
   return (
@@ -95,15 +99,16 @@ export function Character3D({
           <Suspense fallback={proceduralFallback}>
             <GLBCharacter3D
               url={resolvedGlbUrl}
+              animal={animal}
               emotion={emotion}
               isActive={isActive}
+              accessory={accessory}
             />
           </Suspense>
         </GLBErrorBoundary>
       ) : (
         proceduralFallback
       )}
-      {accessory && <Accessory3D accessory={accessory} animal={animal} />}
     </group>
   );
 }

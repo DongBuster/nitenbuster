@@ -28,7 +28,7 @@ export interface FighterConfig {
   id: string;
   name: string;
   animal: AnimalId;
-  accessory: string | null;
+  accessory: string[];
   isBot: boolean;
   spawnIndex: number;
   accentHex: string;

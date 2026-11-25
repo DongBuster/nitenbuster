@@ -37,10 +37,8 @@ import {
 } from '../components/Modals/WildModals';
 import { RulesModal } from '../components/Modals/RulesModal';
 import { TutorialOverlay } from '../components/Modals/TutorialOverlay';
-import {
-  PawsShoutOverlay,
-  type PawsShoutInfo,
-} from '../components/Modals/PawsShoutOverlay';
+import { PawsShoutOverlay } from '../components/Modals/PawsShoutOverlay';
+import { useMatchNotices } from './useMatchNotices';
 import {
   playSfx,
   setAudioPreferences,
@@ -88,32 +86,6 @@ export function OnlineGame3DScreen({
   const [showRules, setShowRules] = useState<boolean>(false);
   const [showTutorial, setShowTutorial] = useState<boolean>(false);
   const [cookiesEarned, setCookiesEarned] = useState<number>(0);
-  const [pawsShout, setPawsShout] = useState<PawsShoutInfo | null>(null);
-  const [penaltyNotice, setPenaltyNotice] = useState<string | null>(null);
-  const prevCalledPawsRef = useRef<Set<string>>(new Set());
-  const prevHumanHandLenRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    if (!gameState) return;
-    const currentSet = new Set(
-      gameState.players.filter((p) => p.calledPaws).map((p) => p.id),
-    );
-    const newlyCalled = gameState.players.find(
-      (p) => p.calledPaws && !prevCalledPawsRef.current.has(p.id),
-    );
-    prevCalledPawsRef.current = currentSet;
-
-    if (newlyCalled && gameState.winnerId === null) {
-      playSfx('paws');
-      setPawsShout({
-        key: `${gameState.turnCount}-${newlyCalled.id}-${Date.now()}`,
-        playerName: newlyCalled.name,
-        animal: newlyCalled.animal,
-      });
-      const timer = window.setTimeout(() => setPawsShout(null), 1700);
-      return () => window.clearTimeout(timer);
-    }
-  }, [gameState]);
 
   const recordedWinnerRef = useRef<string | null>(null);
   const lastTurnCountRef = useRef<number>(-1);
@@ -143,47 +115,15 @@ export function OnlineGame3DScreen({
     );
   }, [gameState, room.myPeerId]);
 
-  // Surface a clear reason toast whenever the local player receives penalty/extra cards online
-  useEffect(() => {
-    if (!gameState || !humanPlayer) {
-      prevHumanHandLenRef.current = null;
-      return;
-    }
+  const handlePawsShoutSfx = useCallback(() => {
+    playSfx('paws');
+  }, []);
 
-    const prevLen = prevHumanHandLenRef.current;
-    const currLen = humanPlayer.hand.length;
-    prevHumanHandLenRef.current = currLen;
-
-    if (
-      prevLen === null ||
-      gameState.turnCount === 0 ||
-      gameState.winnerId !== null ||
-      currLen <= prevLen
-    ) {
-      return;
-    }
-
-    const delta = currLen - prevLen;
-    const latest =
-      gameState.logs.length > 0
-        ? gameState.logs[gameState.logs.length - 1]
-        : null;
-    const reason = gameState.lastEffectBanner ?? latest?.text ?? '';
-    const isNotableEvent =
-      delta >= 2 ||
-      latest?.type === 'penalty' ||
-      reason.includes('Nỏ Thần') ||
-      reason.includes('PAWS') ||
-      reason.includes('Bom') ||
-      reason.includes('Vỏ Chuối') ||
-      reason.includes('Tia Chớp');
-
-    if (isNotableEvent && reason) {
-      setPenaltyNotice(`+${delta} lá — ${reason}`);
-      const timer = window.setTimeout(() => setPenaltyNotice(null), 2800);
-      return () => window.clearTimeout(timer);
-    }
-  }, [gameState, humanPlayer]);
+  const { penaltyNotice, pawsShout } = useMatchNotices({
+    gameState,
+    humanPlayer,
+    onPawsShout: handlePawsShoutSfx,
+  });
 
   const currentPlayer = gameState
     ? gameState.players[gameState.currentIndex]

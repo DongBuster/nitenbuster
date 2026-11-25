@@ -30,7 +30,8 @@ import { Character3D } from '../scene3d/Character3D';
 import { WinterCabinStage } from '../scene3d/WinterCabinStage';
 import { CookieShopModal, RulesModal } from '../components/Modals/RulesModal';
 import { TutorialOverlay } from '../components/Modals/TutorialOverlay';
-import { SHOP_ITEMS, useProfileStore } from '../store/profileStore';
+import { useProfileStore } from '../store/profileStore';
+import { formatEquippedSummary } from '../scene3d/accessoryCatalog';
 import { playSfx, setAudioPreferences } from '../audio/soundEngine';
 
 export interface MainMenuScreenProps {
@@ -84,8 +85,8 @@ export function MainMenuScreen({
 
   const selectedMeta =
     ANIMALS.find((a) => a.id === selectedAnimal) ?? ANIMALS[0];
-  const equippedId = equippedAccessory[selectedAnimal] ?? null;
-  const equippedItem = SHOP_ITEMS.find((i) => i.id === equippedId) ?? null;
+  const equippedList = equippedAccessory[selectedAnimal] ?? [];
+  const equippedSummary = formatEquippedSummary(equippedList);
 
   const toggleSfx = () => {
     const next = !settings.sfxEnabled;
@@ -156,12 +157,13 @@ export function MainMenuScreen({
               <Canvas
                 shadows
                 dpr={[1, 1.5]}
+                frameloop={showShop || showRules || showTutorial ? 'never' : 'always'}
                 gl={{
                   alpha: false,
                   antialias: true,
                   powerPreference: 'high-performance',
                 }}
-                camera={{ position: [0, 1.9, 4.7], fov: 40 }}
+                camera={{ position: [0, 2.0, 5.3], fov: 42 }}
               >
                 <color attach="background" args={['#24160f']} />
                 <Suspense fallback={null}>
@@ -172,14 +174,14 @@ export function MainMenuScreen({
                     isActive
                     accessory={equippedAccessory[selectedAnimal] ?? null}
                     position={[0, 0, 0]}
-                    scale={1.45}
+                    scale={1.38}
                   />
                 </Suspense>
                 <OrbitControls
                   enablePan={false}
                   enableDamping
                   dampingFactor={0.07}
-                  target={[0, 0.85, 0]}
+                  target={[0, 1.0, 0]}
                   minDistance={3.2}
                   maxDistance={7.5}
                   maxPolarAngle={Math.PI / 2 - 0.08}
@@ -200,10 +202,18 @@ export function MainMenuScreen({
                 <span className="text-xs font-semibold text-amber-200/80 drop-shadow-sm">
                   {selectedMeta.personality}
                 </span>
-                {equippedItem && (
-                  <span className="inline-flex w-fit items-center gap-1.5 rounded-full border border-emerald-400/40 bg-emerald-950/85 px-3 py-1 text-[11px] font-bold text-emerald-200">
+                {equippedSummary && (
+                  <span
+                    title={equippedSummary.fullNames.join(', ')}
+                    className="inline-flex w-fit items-center gap-1.5 rounded-full border border-emerald-400/40 bg-emerald-950/85 px-3 py-1 text-[11px] font-bold text-emerald-200"
+                  >
                     <Sparkles className="h-3 w-3 text-emerald-400" />
-                    <span>{equippedItem.name}</span>
+                    <span>
+                      {equippedSummary.primaryName}
+                      {equippedSummary.extraCount > 0
+                        ? ` +${equippedSummary.extraCount}`
+                        : ''}
+                    </span>
                   </span>
                 )}
               </div>

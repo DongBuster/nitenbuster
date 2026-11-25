@@ -12,12 +12,14 @@ export interface Card3DProps {
   faceDown?: boolean;
   playable?: boolean;
   selected?: boolean;
+  forceHover?: boolean;
   activeWildColor?: Color;
   position?: [number, number, number];
   rotation?: [number, number, number];
   scale?: number;
   hoverLift?: boolean;
   hoverZBoost?: number;
+  onInfoAnchorRef?: (obj: THREE.Object3D | null) => void;
   onClick?: () => void;
 }
 
@@ -48,12 +50,14 @@ export function Card3D({
   faceDown = false,
   playable = true,
   selected = false,
+  forceHover = false,
   activeWildColor,
   position = [0, 0, 0],
   rotation = [0, 0, 0],
   scale = 1,
   hoverLift = true,
   hoverZBoost = 0.25,
+  onInfoAnchorRef,
   onClick,
 }: Card3DProps) {
   const innerGroupRef = useRef<THREE.Group>(null);
@@ -74,15 +78,16 @@ export function Card3D({
   const backTexture = useMemo(() => getCardBackTexture(), []);
 
   const isInteractive = Boolean(onClick) && playable;
+  const isHovered = hovered || forceHover;
 
   useEffect(() => {
-    if (hovered && isInteractive) {
+    if (isHovered && isInteractive) {
       document.body.style.cursor = 'pointer';
       return () => {
         document.body.style.cursor = 'auto';
       };
     }
-  }, [hovered, isInteractive]);
+  }, [isHovered, isInteractive]);
 
   useFrame((_, rawDelta) => {
     const dt = Math.min(rawDelta, 0.05);
@@ -90,7 +95,7 @@ export function Card3D({
     const grp = innerGroupRef.current;
 
     if (grp) {
-      const canLift = hoverLift && playable && hovered;
+      const canLift = hoverLift && playable && isHovered;
       const targetY = selected ? 0.24 : canLift ? 0.24 : 0;
       const targetZ = selected ? hoverZBoost : canLift ? hoverZBoost : 0;
       const targetRotY = faceDown ? Math.PI : 0;
@@ -207,6 +212,11 @@ export function Card3D({
               roughness={0.3}
             />
           </mesh>
+        )}
+
+        {/* World-tracked top-right corner anchor so 2D "!" info badges follow card lift & scale */}
+        {onInfoAnchorRef && (
+          <object3D ref={onInfoAnchorRef} position={[0.35, 0.6, 0.03]} />
         )}
       </group>
     </group>
