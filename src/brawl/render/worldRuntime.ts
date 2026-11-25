@@ -86,6 +86,7 @@ import {
   WAKEUP_ANIM_SEC,
   WAKEUP_IMMUNITY_SEC,
 } from '../sim/constants';
+import { getCooldownState } from '../sim/cooldowns';
 import {
   createPartyMotionState,
   stepPartyMotion,
@@ -1354,8 +1355,23 @@ export class BrawlWorldRuntime {
       if (f.status.alive) aliveCount += 1;
     }
 
-    const rollReadyRemaining = Math.max(0, (st?.rollCooldownUntil ?? 0) - now);
-    const rollPct = 1 - Math.min(1, rollReadyRemaining / ROLL_COOLDOWN);
+    const playerGrounded = Boolean(human?.grounded);
+    const holdingRanged =
+      st?.heldItem === 'snowball' || st?.heldItem === 'candy_bomb';
+    const useDropkickCd = !playerGrounded && !holdingRanged;
+    const punchCd = useDropkickCd
+      ? getCooldownState(st?.dropkickCooldownUntil ?? 0, now, DROPKICK_COOLDOWN)
+      : getCooldownState(st?.punchCooldownUntil ?? 0, now, PUNCH_COOLDOWN);
+    const headbuttCd = getCooldownState(
+      st?.headbuttCooldownUntil ?? 0,
+      now,
+      HEADBUTT_COOLDOWN,
+    );
+    const rollCd = getCooldownState(
+      st?.rollCooldownUntil ?? 0,
+      now,
+      ROLL_COOLDOWN,
+    );
     const grabbedTarget = st?.grabbingTargetId
       ? this.fighters.get(st.grabbingTargetId)?.config.name ?? null
       : null;
@@ -1368,6 +1384,7 @@ export class BrawlWorldRuntime {
       nextCollapseInSec: collapseInfo.inSec,
       isRingWarning: collapseInfo.warning,
       playerAlive: Boolean(st?.alive),
+      playerGrounded,
       playerBalance: st?.balance ?? 0,
       playerMaxBalance: st?.maxBalance ?? 100,
       playerStunned: Boolean(st && st.stunnedUntil > now),
@@ -1375,7 +1392,12 @@ export class BrawlWorldRuntime {
       playerInverted: Boolean(st && st.invertedUntil > now),
       playerSpeedLeft: st ? Math.max(0, st.speedBoostUntil - now) : 0,
       playerShieldLeft: st ? Math.max(0, st.shieldUntil - now) : 0,
-      playerRollReadyPct: rollPct,
+      playerRollReadyPct: rollCd.readyPct,
+      playerRollCooldownLeft: rollCd.remainingSec,
+      playerPunchReadyPct: punchCd.readyPct,
+      playerPunchCooldownLeft: punchCd.remainingSec,
+      playerHeadbuttReadyPct: headbuttCd.readyPct,
+      playerHeadbuttCooldownLeft: headbuttCd.remainingSec,
       playerHeldItem: st?.heldItem ?? null,
       playerHeldAmmo: st?.heldAmmo ?? 0,
       playerGrabbingName: grabbedTarget,

@@ -25,6 +25,7 @@ const INITIAL_HUD: HudSnapshot = {
   nextCollapseInSec: 32,
   isRingWarning: false,
   playerAlive: true,
+  playerGrounded: true,
   playerBalance: 100,
   playerMaxBalance: 100,
   playerStunned: false,
@@ -33,6 +34,11 @@ const INITIAL_HUD: HudSnapshot = {
   playerSpeedLeft: 0,
   playerShieldLeft: 0,
   playerRollReadyPct: 1,
+  playerRollCooldownLeft: 0,
+  playerPunchReadyPct: 1,
+  playerPunchCooldownLeft: 0,
+  playerHeadbuttReadyPct: 1,
+  playerHeadbuttCooldownLeft: 0,
   playerHeldItem: null,
   playerHeldAmmo: 0,
   playerGrabbingName: null,
@@ -66,7 +72,8 @@ export function BrawlScreen({ onBackToModeSelect }: BrawlScreenProps) {
   const recordedRef = useRef<boolean>(false);
 
   const controlsEnabled = match.phase === 'fighting' && !paused;
-  const { consumeInput } = useKeyboardMouse(controlsEnabled);
+  const { consumeInput, pressedSkills, triggerSkill, setVirtualHold } =
+    useKeyboardMouse(controlsEnabled);
 
   // Sync audio preferences
   useEffect(() => {
@@ -186,6 +193,10 @@ export function BrawlScreen({ onBackToModeSelect }: BrawlScreenProps) {
           match={match}
           hud={hud}
           paused={paused}
+          controlsEnabled={controlsEnabled}
+          pressedSkills={pressedSkills}
+          onTriggerSkill={triggerSkill}
+          onVirtualHold={setVirtualHold}
           sfxEnabled={settings.sfxEnabled}
           onToggleSfx={() =>
             updateSettings({ sfxEnabled: !settings.sfxEnabled })

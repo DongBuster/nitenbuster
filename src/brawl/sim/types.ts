@@ -159,6 +159,16 @@ export interface KnockoutPopup {
   createdAt: number;
 }
 
+export type BrawlSkillId =
+  | 'punch'
+  | 'headbutt'
+  | 'grab'
+  | 'roll'
+  | 'jump'
+  | 'sprint';
+
+export type PressedSkillState = Record<BrawlSkillId, boolean>;
+
 export interface HudSnapshot {
   aliveCount: number;
   totalFighters: number;
@@ -167,6 +177,7 @@ export interface HudSnapshot {
   nextCollapseInSec: number | null;
   isRingWarning: boolean;
   playerAlive: boolean;
+  playerGrounded: boolean;
   playerBalance: number;
   playerMaxBalance: number;
   playerStunned: boolean;
@@ -175,6 +186,11 @@ export interface HudSnapshot {
   playerSpeedLeft: number;
   playerShieldLeft: number;
   playerRollReadyPct: number;
+  playerRollCooldownLeft: number;
+  playerPunchReadyPct: number;
+  playerPunchCooldownLeft: number;
+  playerHeadbuttReadyPct: number;
+  playerHeadbuttCooldownLeft: number;
   playerHeldItem: HeldWeaponKind;
   playerHeldAmmo: number;
   playerGrabbingName: string | null;

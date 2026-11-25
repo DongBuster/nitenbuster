@@ -6,24 +6,25 @@ import {
   HelpCircle,
   Pause,
   Play,
-  RotateCcw,
-  Shield,
   ShieldAlert,
   Swords,
   Users,
   Volume2,
   VolumeX,
-  Zap,
 } from 'lucide-react';
 import { playSfx } from '../../audio/soundEngine';
-import { ITEM_META } from '../sim/combat';
 import { getSortedStandings } from '../sim/matchStore';
-import type { HudSnapshot, MatchState } from '../sim/types';
+import type { HudSnapshot, MatchState, PressedSkillState } from '../sim/types';
+import { BrawlSkillBar } from './BrawlSkillBar';
 
 export interface BrawlHudProps {
   match: MatchState;
   hud: HudSnapshot;
   paused: boolean;
+  controlsEnabled: boolean;
+  pressedSkills: PressedSkillState;
+  onTriggerSkill: (skill: 'punch' | 'headbutt' | 'roll' | 'jump') => void;
+  onVirtualHold: (skill: 'grab' | 'sprint', held: boolean) => void;
   sfxEnabled: boolean;
   onToggleSfx: () => void;
   onTogglePause: () => void;
@@ -34,6 +35,10 @@ export function BrawlHud({
   match,
   hud,
   paused,
+  controlsEnabled,
+  pressedSkills,
+  onTriggerSkill,
+  onVirtualHold,
   sfxEnabled,
   onToggleSfx,
   onTogglePause,
@@ -41,11 +46,6 @@ export function BrawlHud({
 }: BrawlHudProps) {
   const [showHelp, setShowHelp] = useState(false);
   const topScores = getSortedStandings(match.scores).slice(0, 4);
-  const balancePct = Math.max(
-    0,
-    Math.min(100, (hud.playerBalance / Math.max(1, hud.playerMaxBalance)) * 100),
-  );
-  const heldMeta = hud.playerHeldItem ? ITEM_META[hud.playerHeldItem] : null;
 
   return (
     <div className="pointer-events-none fixed inset-0 z-20 flex flex-col justify-between p-3 sm:p-5">
@@ -289,89 +289,13 @@ export function BrawlHud({
           </div>
         )}
 
-        <div className="flex flex-wrap items-center justify-center gap-3 rounded-2xl border border-white/15 bg-slate-950/90 px-4 py-2.5 text-xs text-white shadow-2xl backdrop-blur-md">
-          {/* Balance / Stun Meter */}
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center justify-between gap-3 text-[11px] font-black">
-              <span>
-                {hud.playerFrozen
-                  ? 'ĐÓNG BĂNG!'
-                  : hud.playerStunned
-                    ? 'CHOÁNG NGÃ!'
-                    : 'Thăng Bằng'}
-              </span>
-              <span className="font-mono text-amber-200">{Math.round(balancePct)}%</span>
-            </div>
-            <div className="h-2 w-36 overflow-hidden rounded-full bg-white/15">
-              <div
-                className={`h-full transition-all duration-150 ${
-                  hud.playerStunned || balancePct < 35
-                    ? 'bg-rose-500'
-                    : hud.playerFrozen
-                      ? 'bg-sky-400'
-                      : 'bg-emerald-400'
-                }`}
-                style={{ width: `${balancePct}%` }}
-              />
-            </div>
-          </div>
-
-          <div className="h-7 w-px bg-white/15" />
-
-          {/* Roll Cooldown */}
-          <div className="flex items-center gap-1.5">
-            <span className="rounded-lg bg-white/10 px-2 py-1 font-mono text-[11px] font-black text-sky-200">
-              L
-            </span>
-            <span className="font-bold">
-              {hud.playerRollReadyPct >= 0.99 ? 'Lăn: Sẵn sàng' : 'Đang hồi...'}
-            </span>
-          </div>
-
-          <div className="h-7 w-px bg-white/15" />
-
-          {/* Held Item / Grabbing */}
-          <div className="flex items-center gap-1.5">
-            {hud.playerGrabbingName ? (
-              <span className="font-black text-amber-300">
-                Đang giữ {hud.playerGrabbingName} (Nhả K để ném!)
-              </span>
-            ) : heldMeta ? (
-              <span className="font-black text-amber-200">
-                {heldMeta.label} ×{hud.playerHeldAmmo} (J)
-              </span>
-            ) : (
-              <span className="text-slate-300">J đấm / đá bay · E húc đầu · K nắm/ném · Shift chạy nhanh</span>
-            )}
-          </div>
-
-          {/* Active Buffs / Debuffs */}
-          {(hud.playerSpeedLeft > 0 || hud.playerShieldLeft > 0 || hud.playerInverted) && (
-            <>
-              <div className="h-7 w-px bg-white/15" />
-              <div className="flex items-center gap-2 font-black">
-                {hud.playerSpeedLeft > 0 && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-cyan-500/25 px-2 py-0.5 text-cyan-200">
-                    <Zap className="h-3 w-3" />
-                    <span>{hud.playerSpeedLeft.toFixed(1)}s</span>
-                  </span>
-                )}
-                {hud.playerShieldLeft > 0 && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/25 px-2 py-0.5 text-amber-200">
-                    <Shield className="h-3 w-3" />
-                    <span>{hud.playerShieldLeft.toFixed(1)}s</span>
-                  </span>
-                )}
-                {hud.playerInverted && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-purple-500/35 px-2 py-0.5 text-purple-200">
-                    <RotateCcw className="h-3 w-3" />
-                    <span>Đảo phím!</span>
-                  </span>
-                )}
-              </div>
-            </>
-          )}
-        </div>
+        <BrawlSkillBar
+          hud={hud}
+          controlsEnabled={controlsEnabled}
+          pressedSkills={pressedSkills}
+          onTriggerSkill={onTriggerSkill}
+          onVirtualHold={onVirtualHold}
+        />
       </footer>
     </div>
   );

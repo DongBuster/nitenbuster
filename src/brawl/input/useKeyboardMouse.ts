@@ -1,5 +1,35 @@
-import { useCallback, useEffect, useRef } from 'react';
-import type { EmoteKind, FighterInput } from '../sim/types';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { EmoteKind, FighterInput, PressedSkillState } from '../sim/types';
+
+const IDLE_SKILLS: PressedSkillState = {
+  punch: false,
+  headbutt: false,
+  grab: false,
+  roll: false,
+  jump: false,
+  sprint: false,
+};
+
+function mapCodeToSkill(code: string): keyof PressedSkillState | null {
+  switch (code) {
+    case 'KeyJ':
+      return 'punch';
+    case 'KeyE':
+    case 'KeyH':
+      return 'headbutt';
+    case 'KeyK':
+      return 'grab';
+    case 'KeyL':
+      return 'roll';
+    case 'Space':
+      return 'jump';
+    case 'ShiftLeft':
+    case 'ShiftRight':
+      return 'sprint';
+    default:
+      return null;
+  }
+}
 
 export function useKeyboardMouse(enabled: boolean) {
   const keysRef = useRef<Set<string>>(new Set());
@@ -8,7 +38,37 @@ export function useKeyboardMouse(enabled: boolean) {
   const headbuttQueuedRef = useRef<boolean>(false);
   const rollQueuedRef = useRef<boolean>(false);
   const emoteQueuedRef = useRef<EmoteKind | null>(null);
-  const mouseDownRef = useRef<boolean>(false);
+  const virtualGrabRef = useRef<boolean>(false);
+  const virtualSprintRef = useRef<boolean>(false);
+  const pulseTimersRef = useRef<Partial<Record<keyof PressedSkillState, number>>>({});
+  const enabledRef = useRef<boolean>(enabled);
+  enabledRef.current = enabled;
+
+  const [pressedSkills, setPressedSkills] = useState<PressedSkillState>(IDLE_SKILLS);
+
+  const setSkillVisual = useCallback(
+    (skill: keyof PressedSkillState, active: boolean) => {
+      setPressedSkills((prev) =>
+        prev[skill] === active ? prev : { ...prev, [skill]: active },
+      );
+    },
+    [],
+  );
+
+  const pulseSkillVisual = useCallback(
+    (skill: keyof PressedSkillState) => {
+      setSkillVisual(skill, true);
+      const prevTimer = pulseTimersRef.current[skill];
+      if (prevTimer !== undefined) {
+        window.clearTimeout(prevTimer);
+      }
+      pulseTimersRef.current[skill] = window.setTimeout(() => {
+        delete pulseTimersRef.current[skill];
+        setSkillVisual(skill, false);
+      }, 140);
+    },
+    [setSkillVisual],
+  );
 
   const resetAll = useCallback(() => {
     keysRef.current.clear();
@@ -17,8 +77,50 @@ export function useKeyboardMouse(enabled: boolean) {
     headbuttQueuedRef.current = false;
     rollQueuedRef.current = false;
     emoteQueuedRef.current = null;
-    mouseDownRef.current = false;
+    virtualGrabRef.current = false;
+    virtualSprintRef.current = false;
+    for (const timer of Object.values(pulseTimersRef.current)) {
+      if (timer !== undefined) window.clearTimeout(timer);
+    }
+    pulseTimersRef.current = {};
+    setPressedSkills(IDLE_SKILLS);
   }, []);
+
+  const triggerSkill = useCallback(
+    (skill: 'punch' | 'headbutt' | 'roll' | 'jump') => {
+      if (!enabledRef.current) return;
+      if (skill === 'jump') {
+        jumpBufferedUntilRef.current = performance.now() + 130;
+      } else if (skill === 'punch') {
+        punchQueuedRef.current = true;
+      } else if (skill === 'headbutt') {
+        headbuttQueuedRef.current = true;
+      } else if (skill === 'roll') {
+        rollQueuedRef.current = true;
+      }
+      pulseSkillVisual(skill);
+    },
+    [pulseSkillVisual],
+  );
+
+  const setVirtualHold = useCallback(
+    (skill: 'grab' | 'sprint', held: boolean) => {
+      if (!enabledRef.current && held) return;
+      if (skill === 'grab') {
+        virtualGrabRef.current = held;
+        setSkillVisual('grab', held || keysRef.current.has('KeyK'));
+      } else {
+        virtualSprintRef.current = held;
+        setSkillVisual(
+          'sprint',
+          held ||
+            keysRef.current.has('ShiftLeft') ||
+            keysRef.current.has('ShiftRight'),
+        );
+      }
+    },
+    [setSkillVisual],
+  );
 
   useEffect(() => {
     if (!enabled) {
@@ -63,6 +165,9 @@ export function useKeyboardMouse(enabled: boolean) {
         } else if (e.code === 'Digit4') {
           emoteQueuedRef.current = 'cheer';
         }
+
+        const skill = mapCodeToSkill(e.code);
+        if (skill) setSkillVisual(skill, true);
       }
 
       keysRef.current.add(e.code);
@@ -70,6 +175,21 @@ export function useKeyboardMouse(enabled: boolean) {
 
     const onKeyUp = (e: KeyboardEvent) => {
       keysRef.current.delete(e.code);
+      const skill = mapCodeToSkill(e.code);
+      if (!skill) return;
+
+      if (skill === 'sprint') {
+        setSkillVisual(
+          'sprint',
+          virtualSprintRef.current ||
+            keysRef.current.has('ShiftLeft') ||
+            keysRef.current.has('ShiftRight'),
+        );
+      } else if (skill === 'grab') {
+        setSkillVisual('grab', virtualGrabRef.current);
+      } else {
+        setSkillVisual(skill, false);
+      }
     };
 
     const onMouseDown = (e: MouseEvent) => {
@@ -78,10 +198,11 @@ export function useKeyboardMouse(enabled: boolean) {
         return;
       }
       if (e.button === 0) {
-        mouseDownRef.current = true;
         punchQueuedRef.current = true;
+        pulseSkillVisual('punch');
       } else if (e.button === 2) {
         headbuttQueuedRef.current = true;
+        pulseSkillVisual('headbutt');
       }
     };
 
@@ -93,12 +214,6 @@ export function useKeyboardMouse(enabled: boolean) {
       e.preventDefault();
     };
 
-    const onMouseUp = (e: MouseEvent) => {
-      if (e.button === 0) {
-        mouseDownRef.current = false;
-      }
-    };
-
     const onVisibility = () => {
       if (document.hidden) resetAll();
     };
@@ -106,7 +221,6 @@ export function useKeyboardMouse(enabled: boolean) {
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
     window.addEventListener('mousedown', onMouseDown);
-    window.addEventListener('mouseup', onMouseUp);
     window.addEventListener('contextmenu', onContextMenu);
     window.addEventListener('blur', resetAll);
     document.addEventListener('visibilitychange', onVisibility);
@@ -115,12 +229,11 @@ export function useKeyboardMouse(enabled: boolean) {
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('mousedown', onMouseDown);
-      window.removeEventListener('mouseup', onMouseUp);
       window.removeEventListener('contextmenu', onContextMenu);
       window.removeEventListener('blur', resetAll);
       document.removeEventListener('visibilitychange', onVisibility);
     };
-  }, [enabled, resetAll]);
+  }, [enabled, pulseSkillVisual, resetAll, setSkillVisual]);
 
   const consumeInput = useCallback((): FighterInput => {
     const keys = keysRef.current;
@@ -156,8 +269,11 @@ export function useKeyboardMouse(enabled: boolean) {
     const emote = emoteQueuedRef.current;
     emoteQueuedRef.current = null;
 
-    const grabHeld = keys.has('KeyK');
-    const sprint = keys.has('ShiftLeft') || keys.has('ShiftRight');
+    const grabHeld = keys.has('KeyK') || virtualGrabRef.current;
+    const sprint =
+      keys.has('ShiftLeft') ||
+      keys.has('ShiftRight') ||
+      virtualSprintRef.current;
 
     return {
       moveX,
@@ -172,5 +288,5 @@ export function useKeyboardMouse(enabled: boolean) {
     };
   }, []);
 
-  return { consumeInput };
+  return { consumeInput, pressedSkills, triggerSkill, setVirtualHold };
 }
