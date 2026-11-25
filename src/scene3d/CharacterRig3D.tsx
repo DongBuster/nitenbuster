@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import type { PartyMotionState } from '../brawl/sim/partyMotion';
 import type { Emotion } from '../engine/types';
 import type { AccessorySelection } from './accessoryCatalog';
+import { computeBlinkScaleY } from './plushCurves';
 
 export const BrawlMotionContext =
   createContext<RefObject<PartyMotionState | null> | null>(null);
@@ -18,6 +19,7 @@ export interface RigRefs {
   root: RefObject<THREE.Group | null>;
   body: RefObject<THREE.Group | null>;
   head: RefObject<THREE.Group | null>;
+  eyes?: RefObject<THREE.Group | null>;
   earLeft?: RefObject<THREE.Group | null>;
   earRight?: RefObject<THREE.Group | null>;
   armLeft?: RefObject<THREE.Group | null>;
@@ -327,6 +329,13 @@ export function useAnimalMotion(
       const base = getBaseTransform(tail);
       tail.rotation.x = THREE.MathUtils.lerp(tail.rotation.x, base.rot[0] + tailRotX, smooth);
       tail.rotation.y = THREE.MathUtils.lerp(tail.rotation.y, base.rot[1] + tailRotY, smooth);
+    }
+
+    const eyes = refs.eyes?.current;
+    if (eyes) {
+      const base = getBaseTransform(eyes);
+      const blinkY = computeBlinkScaleY(state.clock.elapsedTime, phaseRef.current, emotion);
+      eyes.scale.y = base.scale[1] * blinkY;
     }
   });
 }

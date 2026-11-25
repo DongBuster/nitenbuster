@@ -9,6 +9,7 @@ import { ModeSelectScreen } from './screens/ModeSelectScreen';
 import { useOnlineRoom } from './online/useOnlineRoom';
 
 const LazyBrawlScreen = lazy(() => import('./screens/BrawlScreen'));
+const LazyBlockBlastScreen = lazy(() => import('./screens/BlockBlastScreen'));
 
 type AppScreen =
   | 'modeSelect'
@@ -16,7 +17,8 @@ type AppScreen =
   | 'game'
   | 'online'
   | 'studio3d'
-  | 'brawl';
+  | 'brawl'
+  | 'blockblast';
 
 function OnlineModeContainer({ onBackToMenu }: { onBackToMenu: () => void }) {
   const room = useOnlineRoom();
@@ -28,36 +30,49 @@ function OnlineModeContainer({ onBackToMenu }: { onBackToMenu: () => void }) {
   return <OnlineLobbyScreen room={room} onBackToMenu={onBackToMenu} />;
 }
 
-interface BrawlBoundaryState {
+interface ModeBoundaryProps {
+  title: string;
+  fallbackMessage: string;
+  bgClass?: string;
+  onBack: () => void;
+  children: ReactNode;
+}
+
+interface ModeBoundaryState {
   hasError: boolean;
   message: string;
 }
 
-class BrawlErrorBoundary extends Component<
-  { onBack: () => void; children: ReactNode },
-  BrawlBoundaryState
-> {
-  state: BrawlBoundaryState = { hasError: false, message: '' };
+/**
+ * Shared error boundary for lazy-loaded game modes so initialization failures
+ * always present a styled recovery action back to the mode hub.
+ */
+class ModeErrorBoundary extends Component<ModeBoundaryProps, ModeBoundaryState> {
+  state: ModeBoundaryState = { hasError: false, message: '' };
 
-  static getDerivedStateFromError(error: Error): BrawlBoundaryState {
+  static getDerivedStateFromError(error: Error): ModeBoundaryState {
     return {
       hasError: true,
-      message: error?.message || 'Không thể khởi tạo engine vật lý 3D.',
+      message: error?.message || '',
     };
   }
 
   render() {
     if (this.state.hasError) {
       return (
-        <div className="flex min-h-screen flex-col items-center justify-center bg-[#0F1B2D] p-6 text-center text-white">
+        <div
+          className={`flex min-h-screen flex-col items-center justify-center p-6 text-center text-white ${this.props.bgClass ?? 'bg-[#0F1B2D]'}`}
+        >
           <div className="max-w-md rounded-3xl border border-rose-300/40 bg-slate-900 p-6 shadow-2xl">
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-500/20 text-rose-300">
               <AlertTriangle className="h-6 w-6" />
             </div>
             <h2 className="mt-3 font-display text-xl font-black text-rose-200">
-              Không thể mở Brawl Arena 3D
+              {this.props.title}
             </h2>
-            <p className="mt-2 text-xs text-slate-300">{this.state.message}</p>
+            <p className="mt-2 text-xs text-slate-300">
+              {this.state.message || this.props.fallbackMessage}
+            </p>
             <button
               type="button"
               onClick={() => {
@@ -75,6 +90,34 @@ class BrawlErrorBoundary extends Component<
     }
     return this.props.children;
   }
+}
+
+/**
+ * Shared Suspense loading state for lazy-loaded game modes.
+ */
+function ModeLoadingFallback({
+  label,
+  bgClass,
+  spinnerClass,
+  textClass,
+}: {
+  label: string;
+  bgClass: string;
+  spinnerClass: string;
+  textClass: string;
+}) {
+  return (
+    <div
+      className={`flex min-h-screen flex-col items-center justify-center gap-3 text-white ${bgClass}`}
+    >
+      <div
+        className={`h-10 w-10 animate-spin rounded-full border-4 border-t-transparent ${spinnerClass}`}
+      />
+      <div className={`text-sm font-black tracking-wide ${textClass}`}>
+        {label}
+      </div>
+    </div>
+  );
 }
 
 export function App() {
@@ -113,6 +156,7 @@ export function App() {
         <ModeSelectScreen
           onSelectPawsCards={() => setScreen('menu')}
           onSelectBrawlArena={() => setScreen('brawl')}
+          onSelectBlockBlast={() => setScreen('blockblast')}
           onOpenStudio3D={() => setScreen('studio3d')}
         />
       )}
@@ -134,22 +178,51 @@ export function App() {
       {screen === 'studio3d' && <Showcase3D />}
 
       {screen === 'brawl' && (
-        <BrawlErrorBoundary onBack={() => setScreen('modeSelect')}>
+        <ModeErrorBoundary
+          title="Không thể mở Brawl Arena 3D"
+          fallbackMessage="Không thể khởi tạo engine vật lý 3D."
+          bgClass="bg-[#0F1B2D]"
+          onBack={() => setScreen('modeSelect')}
+        >
           <Suspense
             fallback={
-              <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-[#14243A] text-white">
-                <div className="h-10 w-10 animate-spin rounded-full border-4 border-sky-400 border-t-transparent" />
-                <div className="text-sm font-black tracking-wide text-sky-200">
-                  Đang tải đấu trường Brawl Arena 3D...
-                </div>
-              </div>
+              <ModeLoadingFallback
+                label="Đang tải đấu trường Brawl Arena 3D..."
+                bgClass="bg-[#14243A]"
+                spinnerClass="border-sky-400"
+                textClass="text-sky-200"
+              />
             }
           >
             <LazyBrawlScreen
               onBackToModeSelect={() => setScreen('modeSelect')}
             />
           </Suspense>
-        </BrawlErrorBoundary>
+        </ModeErrorBoundary>
+      )}
+
+      {screen === 'blockblast' && (
+        <ModeErrorBoundary
+          title="Không thể mở Block Blast PAWS"
+          fallbackMessage="Không thể khởi tạo bảng xếp khối Block Blast PAWS."
+          bgClass="bg-[#1a100b]"
+          onBack={() => setScreen('modeSelect')}
+        >
+          <Suspense
+            fallback={
+              <ModeLoadingFallback
+                label="Đang tải Block Blast PAWS..."
+                bgClass="bg-[#1a100b]"
+                spinnerClass="border-emerald-400"
+                textClass="text-emerald-200"
+              />
+            }
+          >
+            <LazyBlockBlastScreen
+              onBackToModeSelect={() => setScreen('modeSelect')}
+            />
+          </Suspense>
+        </ModeErrorBoundary>
       )}
     </div>
   );

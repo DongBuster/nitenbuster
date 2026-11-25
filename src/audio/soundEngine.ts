@@ -21,7 +21,13 @@ export type SfxType =
   | 'countdown'
   | 'roundStart'
   | 'tileFall'
-  | 'grab';
+  | 'grab'
+  | 'blockPickup'
+  | 'blockPlace'
+  | 'lineClear'
+  | 'candyBomb'
+  | 'reroll'
+  | 'allClear';
 
 export interface AudioPreferences {
   sfxEnabled?: boolean;
@@ -147,7 +153,7 @@ function playNoiseBurst(
   src.stop(now + dur + 0.02);
 }
 
-export function playSfx(type: SfxType): void {
+export function playSfx(type: SfxType, opts?: { combo?: number }): void {
   if (!prefs.sfxEnabled) return;
   const ctx = getAudioContext();
   if (!ctx) return;
@@ -275,6 +281,62 @@ export function playSfx(type: SfxType): void {
       case 'grab':
         playTone(ctx, { freq: 310, endFreq: 470, type: 'triangle', duration: 0.08, gain: 0.18 });
         break;
+
+      case 'blockPickup':
+        playTone(ctx, { freq: 380, endFreq: 520, type: 'sine', duration: 0.06, gain: 0.14 });
+        break;
+
+      case 'blockPlace':
+        playTone(ctx, { freq: 240, endFreq: 170, type: 'triangle', duration: 0.085, gain: 0.22 });
+        playTone(ctx, { freq: 520, type: 'sine', startOffset: 0.015, duration: 0.05, gain: 0.12 });
+        break;
+
+      case 'lineClear': {
+        const combo = Math.min(6, Math.max(1, Number.isFinite(opts?.combo) ? Math.floor(opts!.combo!) : 1));
+        const base = 440 * Math.pow(1.09, combo - 1);
+        playTone(ctx, { freq: base, type: 'triangle', startOffset: 0, duration: 0.12, gain: 0.22 });
+        playTone(ctx, { freq: base * 1.25, type: 'triangle', startOffset: 0.055, duration: 0.13, gain: 0.22 });
+        playTone(ctx, { freq: base * 1.5, type: 'sine', startOffset: 0.11, duration: 0.22, gain: 0.24 });
+        break;
+      }
+
+      case 'candyBomb':
+        playNoiseBurst(ctx, { duration: 0.22, filterFreq: 680, filterType: 'lowpass', gain: 0.26 });
+        playTone(ctx, { freq: 620, endFreq: 1240, type: 'triangle', startOffset: 0.04, duration: 0.18, gain: 0.22 });
+        break;
+
+      case 'reroll':
+        playTone(ctx, { freq: 392, type: 'sine', startOffset: 0, duration: 0.07, gain: 0.16 });
+        playTone(ctx, { freq: 523.25, type: 'sine', startOffset: 0.055, duration: 0.07, gain: 0.18 });
+        playTone(ctx, { freq: 659.25, type: 'triangle', startOffset: 0.11, duration: 0.12, gain: 0.2 });
+        break;
+
+      case 'allClear': {
+        playNoiseBurst(ctx, {
+          duration: 0.28,
+          filterFreq: 1100,
+          filterType: 'bandpass',
+          gain: 0.24,
+        });
+        playTone(ctx, {
+          freq: 196,
+          endFreq: 82,
+          type: 'triangle',
+          duration: 0.16,
+          gain: 0.16,
+        });
+        const notes = [523.25, 659.25, 783.99, 1046.5, 1318.51];
+        notes.forEach((freq, idx) => {
+          playTone(ctx, {
+            freq,
+            type: idx >= 3 ? 'sine' : 'triangle',
+            startOffset: idx * 0.055,
+            duration: idx === notes.length - 1 ? 0.42 : 0.16,
+            gain: 0.22,
+          });
+        });
+        break;
+      }
     }
   } catch {
     // Ignore Web Audio errors in restricted environments

@@ -4,6 +4,7 @@ import {
   Boxes,
   Cookie,
   Gamepad2,
+  LayoutGrid,
   Sparkles,
   Swords,
   Trophy,
@@ -16,6 +17,7 @@ import { useProfileStore } from '../store/profileStore';
 export interface ModeSelectScreenProps {
   onSelectPawsCards: () => void;
   onSelectBrawlArena: () => void;
+  onSelectBlockBlast: () => void;
   onOpenStudio3D: () => void;
 }
 
@@ -25,7 +27,7 @@ interface ModeSpecItem {
 }
 
 interface GameModeEntry {
-  id: 'cards' | 'brawl';
+  id: 'cards' | 'brawl' | 'blockblast';
   title: string;
   genreBadge: string;
   badgeIcon: ReactNode;
@@ -45,15 +47,23 @@ interface GameModeEntry {
 
 /**
  * Arcade mode hub with bespoke 16:9 key-art banners and explicit genre specs
- * so players immediately distinguish turn-based card strategy from physics brawl.
+ * so players immediately distinguish turn-based card strategy, physics brawl,
+ * and 8x8 block puzzle modes.
  */
 export function ModeSelectScreen({
   onSelectPawsCards,
   onSelectBrawlArena,
+  onSelectBlockBlast,
   onOpenStudio3D,
 }: ModeSelectScreenProps) {
-  const { cookies, gamesWon, gamesPlayed, selectedAnimal, equippedAccessory } =
-    useProfileStore();
+  const {
+    cookies,
+    gamesWon,
+    gamesPlayed,
+    blockBlastBestScore,
+    selectedAnimal,
+    equippedAccessory,
+  } = useProfileStore();
   const animalMeta =
     ANIMALS.find((a) => a.id === selectedAnimal) ?? ANIMALS[0];
   const equippedSummary = formatEquippedSummary(
@@ -111,13 +121,38 @@ export function ModeSelectScreen({
       ],
       onEnter: onSelectBrawlArena,
     },
+    {
+      id: 'blockblast',
+      title: 'Block Blast PAWS',
+      genreBadge: 'Giải Đố Xếp Khối · 8×8',
+      badgeIcon: <LayoutGrid className="h-3.5 w-3.5 text-emerald-300" />,
+      description:
+        'Kéo thả 29 hình khối kẹo gỗ lên lưới 8×8, kích hoạt chuỗi Combo, Đổi Khay và Bom Kẹo 3×3 cùng thú bông 3D cổ vũ!',
+      bannerWebp: '/banners/block-blast-banner.webp',
+      bannerJpg: '/banners/block-blast-banner.jpg',
+      bannerAlt:
+        'Các khối gạch kẹo nhiều màu rực rỡ xếp trên bàn gỗ Winter Cabin cùng thú bông cổ vũ dưới ánh đèn lồng ấm',
+      ctaLabel: 'Chơi Block Blast PAWS',
+      cardClass:
+        'border-emerald-500/35 bg-[#0f241d] hover:border-emerald-400 hover:shadow-[0_22px_46px_rgba(52,211,153,0.2)] has-[button:focus-visible]:outline-emerald-300',
+      badgeClass: 'border-emerald-400/35 bg-emerald-400/15 text-emerald-200',
+      specClass: 'border-emerald-900/50 bg-black/25',
+      ctaClass: 'btn-tactile-emerald',
+      ctaTextClass: 'text-white',
+      specs: [
+        { label: 'Lối chơi', value: 'Giải đố lưới 8×8' },
+        { label: 'PAWS Twist', value: 'Đổi Khay · Bom Kẹo 3×3' },
+        { label: 'Kỷ lục', value: `${blockBlastBestScore.toLocaleString()} điểm` },
+      ],
+      onEnter: onSelectBlockBlast,
+    },
   ];
 
   return (
-    <div className="min-h-screen bg-[#1a100b] bg-[radial-gradient(circle_at_22%_0%,_#3a2114_0%,_transparent_48%),radial-gradient(circle_at_78%_0%,_#112840_0%,_transparent_48%),linear-gradient(180deg,_#1c110c_0%,_#120b08_100%)] text-[#FFF9F0] selection:bg-amber-300 selection:text-[#2C1B11]">
-      <div className="mx-auto flex min-h-screen max-w-6xl flex-col justify-between gap-5 px-4 py-5 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-[#1a100b] bg-[radial-gradient(circle_at_18%_0%,_#3a2114_0%,_transparent_44%),radial-gradient(circle_at_50%_0%,_#112840_0%,_transparent_44%),radial-gradient(circle_at_84%_0%,_#103326_0%,_transparent_44%),linear-gradient(180deg,_#1c110c_0%,_#120b08_100%)] text-[#FFF9F0] selection:bg-amber-300 selection:text-[#2C1B11]">
+      <div className="mx-auto flex min-h-screen max-w-7xl flex-col justify-between gap-5 px-4 py-5 sm:px-6 lg:px-8">
         {/* Hero Showcase Header */}
-        <header className="relative overflow-hidden rounded-3xl border border-amber-500/25 bg-gradient-to-r from-[#341c11]/95 via-[#211517]/95 to-[#12263c]/95 px-6 py-4 shadow-[0_14px_34px_rgba(0,0,0,0.42)]">
+        <header className="relative overflow-hidden rounded-3xl border border-amber-500/25 bg-gradient-to-r from-[#341c11]/95 via-[#182235]/95 to-[#0f2920]/95 px-6 py-4 shadow-[0_14px_34px_rgba(0,0,0,0.42)]">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="min-w-0">
               <div className="inline-flex items-center gap-2 rounded-full border border-amber-400/30 bg-amber-950/75 px-3 py-1 text-xs font-bold tracking-wide text-amber-200">
@@ -128,8 +163,9 @@ export function ModeSelectScreen({
                 PAWS ARCADE 3D
               </h1>
               <p className="mt-1 text-sm text-amber-100/80">
-                Chọn <span className="font-bold text-amber-300">Đấu Bài</span> cân não bên lò sưởi hoặc{' '}
-                <span className="font-bold text-sky-300">Hỗn Chiến</span> vật lý trên sàn băng tuyết.
+                Chọn <span className="font-bold text-amber-300">Đấu Bài</span> cân não,{' '}
+                <span className="font-bold text-sky-300">Hỗn Chiến</span> vật lý trên sàn băng hoặc{' '}
+                <span className="font-bold text-emerald-300">Xếp Khối 8×8</span> cùng thú bông 3D.
               </p>
             </div>
 
@@ -181,8 +217,8 @@ export function ModeSelectScreen({
           </div>
         </header>
 
-        {/* Two Distinct Game Mode Cards */}
-        <main className="grid flex-1 grid-cols-1 items-stretch gap-6 md:grid-cols-2">
+        {/* Three Distinct Game Mode Cards */}
+        <main className="grid flex-1 grid-cols-1 items-stretch gap-6 md:grid-cols-3">
           {gameModes.map((mode) => (
             <article
               key={mode.id}
@@ -208,7 +244,7 @@ export function ModeSelectScreen({
                   {mode.badgeIcon}
                   <span>{mode.genreBadge}</span>
                 </span>
-                <h2 className="mt-3 font-display text-3xl font-black text-white">
+                <h2 className="mt-3 font-display text-2xl font-black text-white xl:text-3xl">
                   {mode.title}
                 </h2>
               </header>
@@ -218,7 +254,7 @@ export function ModeSelectScreen({
                   {mode.description}
                 </p>
 
-                <dl className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                <dl className="grid grid-cols-1 gap-2 sm:grid-cols-3 md:grid-cols-1 xl:grid-cols-3">
                   {mode.specs.map((spec) => (
                     <div
                       key={spec.label}
@@ -258,7 +294,7 @@ export function ModeSelectScreen({
 
         {/* Footer note */}
         <footer className="text-center text-xs text-amber-200/55">
-          Dùng chung bộ 8 nhân vật 3D, 15 phụ kiện phối đồ và ví Cookies giữa cả hai chế độ.
+          Dùng chung bộ 8 nhân vật 3D, 15 phụ kiện phối đồ và ví Cookies giữa cả ba chế độ.
         </footer>
       </div>
     </div>
