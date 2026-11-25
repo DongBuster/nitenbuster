@@ -14,7 +14,6 @@ function mapCodeToSkill(code: string): keyof PressedSkillState | null {
   switch (code) {
     case 'KeyJ':
       return 'punch';
-    case 'KeyE':
     case 'KeyH':
       return 'headbutt';
     case 'KeyK':
@@ -152,7 +151,7 @@ export function useKeyboardMouse(enabled: boolean) {
           jumpBufferedUntilRef.current = performance.now() + 130;
         } else if (e.code === 'KeyJ') {
           punchQueuedRef.current = true;
-        } else if (e.code === 'KeyE' || e.code === 'KeyH') {
+        } else if (e.code === 'KeyH') {
           headbuttQueuedRef.current = true;
         } else if (e.code === 'KeyL') {
           rollQueuedRef.current = true;

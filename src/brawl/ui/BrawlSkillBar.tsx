@@ -177,10 +177,10 @@ export function BrawlSkillBar({
     },
     {
       id: 'headbutt',
-      keyBadge: 'E',
+      keyBadge: 'H',
       label: 'Húc đầu',
-      title: 'Lao người húc đầu hất văng đối thủ (Phím E hoặc Chuột phải)',
-      ariaLabel: 'Húc đầu hất văng (Phím E)',
+      title: 'Lao người húc đầu hất văng đối thủ (Phím H hoặc Chuột phải)',
+      ariaLabel: 'Húc đầu hất văng (Phím H)',
       icon: <Flame className="h-4 w-4 text-orange-300" aria-hidden="true" />,
       readyPct: hud.playerHeadbuttReadyPct,
       cooldownLeft: hud.playerHeadbuttCooldownLeft,

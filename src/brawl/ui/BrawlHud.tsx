@@ -49,153 +49,179 @@ export function BrawlHud({
 
   return (
     <div className="pointer-events-none fixed inset-0 z-20 flex flex-col justify-between p-3 sm:p-5">
-      {/* TOP BAR */}
-      <header className="flex flex-wrap items-start justify-between gap-3">
-        {/* Top-left: Exit, Round, Alive count, Collapse timer */}
-        <div className="pointer-events-auto flex flex-wrap items-center gap-2" data-brawl-ui="true">
-          <button
-            type="button"
-            onClick={() => {
-              playSfx('click');
-              onExit();
-            }}
-            className="btn-tactile-wood inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-white/20 px-3 py-1.5 text-xs font-black text-amber-100 shadow-md transition-colors focus-visible:outline-2 focus-visible:outline-amber-300"
-          >
-            <ArrowLeft className="h-3.5 w-3.5 text-amber-300" />
-            <span>Thoát</span>
-          </button>
-
-          <div className="inline-flex items-center gap-1.5 rounded-xl border border-amber-400/40 bg-slate-950/85 px-3 py-1.5 text-xs font-black text-amber-200 shadow-md">
-            <Swords className="h-3.5 w-3.5 text-amber-400" />
-            <span>Hiệp {match.round}/{match.totalRounds}</span>
-          </div>
-
-          <div className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-400/35 bg-slate-950/85 px-3 py-1.5 text-xs font-black text-emerald-200 shadow-md">
-            <Users className="h-3.5 w-3.5 text-emerald-400" />
-            <span>Còn sống: {hud.aliveCount}/{hud.totalFighters}</span>
-          </div>
-
-          {hud.nextCollapseRing !== null && hud.nextCollapseInSec !== null && (
-            <div
-              className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-black shadow-md transition-colors ${
-                hud.isRingWarning
-                  ? 'animate-pulse border-rose-300 bg-rose-600/90 text-white'
-                  : 'border-sky-300/35 bg-slate-950/85 text-sky-200'
-              }`}
+      {/* TOP HUD: Header bar + Top-edge Notifications (keeps center arena unobstructed) */}
+      <div className="flex flex-col gap-2">
+        <header className="flex flex-wrap items-start justify-between gap-2">
+          {/* Top-left: Exit, Round, Alive count, Collapse timer */}
+          <div className="pointer-events-auto flex flex-wrap items-center gap-2" data-brawl-ui="true">
+            <button
+              type="button"
+              onClick={() => {
+                playSfx('click');
+                onExit();
+              }}
+              className="btn-tactile-wood inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-white/20 px-3 py-1.5 text-xs font-black text-amber-100 shadow-md transition-colors focus-visible:outline-2 focus-visible:outline-amber-300"
             >
-              {hud.isRingWarning ? (
-                <>
-                  <AlertTriangle className="h-3.5 w-3.5 text-white" />
-                  <span>Sàn vòng {hud.nextCollapseRing} SỤP!</span>
-                </>
-              ) : (
-                <>
-                  <Clock className="h-3.5 w-3.5 text-sky-300" />
-                  <span>Sàn vòng {hud.nextCollapseRing} sụp ({Math.ceil(hud.nextCollapseInSec)}s)</span>
-                </>
-              )}
-            </div>
-          )}
-        </div>
+              <ArrowLeft className="h-3.5 w-3.5 text-amber-300" />
+              <span>Thoát</span>
+            </button>
 
-        {/* Top-right: Mini Standings + Controls */}
-        <div className="pointer-events-auto flex items-start gap-2" data-brawl-ui="true">
-          <div className="hidden rounded-2xl border border-white/15 bg-slate-950/85 px-3 py-2 text-xs shadow-xl sm:block">
-            <div className="mb-1 text-[10px] font-black uppercase tracking-wider text-sky-200">
-              Bảng Điểm
+            <div className="inline-flex items-center gap-1.5 rounded-xl border border-amber-400/40 bg-slate-950/85 px-3 py-1.5 text-xs font-black text-amber-200 shadow-md">
+              <Swords className="h-3.5 w-3.5 text-amber-400" />
+              <span>Hiệp {match.round}/{match.totalRounds}</span>
             </div>
-            <div className="space-y-0.5">
-              {topScores.map((s, idx) => (
-                <div key={s.id} className="flex items-center justify-between gap-4 font-bold">
-                  <span className={s.id === 'human' ? 'text-amber-300' : 'text-slate-200'}>
-                    #{idx + 1} {s.name}
-                  </span>
-                  <span className="font-mono font-black text-amber-200">{s.points}đ</span>
-                </div>
-              ))}
-            </div>
-          </div>
 
-          <button
-            type="button"
-            onClick={onToggleSfx}
-            aria-label={sfxEnabled ? 'Tắt âm thanh' : 'Bật âm thanh'}
-            className="btn-tactile-wood cursor-pointer rounded-xl border border-white/20 p-2 text-amber-100 shadow-md"
-          >
-            {sfxEnabled ? (
-              <Volume2 className="h-4 w-4 text-amber-300" />
-            ) : (
-              <VolumeX className="h-4 w-4 text-white/50" />
+            <div className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-400/35 bg-slate-950/85 px-3 py-1.5 text-xs font-black text-emerald-200 shadow-md">
+              <Users className="h-3.5 w-3.5 text-emerald-400" />
+              <span>Còn sống: {hud.aliveCount}/{hud.totalFighters}</span>
+            </div>
+
+            {hud.nextCollapseRing !== null && hud.nextCollapseInSec !== null && (
+              <div
+                className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-black shadow-md transition-colors ${
+                  hud.isRingWarning
+                    ? 'animate-pulse border-rose-300 bg-rose-600/90 text-white'
+                    : 'border-sky-300/35 bg-slate-950/85 text-sky-200'
+                }`}
+              >
+                {hud.isRingWarning ? (
+                  <>
+                    <AlertTriangle className="h-3.5 w-3.5 text-white" />
+                    <span>Sàn vòng {hud.nextCollapseRing} SỤP!</span>
+                  </>
+                ) : (
+                  <>
+                    <Clock className="h-3.5 w-3.5 text-sky-300" />
+                    <span>Sàn vòng {hud.nextCollapseRing} sụp ({Math.ceil(hud.nextCollapseInSec)}s)</span>
+                  </>
+                )}
+              </div>
             )}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setShowHelp((v) => !v)}
-            aria-label="Xem phím điều khiển"
-            className="btn-tactile-wood inline-flex cursor-pointer items-center gap-1 rounded-xl border border-white/20 px-2.5 py-2 text-xs font-black text-amber-100 shadow-md"
-          >
-            <HelpCircle className="h-4 w-4 text-amber-300" />
-            <span>Phím</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={onTogglePause}
-            aria-label="Tạm dừng"
-            className="btn-tactile-wood cursor-pointer rounded-xl border border-white/20 p-2 text-amber-100 shadow-md"
-          >
-            <Pause className="h-4 w-4 text-amber-300" />
-          </button>
-        </div>
-      </header>
-
-      {/* Center Dynamic Banners & Controls Popover */}
-      <div className="pointer-events-none flex flex-col items-center gap-2">
-        {hud.bannerText && (
-          <div className="rounded-full border border-amber-300/60 bg-slate-950/90 px-4 py-1.5 text-xs font-black text-amber-200 shadow-2xl backdrop-blur-md sm:text-sm">
-            {hud.bannerText}
           </div>
-        )}
 
-        {hud.koFeed.length > 0 && (
-          <div className="flex flex-col items-center gap-1">
+          {/* Top-right: Audio, Help (+ anchored popover), Pause */}
+          <div className="pointer-events-auto relative flex items-center gap-2" data-brawl-ui="true">
+            <button
+              type="button"
+              onClick={onToggleSfx}
+              aria-label={sfxEnabled ? 'Tắt âm thanh' : 'Bật âm thanh'}
+              className="btn-tactile-wood cursor-pointer rounded-xl border border-white/20 p-2 text-amber-100 shadow-md"
+            >
+              {sfxEnabled ? (
+                <Volume2 className="h-4 w-4 text-amber-300" />
+              ) : (
+                <VolumeX className="h-4 w-4 text-white/50" />
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setShowHelp((v) => !v)}
+              aria-label="Xem phím điều khiển"
+              aria-expanded={showHelp}
+              aria-controls="brawl-controls-popover"
+              className="btn-tactile-wood inline-flex cursor-pointer items-center gap-1 rounded-xl border border-white/20 px-2.5 py-2 text-xs font-black text-amber-100 shadow-md"
+            >
+              <HelpCircle className="h-4 w-4 text-amber-300" />
+              <span>Phím</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={onTogglePause}
+              aria-label="Tạm dừng"
+              className="btn-tactile-wood cursor-pointer rounded-xl border border-white/20 p-2 text-amber-100 shadow-md"
+            >
+              <Pause className="h-4 w-4 text-amber-300" />
+            </button>
+
+            {showHelp && (
+              <div
+                id="brawl-controls-popover"
+                role="dialog"
+                aria-label="Phím điều khiển"
+                data-brawl-ui="true"
+                className="pointer-events-auto absolute right-0 top-full z-30 mt-2 w-[min(20rem,calc(100vw-1.5rem))] rounded-2xl border border-white/20 bg-slate-950/95 p-4 text-xs text-slate-100 shadow-2xl backdrop-blur-md"
+              >
+                <div className="mb-2 flex items-center justify-between gap-4 font-black text-amber-300">
+                  <span>Phím Điều Khiển</span>
+                  <button
+                    type="button"
+                    onClick={() => setShowHelp(false)}
+                    className="cursor-pointer rounded bg-white/10 px-2 py-0.5 text-[10px] hover:bg-white/20"
+                  >
+                    Đóng
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 gap-y-1 sm:grid-cols-2 sm:gap-x-4">
+                  <span><strong>WASD + Shift</strong>: Chạy / Nước rút</span>
+                  <span><strong>Space</strong>: Nhảy</span>
+                  <span><strong>J / Chuột trái</strong>: Đấm (Trên không: Đá bay!)</span>
+                  <span><strong>H / Chuột phải</strong>: Húc đầu</span>
+                  <span><strong>Giữ/Nhả K</strong>: Nắm & Xoay ném</span>
+                  <span><strong>L</strong>: Lăn né · <strong>1–4</strong>: Emote</span>
+                </div>
+              </div>
+            )}
+          </div>
+        </header>
+
+        {/* Sub-header HUD strip: KO feed (top-left), event banner (top-center), standings (top-right) */}
+        <div className="grid grid-cols-1 items-start gap-2 sm:grid-cols-2 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:gap-3">
+          {/* Top-left KO Feed (auto-expires after 3.5s) */}
+          <div
+            role="region"
+            aria-label="Thông báo loại khỏi sàn"
+            aria-live="polite"
+            className="order-2 flex min-w-0 flex-col items-start gap-1 md:order-1 md:justify-self-start"
+          >
             {hud.koFeed.slice(0, 2).map((item) => (
               <div
                 key={item.id}
-                className="rounded-full border border-rose-300/40 bg-rose-950/80 px-3 py-0.5 text-[11px] font-bold text-rose-100 shadow-md"
+                className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-rose-300/40 bg-rose-950/85 px-3 py-1 text-[11px] font-bold text-rose-100 shadow-md backdrop-blur-sm"
               >
-                {item.text}
+                <ShieldAlert className="h-3.5 w-3.5 shrink-0 text-rose-400" aria-hidden="true" />
+                <span className="truncate">{item.text}</span>
               </div>
             ))}
           </div>
-        )}
 
-        {showHelp && (
+          {/* Top-center Event Banner (Ring collapse / Item pickup) */}
           <div
-            data-brawl-ui="true"
-            className="pointer-events-auto rounded-2xl border border-white/20 bg-slate-950/95 p-4 text-xs text-slate-100 shadow-2xl backdrop-blur-md"
+            role="status"
+            aria-live="polite"
+            className={
+              hud.bannerText
+                ? 'order-1 flex justify-center sm:col-span-2 md:order-2 md:col-span-1 md:justify-self-center'
+                : 'sr-only md:not-sr-only md:order-2 md:justify-self-center'
+            }
           >
-            <div className="mb-2 flex items-center justify-between gap-4 font-black text-amber-300">
-              <span>Phím Điều Khiển</span>
-              <button
-                type="button"
-                onClick={() => setShowHelp(false)}
-                className="cursor-pointer rounded bg-white/10 px-2 py-0.5 text-[10px]"
-              >
-                Đóng
-              </button>
-            </div>
-            <div className="grid grid-cols-2 gap-x-5 gap-y-1">
-              <span><strong>WASD + Shift</strong>: Chạy / Nước rút</span>
-              <span><strong>Space</strong>: Nhảy</span>
-              <span><strong>J / Chuột trái</strong>: Đấm (Trên không: Đá bay!)</span>
-              <span><strong>E / Chuột phải</strong>: Húc đầu</span>
-              <span><strong>Giữ/Nhả K</strong>: Nắm & Xoay ném</span>
-              <span><strong>L</strong>: Lăn né · <strong>1–4</strong>: Emote</span>
+            {hud.bannerText && (
+              <div className="max-w-md rounded-full border border-amber-300/60 bg-slate-950/90 px-4 py-1.5 text-center text-xs font-black text-amber-200 shadow-lg backdrop-blur-md">
+                {hud.bannerText}
+              </div>
+            )}
+          </div>
+
+          {/* Top-right Mini Standings */}
+          <div className="order-3 hidden justify-self-end sm:block">
+            <div className="rounded-2xl border border-white/15 bg-slate-950/85 px-3 py-2 text-xs shadow-xl">
+              <div className="mb-1 text-[10px] font-black uppercase tracking-wider text-sky-200">
+                Bảng Điểm
+              </div>
+              <div className="space-y-0.5">
+                {topScores.map((s, idx) => (
+                  <div key={s.id} className="flex items-center justify-between gap-4 font-bold">
+                    <span className={s.id === 'human' ? 'text-amber-300' : 'text-slate-200'}>
+                      #{idx + 1} {s.name}
+                    </span>
+                    <span className="font-mono font-black text-amber-200">{s.points}đ</span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
-        )}
+        </div>
       </div>
 
       {/* COUNTDOWN OVERLAY (3-2-1) */}
@@ -256,7 +282,7 @@ export function BrawlHud({
               Tạm Dừng
             </h2>
             <p className="mt-2 text-xs text-slate-300">
-              WASD + Shift chạy · Space nhảy · J đấm (trên không: đá bay) · E húc đầu · K nắm ném · L lăn né
+              WASD + Shift chạy · Space nhảy · J đấm (trên không: đá bay) · H húc đầu · K nắm ném · L lăn né
             </p>
             <div className="mt-5 flex flex-col gap-2.5">
               <button

@@ -88,6 +88,11 @@ import {
 } from '../sim/constants';
 import { getCooldownState } from '../sim/cooldowns';
 import {
+  pruneExpiredKoFeed,
+  pushKoFeedEntry,
+  type TimedKoFeedItem,
+} from '../sim/koFeed';
+import {
   createPartyMotionState,
   stepPartyMotion,
   type PartyMotionState,
@@ -160,7 +165,7 @@ export class BrawlWorldRuntime {
   shakeIntensity = 0;
   bannerText: string | null = null;
   bannerUntil = 0;
-  koFeed: Array<{ id: string; text: string }> = [];
+  koFeed: TimedKoFeedItem[] = [];
   difficulty: BrawlDifficulty;
 
   private uidSeq = 1;
@@ -225,7 +230,11 @@ export class BrawlWorldRuntime {
 
   private pushKoFeed(text: string): void {
     const id = this.nextId('ko');
-    this.koFeed = [{ id, text }, ...this.koFeed].slice(0, 4);
+    this.koFeed = pushKoFeedEntry(this.koFeed, {
+      id,
+      text,
+      nowSec: this.nowSec,
+    });
   }
 
   private spawnHitEffect(
@@ -814,9 +823,12 @@ export class BrawlWorldRuntime {
     this.nowSec += dt;
     this.shakeIntensity = Math.max(0, this.shakeIntensity - dt * 1.9);
 
-    // Expire banner & transient effects cleanly
+    // Expire banner, KO feed entries, & transient effects cleanly
     if (this.bannerText && this.nowSec > this.bannerUntil) {
       this.bannerText = null;
+    }
+    if (this.koFeed.length > 0) {
+      this.koFeed = pruneExpiredKoFeed(this.koFeed, this.nowSec);
     }
     this.hitEffects = this.hitEffects.filter(
       (fx) => this.nowSec - fx.createdAt < 0.55,
@@ -957,7 +969,7 @@ export class BrawlWorldRuntime {
             z: THREE.MathUtils.clamp(fighter.pos.z, -8, 8),
             createdAt: this.nowSec,
           });
-          this.pushKoFeed(`💥 ${fighter.config.name} rơi khỏi sàn!`);
+          this.pushKoFeed(`${fighter.config.name} rơi khỏi sàn!`);
           playSfx('ko');
         }
         continue;
@@ -1402,7 +1414,7 @@ export class BrawlWorldRuntime {
       playerHeldAmmo: st?.heldAmmo ?? 0,
       playerGrabbingName: grabbedTarget,
       bannerText: this.bannerText,
-      koFeed: this.koFeed,
+      koFeed: this.koFeed.map(({ id, text }) => ({ id, text })),
     };
   }
 }
