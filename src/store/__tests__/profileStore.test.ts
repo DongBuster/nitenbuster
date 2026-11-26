@@ -6,9 +6,11 @@ import {
   MAX_BLOCK_BLAST_SCORE,
   MAX_COOKIES,
   MAX_GAMES,
+  MAX_GLASS_TIME_SEC,
   MAX_SETTLED_MATCH_IDS,
   sanitizeProfileData,
   settleBlockBlastMatch,
+  settleGlassCarryMatch,
 } from '../profileSchema.ts';
 import {
   computeHmacSha256Hex,
@@ -374,5 +376,157 @@ describe('settleBlockBlastMatch anti-cheat settlement', () => {
     assert.equal(settled.nextProfile.settledMatchIds.length, MAX_SETTLED_MATCH_IDS);
     assert.equal(settled.nextProfile.settledMatchIds[0], 'prev-match-01');
     assert.equal(settled.nextProfile.settledMatchIds[MAX_SETTLED_MATCH_IDS - 1], 'bb-non-best-21');
+  });
+});
+
+describe('settleGlassCarryMatch', () => {
+  it('defaults glassBestTimeSec to null and glassBestStars to 0 on fresh/legacy profiles and sanitizes bounds', () => {
+    assert.equal(DEFAULT_PROFILE.glassBestTimeSec, null);
+    assert.equal(DEFAULT_PROFILE.glassBestStars, 0);
+
+    const legacy = sanitizeProfileData({ cookies: 80, selectedAnimal: 'cat' });
+    assert.equal(legacy.glassBestTimeSec, null);
+    assert.equal(legacy.glassBestStars, 0);
+
+    const invalid = sanitizeProfileData({
+      glassBestTimeSec: -10,
+      glassBestStars: 99,
+    });
+    assert.equal(invalid.glassBestTimeSec, null);
+    assert.equal(invalid.glassBestStars, 3);
+
+    const roundedAndClamped = sanitizeProfileData({
+      glassBestTimeSec: MAX_GLASS_TIME_SEC + 500,
+      glassBestStars: -2,
+    });
+    assert.equal(roundedAndClamped.glassBestTimeSec, MAX_GLASS_TIME_SEC);
+    assert.equal(roundedAndClamped.glassBestStars, 0);
+
+    const twoDecimals = sanitizeProfileData({
+      glassBestTimeSec: 123.4567,
+      glassBestStars: 2.9,
+    });
+    assert.equal(twoDecimals.glassBestTimeSec, 123.46);
+    assert.equal(twoDecimals.glassBestStars, 2);
+  });
+
+  it('awards 3/2/1 star cookie rewards (50/30/15), increments gamesPlayed/gamesWon, and updates best time & stars', () => {
+    const threeStar = settleGlassCarryMatch(DEFAULT_PROFILE, {
+      matchId: 'glass-3star-1',
+      elapsedSec: 120.345,
+      shatters: 1,
+    });
+    assert.equal(threeStar.ok, true);
+    assert.equal(threeStar.stars, 3);
+    assert.equal(threeStar.reward, 50);
+    assert.equal(threeStar.isNewBest, true);
+    assert.equal(threeStar.nextProfile.cookies, DEFAULT_PROFILE.cookies + 50);
+    assert.equal(threeStar.nextProfile.gamesPlayed, 1);
+    assert.equal(threeStar.nextProfile.gamesWon, 1);
+    assert.equal(threeStar.nextProfile.glassBestStars, 3);
+    assert.equal(threeStar.nextProfile.glassBestTimeSec, 120.35);
+    assert.deepEqual(threeStar.nextProfile.settledMatchIds, ['glass-3star-1']);
+
+    const twoStar = settleGlassCarryMatch(DEFAULT_PROFILE, {
+      matchId: 'glass-2star-1',
+      elapsedSec: 250,
+      shatters: 4,
+    });
+    assert.equal(twoStar.ok, true);
+    assert.equal(twoStar.stars, 2);
+    assert.equal(twoStar.reward, 30);
+    assert.equal(twoStar.isNewBest, true);
+    assert.equal(twoStar.nextProfile.cookies, DEFAULT_PROFILE.cookies + 30);
+    assert.equal(twoStar.nextProfile.glassBestStars, 2);
+    assert.equal(twoStar.nextProfile.glassBestTimeSec, 250);
+
+    const oneStar = settleGlassCarryMatch(DEFAULT_PROFILE, {
+      matchId: 'glass-1star-1',
+      elapsedSec: 400,
+      shatters: 8,
+    });
+    assert.equal(oneStar.ok, true);
+    assert.equal(oneStar.stars, 1);
+    assert.equal(oneStar.reward, 15);
+    assert.equal(oneStar.isNewBest, true);
+    assert.equal(oneStar.nextProfile.cookies, DEFAULT_PROFILE.cookies + 15);
+    assert.equal(oneStar.nextProfile.glassBestStars, 1);
+    assert.equal(oneStar.nextProfile.glassBestTimeSec, 400);
+  });
+
+  it('rejects duplicate matchId and invalid payloads without modifying profile', () => {
+    const first = settleGlassCarryMatch(DEFAULT_PROFILE, {
+      matchId: 'glass-dup-01',
+      elapsedSec: 150,
+      shatters: 0,
+    });
+    assert.equal(first.ok, true);
+
+    const duplicate = settleGlassCarryMatch(first.nextProfile, {
+      matchId: 'glass-dup-01',
+      elapsedSec: 90,
+      shatters: 0,
+    });
+    assert.equal(duplicate.ok, false);
+    assert.equal(duplicate.reward, 0);
+    assert.equal(duplicate.stars, 1);
+    assert.equal(duplicate.isNewBest, false);
+    assert.deepEqual(duplicate.nextProfile, first.nextProfile);
+
+    const badPayloads = [
+      { matchId: 'ab', elapsedSec: 100, shatters: 0 },
+      { matchId: 'x'.repeat(81), elapsedSec: 100, shatters: 0 },
+      { matchId: 'glass-bad-time', elapsedSec: 0, shatters: 0 },
+      { matchId: 'glass-bad-time-2', elapsedSec: MAX_GLASS_TIME_SEC + 1, shatters: 0 },
+      { matchId: 'glass-bad-shatter', elapsedSec: 100, shatters: -1 },
+      { matchId: 'glass-bad-shatter-2', elapsedSec: 100, shatters: Number.NaN },
+    ];
+    for (const payload of badPayloads) {
+      const res = settleGlassCarryMatch(DEFAULT_PROFILE, payload);
+      assert.equal(res.ok, false);
+      assert.equal(res.reward, 0);
+      assert.deepEqual(res.nextProfile, DEFAULT_PROFILE);
+    }
+  });
+
+  it('preserves better stars and faster time on slower/lower-star runs while still awarding cookies for a new matchId', () => {
+    const initial = settleGlassCarryMatch(DEFAULT_PROFILE, {
+      matchId: 'glass-run-1',
+      elapsedSec: 140,
+      shatters: 1,
+    });
+    assert.equal(initial.ok, true);
+    assert.equal(initial.stars, 3);
+    assert.equal(initial.nextProfile.glassBestStars, 3);
+    assert.equal(initial.nextProfile.glassBestTimeSec, 140);
+
+    // Slower & lower-star run with a new matchId
+    const slowerLower = settleGlassCarryMatch(initial.nextProfile, {
+      matchId: 'glass-run-2',
+      elapsedSec: 320,
+      shatters: 7,
+    });
+    assert.equal(slowerLower.ok, true);
+    assert.equal(slowerLower.stars, 1);
+    assert.equal(slowerLower.reward, 15);
+    assert.equal(slowerLower.isNewBest, false);
+    assert.equal(slowerLower.nextProfile.cookies, initial.nextProfile.cookies + 15);
+    assert.equal(slowerLower.nextProfile.gamesPlayed, 2);
+    assert.equal(slowerLower.nextProfile.gamesWon, 2);
+    assert.equal(slowerLower.nextProfile.glassBestStars, 3);
+    assert.equal(slowerLower.nextProfile.glassBestTimeSec, 140);
+
+    // Faster time with 3 stars beats previous 140s best
+    const fasterBest = settleGlassCarryMatch(slowerLower.nextProfile, {
+      matchId: 'glass-run-3',
+      elapsedSec: 98.42,
+      shatters: 0,
+    });
+    assert.equal(fasterBest.ok, true);
+    assert.equal(fasterBest.stars, 3);
+    assert.equal(fasterBest.reward, 50);
+    assert.equal(fasterBest.isNewBest, true);
+    assert.equal(fasterBest.nextProfile.glassBestStars, 3);
+    assert.equal(fasterBest.nextProfile.glassBestTimeSec, 98.42);
   });
 });

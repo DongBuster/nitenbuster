@@ -13,7 +13,9 @@ import {
   DEFAULT_PROFILE,
   sanitizeProfileData,
   settleBlockBlastMatch,
+  settleGlassCarryMatch,
   type BlockBlastSettlementResult,
+  type GlassSettlementResult,
   type PlayerProfile,
   type ProfileSettings,
 } from './profileSchema.ts';
@@ -21,7 +23,9 @@ import {
 export {
   SHOP_ITEMS,
   settleBlockBlastMatch,
+  settleGlassCarryMatch,
   type BlockBlastSettlementResult,
+  type GlassSettlementResult,
   type PlayerProfile,
   type ProfileSettings,
   type ShopItem,
@@ -227,6 +231,22 @@ export function useProfileStore() {
     [],
   );
 
+  const recordGlassMatchResult = useCallback(
+    (payload: { matchId: string; elapsedSec: number; shatters: number }) => {
+      const settlement = settleGlassCarryMatch(currentProfile, payload);
+      if (settlement.ok) {
+        persistAndNotify(settlement.nextProfile);
+      }
+      return {
+        ok: settlement.ok,
+        reward: settlement.reward,
+        stars: settlement.stars,
+        isNewBest: settlement.isNewBest,
+      };
+    },
+    [],
+  );
+
   const buyAccessory = useCallback((id: string): boolean => {
     const item = SHOP_ITEMS.find((i) => i.id === id);
     if (!item) return false;
@@ -280,6 +300,7 @@ export function useProfileStore() {
     recordBrawlResult,
     spendBlockBlastBomb,
     recordBlockBlastResult,
+    recordGlassMatchResult,
     buyAccessory,
     equipAccessory,
     clearAccessories,

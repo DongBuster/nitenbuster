@@ -1,0 +1,199 @@
+import type { AnimalId } from '../../engine/types.ts';
+import type {
+  GlassSimState,
+  LiftIntent,
+  PlayerSimState,
+  PlayerSlot,
+  ShatterReason,
+  SimEvent,
+} from '../sim/types.ts';
+
+export const GLASS_MAX_PLAYERS = 2;
+export const GLASS_DISCONNECT_GRACE_MS = 8000;
+export const GLASS_COUNTDOWN_MS = 2800;
+export const GLASS_SNAPSHOT_INTERVAL_MS = 67;
+export const GLASS_INPUT_INTERVAL_MS = 67;
+export const GLASS_INPUT_STALE_MS = 400;
+export const GLASS_INTERPOLATION_DELAY_MS = 75;
+
+export const GLASS_EMOTES = [
+  { id: 1, icon: '🐢', text: 'Chậm thôi!' },
+  { id: 2, icon: '⬆️', text: 'Nhảy nào!' },
+  { id: 3, icon: '🙌', text: 'Nâng lên!' },
+  { id: 4, icon: '👇', text: 'Hạ xuống!' },
+] as const;
+
+export type GlassRoomPhase =
+  | 'idle'
+  | 'lobby'
+  | 'countdown'
+  | 'playing'
+  | 'finished';
+
+export type GlassConnectionStatus =
+  | 'disconnected'
+  | 'connecting'
+  | 'connected'
+  | 'error';
+
+export type GlassRoomMember = {
+  peerId: string;
+  name: string;
+  animal: AnimalId;
+  accessory: string[];
+  ready: boolean;
+  joinedAt: number;
+};
+
+export type PackedPlayerState = {
+  x: number;
+  y: number;
+  z: number;
+  vx: number;
+  vy: number;
+  vz: number;
+  yaw: number;
+  grounded: boolean;
+  liftOffset: number;
+  onIce: boolean;
+  inWind: boolean;
+};
+
+export type GlassSnapshotPayload = {
+  matchId: string;
+  tick: number;
+  matchTime: number;
+  phase: 'playing' | 'finished';
+  checkpointIndex: number;
+  shatters: number;
+  p1: PackedPlayerState;
+  p2: PackedPlayerState;
+  glass: {
+    hp: number;
+    stress: number;
+    centerX: number;
+    centerY: number;
+    centerZ: number;
+    yaw: number;
+    pitch: number;
+    length: number;
+    invulnTimer: number;
+    shatterTimer: number;
+    shatterReason: ShatterReason | null;
+    lastImpactX: number;
+    lastImpactY: number;
+    lastImpactZ: number;
+  };
+  events: SimEvent[];
+};
+
+export type GlassInputPayload = {
+  matchId: string;
+  peerId: string;
+  seq: number;
+  moveX: number;
+  moveZ: number;
+  jump: boolean;
+  lift: LiftIntent;
+};
+
+export type GlassStartPayload = {
+  matchId: string;
+  hostPeerId: string;
+  guestPeerId: string;
+  countdownMs: number;
+  startedAt: number;
+};
+
+export type GlassEmotePayload = {
+  peerId: string;
+  slot: PlayerSlot;
+  icon: string;
+  text: string;
+  at: number;
+};
+
+export type GlassFinishPayload = {
+  matchId: string;
+  elapsedSec: number;
+  shatters: number;
+};
+
+export type GlassReturnLobbyPayload = {
+  hostPeerId: string;
+};
+
+export type GlassSyncRequestPayload = {
+  requesterPeerId: string;
+  matchId: string;
+};
+
+export type GlassSyncStatePayload = {
+  targetPeerId: string;
+  matchId: string;
+  hostPeerId: string;
+  guestPeerId: string;
+  phase: 'countdown' | 'playing' | 'finished';
+  countdownRemainingMs: number;
+  snapshot: GlassSnapshotPayload | null;
+  finalResult: GlassFinishPayload | null;
+};
+
+function round2(value: number): number {
+  const rounded = Math.round(value * 100) / 100;
+  return Object.is(rounded, -0) ? 0 : rounded;
+}
+
+function packPlayerState(player: PlayerSimState): PackedPlayerState {
+  return {
+    x: round2(player.x),
+    y: round2(player.y),
+    z: round2(player.z),
+    vx: round2(player.vx),
+    vy: round2(player.vy),
+    vz: round2(player.vz),
+    yaw: round2(player.yaw),
+    grounded: player.grounded,
+    liftOffset: round2(player.liftOffset),
+    onIce: player.onIce,
+    inWind: player.inWind,
+  };
+}
+
+/**
+ * Compresses a 60Hz `GlassSimState` into a compact network snapshot by rounding
+ * floating-point coordinates, angles, and timers to 2 decimals while preserving
+ * exact tick, discrete counters, flags, and events.
+ */
+export function packSimSnapshot(
+  matchId: string,
+  state: GlassSimState,
+): GlassSnapshotPayload {
+  return {
+    matchId,
+    tick: state.tick,
+    matchTime: round2(state.matchTime),
+    phase: state.phase,
+    checkpointIndex: state.checkpointIndex,
+    shatters: state.shatters,
+    p1: packPlayerState(state.p1),
+    p2: packPlayerState(state.p2),
+    glass: {
+      hp: state.glass.hp,
+      stress: round2(state.glass.stress),
+      centerX: round2(state.glass.centerX),
+      centerY: round2(state.glass.centerY),
+      centerZ: round2(state.glass.centerZ),
+      yaw: round2(state.glass.yaw),
+      pitch: round2(state.glass.pitch),
+      length: round2(state.glass.length),
+      invulnTimer: round2(state.glass.invulnTimer),
+      shatterTimer: round2(state.glass.shatterTimer),
+      shatterReason: state.glass.shatterReason,
+      lastImpactX: round2(state.glass.lastImpactX),
+      lastImpactY: round2(state.glass.lastImpactY),
+      lastImpactZ: round2(state.glass.lastImpactZ),
+    },
+    events: state.events.map((evt) => ({ ...evt })),
+  };
+}

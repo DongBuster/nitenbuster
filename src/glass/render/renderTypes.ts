@@ -1,0 +1,83 @@
+import type {
+  GlassSnapshotPayload,
+  PackedPlayerState,
+} from '../online/protocol';
+import { createInitialSimState } from '../sim/physics';
+import type { GlassSimState, PlayerSimState, ShatterReason } from '../sim/types';
+
+export interface GlassHudSnapshot {
+  matchTime: number;
+  stageNumber: number;
+  stageName: string;
+  checkpointIndex: number;
+  totalCheckpoints: number;
+  shatters: number;
+  glassHp: number;
+  glassMaxHp: number;
+  glassStress: number;
+  shatterTimer: number;
+  shatterReason: ShatterReason | null;
+  p1Lift: number;
+  p2Lift: number;
+  progressPct: number;
+}
+
+export interface GlassRenderState {
+  matchTime: number;
+  checkpointIndex: number;
+  p1: PackedPlayerState;
+  p2: PackedPlayerState;
+  glass: GlassSnapshotPayload['glass'];
+  cameraShake: number;
+  lastCrackAt: number;
+  shatterBurstId: number;
+  shatterOrigin: [number, number, number];
+}
+
+function toPackedPlayer(p: PlayerSimState): PackedPlayerState {
+  return {
+    x: p.x,
+    y: p.y,
+    z: p.z,
+    vx: p.vx,
+    vy: p.vy,
+    vz: p.vz,
+    yaw: p.yaw,
+    grounded: p.grounded,
+    liftOffset: p.liftOffset,
+    onIce: p.onIce,
+    inWind: p.inWind,
+  };
+}
+
+/** Creates an initialized mutable `GlassRenderState` at Checkpoint 0. */
+export function createInitialRenderState(
+  sim: GlassSimState = createInitialSimState(),
+): GlassRenderState {
+  return {
+    matchTime: sim.matchTime,
+    checkpointIndex: sim.checkpointIndex,
+    p1: toPackedPlayer(sim.p1),
+    p2: toPackedPlayer(sim.p2),
+    glass: {
+      hp: sim.glass.hp,
+      stress: sim.glass.stress,
+      centerX: sim.glass.centerX,
+      centerY: sim.glass.centerY,
+      centerZ: sim.glass.centerZ,
+      yaw: sim.glass.yaw,
+      pitch: sim.glass.pitch,
+      length: sim.glass.length,
+      invulnTimer: sim.glass.invulnTimer,
+      shatterTimer: sim.glass.shatterTimer,
+      shatterReason: sim.glass.shatterReason,
+      lastImpactX: sim.glass.lastImpactX,
+      lastImpactY: sim.glass.lastImpactY,
+      lastImpactZ: sim.glass.lastImpactZ,
+    },
+    cameraShake: 0,
+    lastCrackAt: 0,
+    shatterBurstId: 0,
+    shatterOrigin: [sim.glass.centerX, sim.glass.centerY, sim.glass.centerZ],
+  };
+}

@@ -8,6 +8,7 @@ import {
   Sparkles,
   Swords,
   Trophy,
+  Users,
 } from 'lucide-react';
 import { playSfx } from '../audio/soundEngine';
 import { ANIMALS } from '../engine/types';
@@ -18,6 +19,7 @@ export interface ModeSelectScreenProps {
   onSelectPawsCards: () => void;
   onSelectBrawlArena: () => void;
   onSelectBlockBlast: () => void;
+  onSelectGlassCarry: () => void;
   onOpenStudio3D: () => void;
 }
 
@@ -27,12 +29,12 @@ interface ModeSpecItem {
 }
 
 interface GameModeEntry {
-  id: 'cards' | 'brawl' | 'blockblast';
+  id: 'cards' | 'brawl' | 'blockblast' | 'glassCarry';
   title: string;
   genreBadge: string;
   badgeIcon: ReactNode;
   description: string;
-  bannerWebp: string;
+  bannerWebp?: string;
   bannerJpg: string;
   bannerAlt: string;
   ctaLabel: string;
@@ -48,12 +50,13 @@ interface GameModeEntry {
 /**
  * Arcade mode hub with bespoke 16:9 key-art banners and explicit genre specs
  * so players immediately distinguish turn-based card strategy, physics brawl,
- * and 8x8 block puzzle modes.
+ * 8x8 block puzzle, and 2-player online co-op glass carry modes.
  */
 export function ModeSelectScreen({
   onSelectPawsCards,
   onSelectBrawlArena,
   onSelectBlockBlast,
+  onSelectGlassCarry,
   onOpenStudio3D,
 }: ModeSelectScreenProps) {
   const {
@@ -61,6 +64,8 @@ export function ModeSelectScreen({
     gamesWon,
     gamesPlayed,
     blockBlastBestScore,
+    glassBestStars,
+    glassBestTimeSec,
     selectedAnimal,
     equippedAccessory,
   } = useProfileStore();
@@ -146,11 +151,42 @@ export function ModeSelectScreen({
       ],
       onEnter: onSelectBlockBlast,
     },
+    {
+      id: 'glassCarry',
+      title: 'Glass Carry Co-op',
+      genreBadge: 'Co-op Vật Lý · 2 Người Online',
+      badgeIcon: <Users className="h-3.5 w-3.5 text-cyan-300" />,
+      description:
+        'Phối hợp cùng đồng đội Online khiêng tấm kính pha lê vượt 5 chặng cầu gỗ, sàn băng, quạt gió và búa lắc. Nâng/hạ kính ăn ý để không vỡ tan tành!',
+      bannerWebp: '/banners/glass-carry-banner.webp',
+      bannerJpg: '/banners/glass-carry-banner.jpg',
+      bannerAlt:
+        'Hai thú bông 3D cẩn thận khiêng tấm kính pha lê sáng lấp lánh qua cây cầu gỗ tuyết có búa lắc và đèn lồng ấm',
+      ctaLabel: 'Vào Phòng Glass Carry',
+      cardClass:
+        'border-cyan-500/35 bg-[#0c212b] hover:border-cyan-400 hover:shadow-[0_22px_46px_rgba(34,211,238,0.22)] has-[button:focus-visible]:outline-cyan-300',
+      badgeClass: 'border-cyan-400/35 bg-cyan-400/15 text-cyan-200',
+      specClass: 'border-cyan-900/50 bg-black/25',
+      ctaClass: 'btn-tactile-cyan',
+      ctaTextClass: 'text-[#06222c]',
+      specs: [
+        { label: 'Lối chơi', value: 'Online 2 người Co-op' },
+        { label: 'Đường đua', value: '5 chặng · Checkpoint' },
+        {
+          label: 'Kỷ lục',
+          value:
+            glassBestStars > 0 && glassBestTimeSec !== null
+              ? `${glassBestStars}★ · ${Math.round(glassBestTimeSec)}s`
+              : 'Chưa phá đảo',
+        },
+      ],
+      onEnter: onSelectGlassCarry,
+    },
   ];
 
   return (
     <div className="min-h-screen bg-[#1a100b] bg-[radial-gradient(circle_at_18%_0%,_#3a2114_0%,_transparent_44%),radial-gradient(circle_at_50%_0%,_#112840_0%,_transparent_44%),radial-gradient(circle_at_84%_0%,_#103326_0%,_transparent_44%),linear-gradient(180deg,_#1c110c_0%,_#120b08_100%)] text-[#FFF9F0] selection:bg-amber-300 selection:text-[#2C1B11]">
-      <div className="mx-auto flex min-h-screen max-w-7xl flex-col justify-between gap-5 px-4 py-5 sm:px-6 lg:px-8">
+      <div className="mx-auto flex min-h-screen max-w-[92rem] flex-col justify-between gap-5 px-4 py-5 sm:px-6 lg:px-8">
         {/* Hero Showcase Header */}
         <header className="relative overflow-hidden rounded-3xl border border-amber-500/25 bg-gradient-to-r from-[#341c11]/95 via-[#182235]/95 to-[#0f2920]/95 px-6 py-4 shadow-[0_14px_34px_rgba(0,0,0,0.42)]">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -164,8 +200,9 @@ export function ModeSelectScreen({
               </h1>
               <p className="mt-1 text-sm text-amber-100/80">
                 Chọn <span className="font-bold text-amber-300">Đấu Bài</span> cân não,{' '}
-                <span className="font-bold text-sky-300">Hỗn Chiến</span> vật lý trên sàn băng hoặc{' '}
-                <span className="font-bold text-emerald-300">Xếp Khối 8×8</span> cùng thú bông 3D.
+                <span className="font-bold text-sky-300">Hỗn Chiến</span> vật lý,{' '}
+                <span className="font-bold text-emerald-300">Xếp Khối 8×8</span> hoặc{' '}
+                <span className="font-bold text-cyan-300">Khiêng Kính Co-op</span> cùng thú bông 3D.
               </p>
             </div>
 
@@ -217,15 +254,17 @@ export function ModeSelectScreen({
           </div>
         </header>
 
-        {/* Three Distinct Game Mode Cards */}
-        <main className="grid flex-1 grid-cols-1 items-stretch gap-6 md:grid-cols-3">
+        {/* Four Distinct Game Mode Cards */}
+        <main className="grid flex-1 grid-cols-1 items-stretch gap-5 md:grid-cols-2 xl:grid-cols-4">
           {gameModes.map((mode) => (
             <article
               key={mode.id}
               className={`group relative flex flex-col justify-between overflow-hidden rounded-3xl border-2 shadow-[0_14px_36px_rgba(0,0,0,0.45)] transition-[transform,border-color,box-shadow] duration-200 hover:-translate-y-1 motion-reduce:transition-colors motion-reduce:hover:translate-y-0 has-[button:focus-visible]:outline-2 has-[button:focus-visible]:outline-offset-2 ${mode.cardClass}`}
             >
               <picture className="block border-b border-white/10 bg-black/40">
-                <source srcSet={mode.bannerWebp} type="image/webp" />
+                {mode.bannerWebp && (
+                  <source srcSet={mode.bannerWebp} type="image/webp" />
+                )}
                 <img
                   src={mode.bannerJpg}
                   alt={mode.bannerAlt}
@@ -294,7 +333,7 @@ export function ModeSelectScreen({
 
         {/* Footer note */}
         <footer className="text-center text-xs text-amber-200/55">
-          Dùng chung bộ 8 nhân vật 3D, 15 phụ kiện phối đồ và ví Cookies giữa cả ba chế độ.
+          Dùng chung bộ 8 nhân vật 3D, 15 phụ kiện phối đồ và ví Cookies giữa cả bốn chế độ.
         </footer>
       </div>
     </div>

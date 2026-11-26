@@ -74,6 +74,20 @@
     box-shadow: 0 1px 0 #047857, 0 2px 4px rgba(0, 0, 0, 0.2);
   }
 
+  .btn-tactile-cyan {
+    background: linear-gradient(180deg, #22d3ee 0%, #0891b2 100%);
+    box-shadow: 0 4px 0 #155e75, 0 6px 12px rgba(0, 0, 0, 0.25);
+    color: #06222c;
+    transition: transform 0.08s ease-out, box-shadow 0.08s ease-out, filter 0.12s ease;
+  }
+  .btn-tactile-cyan:hover {
+    filter: brightness(1.06);
+  }
+  .btn-tactile-cyan:active {
+    transform: translateY(3px);
+    box-shadow: 0 1px 0 #155e75, 0 2px 4px rgba(0, 0, 0, 0.2);
+  }
+
   .btn-tactile-wood {
     background: linear-gradient(180deg, #382419 0%, #29180f 100%);
     box-shadow: 0 4px 0 #180d07, 0 6px 12px rgba(0, 0, 0, 0.25);

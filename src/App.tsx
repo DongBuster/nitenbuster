@@ -14,6 +14,7 @@ const LazyBlockBlastScreen = lazy(() => import('./screens/BlockBlastScreen'));
 const LazyBlockBlastRoomContainer = lazy(
   () => import('./blockblast/ui/BlockBlastRoomContainer'),
 );
+const LazyGlassCarryScreen = lazy(() => import('./screens/GlassCarryScreen'));
 
 type AppScreen =
   | 'modeSelect'
@@ -23,7 +24,8 @@ type AppScreen =
   | 'studio3d'
   | 'brawl'
   | 'blockblast'
-  | 'blockblastRoom';
+  | 'blockblastRoom'
+  | 'glassCarry';
 
 function OnlineModeContainer({ onBackToMenu }: { onBackToMenu: () => void }) {
   const room = useOnlineRoom();
@@ -125,29 +127,47 @@ function ModeLoadingFallback({
   );
 }
 
-function readInitialBbRoomCode(): string {
+function readInitialRoomCodeParam(paramName: string): string {
   if (typeof window === 'undefined') return '';
-  const raw = new URLSearchParams(window.location.search).get('bbRoom') ?? '';
+  const raw = new URLSearchParams(window.location.search).get(paramName) ?? '';
   const clean = normalizeRoomCode(raw);
   return clean.length >= 4 ? clean : '';
 }
 
 export function App() {
-  const [initialBbRoomCode] = useState<string>(() => readInitialBbRoomCode());
-  const [screen, setScreen] = useState<AppScreen>(() =>
-    readInitialBbRoomCode() ? 'blockblastRoom' : 'modeSelect',
+  const [initialBbRoomCode] = useState<string>(() =>
+    readInitialRoomCodeParam('bbRoom'),
   );
+  const [initialGlassRoomCode] = useState<string>(() =>
+    readInitialRoomCodeParam('glassRoom'),
+  );
+  const [screen, setScreen] = useState<AppScreen>(() => {
+    if (initialBbRoomCode) return 'blockblastRoom';
+    if (initialGlassRoomCode) return 'glassCarry';
+    return 'modeSelect';
+  });
 
   useEffect(() => {
-    if (!initialBbRoomCode || typeof window === 'undefined') return;
+    if (
+      (!initialBbRoomCode && !initialGlassRoomCode) ||
+      typeof window === 'undefined'
+    ) {
+      return;
+    }
     const params = new URLSearchParams(window.location.search);
-    if (params.has('bbRoom')) {
-      params.delete('bbRoom');
+    let changed = false;
+    for (const key of ['bbRoom', 'glassRoom']) {
+      if (params.has(key)) {
+        params.delete(key);
+        changed = true;
+      }
+    }
+    if (changed) {
       const nextSearch = params.toString();
       const nextUrl = `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ''}${window.location.hash}`;
       window.history.replaceState({}, '', nextUrl);
     }
-  }, [initialBbRoomCode]);
+  }, [initialBbRoomCode, initialGlassRoomCode]);
 
   return (
     <div className="relative min-h-screen">
@@ -183,6 +203,7 @@ export function App() {
           onSelectPawsCards={() => setScreen('menu')}
           onSelectBrawlArena={() => setScreen('brawl')}
           onSelectBlockBlast={() => setScreen('blockblast')}
+          onSelectGlassCarry={() => setScreen('glassCarry')}
           onOpenStudio3D={() => setScreen('studio3d')}
         />
       )}
@@ -272,6 +293,31 @@ export function App() {
             <LazyBlockBlastRoomContainer
               initialRoomCode={initialBbRoomCode}
               onSwitchToSolo={() => setScreen('blockblast')}
+              onBackToModeSelect={() => setScreen('modeSelect')}
+            />
+          </Suspense>
+        </ModeErrorBoundary>
+      )}
+
+      {screen === 'glassCarry' && (
+        <ModeErrorBoundary
+          title="Không thể mở Glass Carry Co-op"
+          fallbackMessage="Không thể khởi tạo màn chơi 3D Glass Carry Co-op."
+          bgClass="bg-[#0d1b2e]"
+          onBack={() => setScreen('modeSelect')}
+        >
+          <Suspense
+            fallback={
+              <ModeLoadingFallback
+                label="Đang tải cầu kính Glass Carry Co-op..."
+                bgClass="bg-[#0d1b2e]"
+                spinnerClass="border-cyan-400"
+                textClass="text-cyan-200"
+              />
+            }
+          >
+            <LazyGlassCarryScreen
+              initialRoomCode={initialGlassRoomCode}
               onBackToModeSelect={() => setScreen('modeSelect')}
             />
           </Suspense>

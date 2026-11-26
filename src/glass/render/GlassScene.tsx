@@ -1,0 +1,625 @@
+import { useCallback, useEffect, useMemo, useRef, type RefObject } from 'react';
+import { Environment, Lightformer } from '@react-three/drei';
+import { Canvas, useFrame } from '@react-three/fiber';
+import * as THREE from 'three';
+import { playSfx } from '../../audio/soundEngine';
+import { useGlassInput } from '../input/useGlassInput';
+import {
+  GLASS_EMOTES,
+  GLASS_INPUT_STALE_MS,
+  GLASS_SNAPSHOT_INTERVAL_MS,
+  packSimSnapshot,
+  type GlassRoomMember,
+  type GlassSnapshotPayload,
+} from '../online/protocol';
+import { SnapshotInterpolator } from '../online/snapshotInterpolation';
+import type { GlassRoomController } from '../online/useGlassRoom';
+import { FIXED_DT, GLASS_MAX_HP } from '../sim/constants';
+import { GLASS_COURSE, getStageNumberForZ } from '../sim/course';
+import {
+  NEUTRAL_INPUT,
+  createInitialSimState,
+  stepGlassSim,
+} from '../sim/physics';
+import type {
+  GlassSimState,
+  LiftIntent,
+  PlayerInput,
+  SimEvent,
+} from '../sim/types';
+import { CarrierActor } from './CarrierActor';
+import { GlassCamera } from './GlassCamera';
+import { GlassCourseMesh } from './GlassCourseMesh';
+import { GlassPaneMesh } from './GlassPaneMesh';
+import {
+  createInitialRenderState,
+  type GlassHudSnapshot,
+  type GlassRenderState,
+} from './renderTypes';
+
+export interface GlassSceneProps {
+  room: GlassRoomController;
+  paused: boolean;
+  onHudSnapshot: (hud: GlassHudSnapshot) => void;
+}
+
+const FALLBACK_P1_MEMBER: GlassRoomMember = {
+  peerId: 'fallback-p1',
+  name: 'P1',
+  animal: 'dog',
+  accessory: [],
+  ready: true,
+  joinedAt: 0,
+};
+
+const FALLBACK_P2_MEMBER: GlassRoomMember = {
+  peerId: 'fallback-p2',
+  name: 'P2',
+  animal: 'cat',
+  accessory: [],
+  ready: true,
+  joinedAt: 1,
+};
+
+function copySimToRenderState(
+  sim: GlassSimState,
+  target: GlassRenderState,
+): void {
+  target.matchTime = sim.matchTime;
+  target.checkpointIndex = sim.checkpointIndex;
+
+  target.p1.x = sim.p1.x;
+  target.p1.y = sim.p1.y;
+  target.p1.z = sim.p1.z;
+  target.p1.vx = sim.p1.vx;
+  target.p1.vy = sim.p1.vy;
+  target.p1.vz = sim.p1.vz;
+  target.p1.yaw = sim.p1.yaw;
+  target.p1.grounded = sim.p1.grounded;
+  target.p1.liftOffset = sim.p1.liftOffset;
+  target.p1.onIce = sim.p1.onIce;
+  target.p1.inWind = sim.p1.inWind;
+
+  target.p2.x = sim.p2.x;
+  target.p2.y = sim.p2.y;
+  target.p2.z = sim.p2.z;
+  target.p2.vx = sim.p2.vx;
+  target.p2.vy = sim.p2.vy;
+  target.p2.vz = sim.p2.vz;
+  target.p2.yaw = sim.p2.yaw;
+  target.p2.grounded = sim.p2.grounded;
+  target.p2.liftOffset = sim.p2.liftOffset;
+  target.p2.onIce = sim.p2.onIce;
+  target.p2.inWind = sim.p2.inWind;
+
+  target.glass.hp = sim.glass.hp;
+  target.glass.stress = sim.glass.stress;
+  target.glass.centerX = sim.glass.centerX;
+  target.glass.centerY = sim.glass.centerY;
+  target.glass.centerZ = sim.glass.centerZ;
+  target.glass.yaw = sim.glass.yaw;
+  target.glass.pitch = sim.glass.pitch;
+  target.glass.length = sim.glass.length;
+  target.glass.invulnTimer = sim.glass.invulnTimer;
+  target.glass.shatterTimer = sim.glass.shatterTimer;
+  target.glass.shatterReason = sim.glass.shatterReason;
+  target.glass.lastImpactX = sim.glass.lastImpactX;
+  target.glass.lastImpactY = sim.glass.lastImpactY;
+  target.glass.lastImpactZ = sim.glass.lastImpactZ;
+}
+
+function copySnapshotToRenderState(
+  snapshot: GlassSnapshotPayload,
+  target: GlassRenderState,
+): void {
+  target.matchTime = snapshot.matchTime;
+  target.checkpointIndex = snapshot.checkpointIndex;
+
+  Object.assign(target.p1, snapshot.p1);
+  Object.assign(target.p2, snapshot.p2);
+  Object.assign(target.glass, snapshot.glass);
+}
+
+function buildHudSnapshot(
+  renderState: GlassRenderState,
+  shatters: number,
+): GlassHudSnapshot {
+  const stageNumber = getStageNumberForZ(
+    GLASS_COURSE,
+    renderState.glass.centerZ,
+  );
+  const stageName =
+    GLASS_COURSE.stages.find((s) => s.number === stageNumber)?.name ??
+    GLASS_COURSE.stages[0]?.name ??
+    '';
+  const totalCheckpoints = Math.max(0, GLASS_COURSE.checkpoints.length - 1);
+  const progressPct = Math.max(
+    0,
+    Math.min(100, (renderState.glass.centerZ / GLASS_COURSE.finishZ) * 100),
+  );
+
+  return {
+    matchTime: renderState.matchTime,
+    stageNumber,
+    stageName,
+    checkpointIndex: renderState.checkpointIndex,
+    totalCheckpoints,
+    shatters,
+    glassHp: renderState.glass.hp,
+    glassMaxHp: GLASS_MAX_HP,
+    glassStress: renderState.glass.stress,
+    shatterTimer: renderState.glass.shatterTimer,
+    shatterReason: renderState.glass.shatterReason,
+    p1Lift: renderState.p1.liftOffset,
+    p2Lift: renderState.p2.liftOffset,
+    progressPct,
+  };
+}
+
+function FollowShadowLight({
+  renderRef,
+}: {
+  renderRef: RefObject<GlassRenderState>;
+}) {
+  const lightRef = useRef<THREE.DirectionalLight | null>(null);
+  const targetObj = useMemo(() => new THREE.Object3D(), []);
+
+  useFrame(() => {
+    const light = lightRef.current;
+    if (!light) return;
+    const { p1, p2 } = renderRef.current;
+    const midX = (p1.x + p2.x) * 0.5;
+    const midZ = (p1.z + p2.z) * 0.5;
+    light.position.set(midX + 8, 16, midZ - 6);
+    targetObj.position.set(midX, 0, midZ + 4);
+    targetObj.updateMatrixWorld();
+  });
+
+  return (
+    <>
+      <primitive object={targetObj} />
+      <directionalLight
+        ref={lightRef}
+        target={targetObj}
+        position={[8, 16, -4.5]}
+        intensity={1.45}
+        color="#FFE8CC"
+        castShadow
+        shadow-mapSize={[1024, 1024]}
+        shadow-camera-near={1}
+        shadow-camera-far={48}
+        shadow-camera-left={-15}
+        shadow-camera-right={15}
+        shadow-camera-top={16}
+        shadow-camera-bottom={-14}
+        shadow-bias={-0.0005}
+      />
+    </>
+  );
+}
+
+interface GlassWorldDriverProps {
+  room: GlassRoomController;
+  paused: boolean;
+  readInput: () => PlayerInput;
+  renderRef: RefObject<GlassRenderState>;
+  onHudSnapshot: (hud: GlassHudSnapshot) => void;
+}
+
+function GlassWorldDriver({
+  room,
+  paused,
+  readInput,
+  renderRef,
+  onHudSnapshot,
+}: GlassWorldDriverProps) {
+  const simRef = useRef<GlassSimState>(createInitialSimState());
+  const accumulatorRef = useRef<number>(0);
+  const lastSnapshotSentMsRef = useRef<number>(0);
+  const finishNotifiedRef = useRef<boolean>(false);
+  const guestInputRef = useRef<{ input: PlayerInput; receivedAtMs: number }>({
+    input: { ...NEUTRAL_INPUT },
+    receivedAtMs: 0,
+  });
+
+  const interpolatorRef = useRef<SnapshotInterpolator>(
+    new SnapshotInterpolator(),
+  );
+  const pendingGuestEventsRef = useRef<SimEvent[]>([]);
+  const lastProcessedEventIdRef = useRef<number>(0);
+  const shattersRef = useRef<number>(0);
+  const prevLocalLiftRef = useRef<LiftIntent>(0);
+  const hudAccumRef = useRef<number>(0);
+  const activeMatchIdRef = useRef<string>(room.matchId);
+
+  const isHostRef = useRef<boolean>(room.isHost);
+  isHostRef.current = room.isHost;
+
+  const phaseRef = useRef(room.phase);
+  phaseRef.current = room.phase;
+
+  const roomMatchIdRef = useRef<string>(room.matchId);
+  roomMatchIdRef.current = room.matchId;
+
+  const pausedRef = useRef<boolean>(paused);
+  pausedRef.current = paused;
+
+  const onHudSnapshotRef = useRef(onHudSnapshot);
+  onHudSnapshotRef.current = onHudSnapshot;
+
+  const resetSimulationForMatch = useCallback(
+    (nextMatchId: string) => {
+      activeMatchIdRef.current = nextMatchId;
+      const initialSim = createInitialSimState();
+      simRef.current = initialSim;
+      accumulatorRef.current = 0;
+      lastSnapshotSentMsRef.current = 0;
+      finishNotifiedRef.current = false;
+      guestInputRef.current = {
+        input: { ...NEUTRAL_INPUT },
+        receivedAtMs: 0,
+      };
+      interpolatorRef.current.reset();
+      pendingGuestEventsRef.current = [];
+      lastProcessedEventIdRef.current = 0;
+      shattersRef.current = 0;
+      prevLocalLiftRef.current = 0;
+      hudAccumRef.current = 0;
+
+      copySimToRenderState(initialSim, renderRef.current);
+      renderRef.current.cameraShake = 0;
+      renderRef.current.lastCrackAt = 0;
+      renderRef.current.shatterBurstId = 0;
+      renderRef.current.shatterOrigin = [
+        initialSim.glass.centerX,
+        initialSim.glass.centerY,
+        initialSim.glass.centerZ,
+      ];
+
+      onHudSnapshotRef.current(
+        buildHudSnapshot(renderRef.current, shattersRef.current),
+      );
+    },
+    [renderRef],
+  );
+
+  // Reset interpolator, sim state, and event cursor whenever matchId changes
+  useEffect(() => {
+    if (activeMatchIdRef.current !== room.matchId) {
+      resetSimulationForMatch(room.matchId);
+    }
+  }, [room.matchId, resetSimulationForMatch]);
+
+  // Emit initial HUD snapshot once on mount
+  useEffect(() => {
+    onHudSnapshotRef.current(
+      buildHudSnapshot(renderRef.current, shattersRef.current),
+    );
+  }, [renderRef]);
+
+  // Register Guest input & snapshot listeners without causing React re-renders
+  const { setGuestInputListener, setSnapshotListener } = room;
+
+  useEffect(() => {
+    setGuestInputListener((payload) => {
+      if (!isHostRef.current) return;
+      if (!payload.matchId || payload.matchId !== roomMatchIdRef.current) {
+        return;
+      }
+      guestInputRef.current = {
+        input: {
+          moveX: payload.moveX,
+          moveZ: payload.moveZ,
+          jump: payload.jump,
+          lift: payload.lift,
+        },
+        receivedAtMs: performance.now(),
+      };
+    });
+
+    return () => {
+      setGuestInputListener(null);
+    };
+  }, [setGuestInputListener]);
+
+  useEffect(() => {
+    setSnapshotListener((snapshot) => {
+      if (isHostRef.current) return;
+      const expectedMatchId = roomMatchIdRef.current;
+      if (expectedMatchId && snapshot.matchId !== expectedMatchId) {
+        return;
+      }
+      if (snapshot.matchId !== activeMatchIdRef.current) {
+        resetSimulationForMatch(snapshot.matchId);
+      }
+      interpolatorRef.current.push(snapshot, performance.now());
+      if (snapshot.events.length > 0) {
+        pendingGuestEventsRef.current.push(...snapshot.events);
+      }
+    });
+
+    return () => {
+      setSnapshotListener(null);
+    };
+  }, [resetSimulationForMatch, setSnapshotListener]);
+
+  const processSimEvents = useCallback(
+    (events: readonly SimEvent[]) => {
+      for (const evt of events) {
+        if (evt.id <= lastProcessedEventIdRef.current) continue;
+        lastProcessedEventIdRef.current = evt.id;
+
+        switch (evt.kind) {
+          case 'glass_crack':
+            playSfx('glassCrack');
+            renderRef.current.cameraShake = Math.max(
+              renderRef.current.cameraShake,
+              0.45,
+            );
+            renderRef.current.lastCrackAt = renderRef.current.matchTime;
+            break;
+
+          case 'glass_shatter':
+            playSfx('glassShatter');
+            renderRef.current.cameraShake = Math.max(
+              renderRef.current.cameraShake,
+              0.95,
+            );
+            renderRef.current.shatterBurstId += 1;
+            renderRef.current.shatterOrigin = [evt.x, evt.y, evt.z];
+            break;
+
+          case 'checkpoint':
+            playSfx('checkpoint');
+            break;
+
+          case 'course_clear':
+            playSfx('win');
+            break;
+
+          case 'respawn':
+            break;
+        }
+      }
+    },
+    [renderRef],
+  );
+
+  useFrame((_, rawDt) => {
+    const dt = Math.min(rawDt, 0.05);
+    const activePhase = phaseRef.current;
+    const isPlaying = activePhase === 'playing';
+    const localInput =
+      isPlaying && !pausedRef.current ? readInput() : NEUTRAL_INPUT;
+
+    if (isPlaying && !pausedRef.current) {
+      if (
+        localInput.lift !== 0 &&
+        localInput.lift !== prevLocalLiftRef.current
+      ) {
+        playSfx('glassLift');
+      }
+      prevLocalLiftRef.current = localInput.lift;
+    } else {
+      prevLocalLiftRef.current = 0;
+    }
+
+    if (isHostRef.current) {
+      if (isPlaying) {
+        const nowMs = performance.now();
+        const guestRec = guestInputRef.current;
+        const guestStale =
+          guestRec.receivedAtMs === 0 ||
+          nowMs - guestRec.receivedAtMs > GLASS_INPUT_STALE_MS;
+        const p2Input: PlayerInput = guestStale
+          ? {
+              moveX: 0,
+              moveZ: 0,
+              jump: false,
+              lift: guestRec.input.lift,
+            }
+          : guestRec.input;
+
+        accumulatorRef.current += dt;
+        const frameEvents: SimEvent[] = [];
+
+        while (accumulatorRef.current >= FIXED_DT) {
+          accumulatorRef.current -= FIXED_DT;
+          const nextSim = stepGlassSim(
+            simRef.current,
+            localInput,
+            p2Input,
+            FIXED_DT,
+          );
+          simRef.current = nextSim;
+          if (nextSim.events.length > 0) {
+            frameEvents.push(...nextSim.events);
+          }
+          if (nextSim.phase === 'finished') {
+            accumulatorRef.current = 0;
+            break;
+          }
+        }
+
+        shattersRef.current = simRef.current.shatters;
+        copySimToRenderState(simRef.current, renderRef.current);
+
+        if (frameEvents.length > 0) {
+          processSimEvents(frameEvents);
+        }
+
+        const justFinished =
+          simRef.current.phase === 'finished' && !finishNotifiedRef.current;
+        const shouldBroadcast =
+          justFinished ||
+          frameEvents.length > 0 ||
+          nowMs - lastSnapshotSentMsRef.current >= GLASS_SNAPSHOT_INTERVAL_MS;
+
+        if (shouldBroadcast && roomMatchIdRef.current) {
+          const packed = packSimSnapshot(
+            roomMatchIdRef.current,
+            simRef.current,
+          );
+          if (frameEvents.length > 0) {
+            packed.events = frameEvents.map((e) => ({ ...e }));
+          }
+          room.broadcastSnapshot(packed);
+          lastSnapshotSentMsRef.current = nowMs;
+        }
+
+        if (justFinished) {
+          finishNotifiedRef.current = true;
+          onHudSnapshotRef.current(
+            buildHudSnapshot(renderRef.current, shattersRef.current),
+          );
+          room.notifyMatchFinished(
+            simRef.current.matchTime,
+            simRef.current.shatters,
+          );
+        }
+      }
+    } else {
+      // Guest: send local input and sample interpolated snapshots
+      if (isPlaying) {
+        room.sendGuestInput(localInput);
+      }
+
+      if (isPlaying || activePhase === 'finished') {
+        const sampled = interpolatorRef.current.sample(performance.now());
+        if (sampled) {
+          shattersRef.current = sampled.shatters;
+          copySnapshotToRenderState(sampled, renderRef.current);
+          if (sampled.events.length > 0) {
+            pendingGuestEventsRef.current.push(...sampled.events);
+          }
+        }
+        if (pendingGuestEventsRef.current.length > 0) {
+          const batch = pendingGuestEventsRef.current;
+          pendingGuestEventsRef.current = [];
+          processSimEvents(batch);
+        }
+      }
+    }
+
+    hudAccumRef.current += dt;
+    if (hudAccumRef.current >= 0.1) {
+      hudAccumRef.current = 0;
+      onHudSnapshotRef.current(
+        buildHudSnapshot(renderRef.current, shattersRef.current),
+      );
+    }
+  });
+
+  return null;
+}
+
+export function GlassScene({
+  room,
+  paused,
+  onHudSnapshot,
+}: GlassSceneProps) {
+  const renderRef = useRef<GlassRenderState>(createInitialRenderState());
+
+  const { sendEmote } = room;
+  const handleEmote = useCallback(
+    (emoteId: number) => {
+      const idx = GLASS_EMOTES.findIndex((e) => e.id === emoteId);
+      if (idx >= 0) {
+        sendEmote(idx);
+      }
+    },
+    [sendEmote],
+  );
+
+  const { readInput } = useGlassInput({
+    enabled: room.phase === 'playing' && !paused,
+    onEmote: handleEmote,
+  });
+
+  const p1Member = room.p1Member ?? FALLBACK_P1_MEMBER;
+  const p2Member = room.p2Member ?? FALLBACK_P2_MEMBER;
+
+  return (
+    <Canvas
+      shadows
+      dpr={[1, 1.75]}
+      camera={{ position: [0, 9.2, -10.0], fov: 46, near: 0.3, far: 160 }}
+      className="h-full w-full"
+    >
+      <color attach="background" args={['#0d1b2e']} />
+      <fog attach="fog" args={['#0d1b2e', 34, 92]} />
+
+      <Environment resolution={128} frames={1}>
+        <Lightformer
+          form="ring"
+          intensity={1.7}
+          color="#FFE7C2"
+          position={[0, 8, 0]}
+          rotation={[Math.PI / 2, 0, 0]}
+          scale={14}
+        />
+        <Lightformer
+          form="circle"
+          intensity={2.2}
+          color="#FFB878"
+          position={[-6, 4, 4]}
+          rotation={[0, Math.PI / 3, 0]}
+          scale={7}
+        />
+        <Lightformer
+          form="rect"
+          intensity={1.7}
+          color="#CFE8FF"
+          position={[-6, 5, -8]}
+          rotation={[0, Math.PI / 6, 0]}
+          scale={[10, 5, 1]}
+        />
+        <Lightformer
+          form="rect"
+          intensity={2.1}
+          color="#FFD6A5"
+          position={[4, 4, -6]}
+          rotation={[0, -Math.PI / 5, 0]}
+          scale={[10, 5, 1]}
+        />
+      </Environment>
+
+      <ambientLight intensity={0.62} color="#F8FAFC" />
+      <hemisphereLight args={['#FFF7ED', '#1E3A5F', 0.72]} />
+      <directionalLight
+        position={[-6, 9, -8]}
+        intensity={0.55}
+        color="#BAE6FD"
+      />
+      {/* Step simulation/interpolation before scene consumers read renderRef */}
+      <GlassWorldDriver
+        room={room}
+        paused={paused}
+        readInput={readInput}
+        renderRef={renderRef}
+        onHudSnapshot={onHudSnapshot}
+      />
+
+      <FollowShadowLight renderRef={renderRef} />
+
+      <GlassCamera renderRef={renderRef} />
+
+      <GlassCourseMesh renderRef={renderRef} />
+
+      <CarrierActor
+        slot="p1"
+        member={p1Member}
+        renderRef={renderRef}
+        emote={room.activeEmotes.p1 ?? null}
+      />
+      <CarrierActor
+        slot="p2"
+        member={p2Member}
+        renderRef={renderRef}
+        emote={room.activeEmotes.p2 ?? null}
+      />
+
+      <GlassPaneMesh renderRef={renderRef} />
+    </Canvas>
+  );
+}

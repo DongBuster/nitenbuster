@@ -27,7 +27,11 @@ export type SfxType =
   | 'lineClear'
   | 'candyBomb'
   | 'reroll'
-  | 'allClear';
+  | 'allClear'
+  | 'glassCrack'
+  | 'glassShatter'
+  | 'checkpoint'
+  | 'glassLift';
 
 export interface AudioPreferences {
   sfxEnabled?: boolean;
@@ -337,6 +341,37 @@ export function playSfx(type: SfxType, opts?: { combo?: number }): void {
         });
         break;
       }
+
+      case 'glassCrack':
+        playTone(ctx, { freq: 2400, endFreq: 900, type: 'triangle', duration: 0.07, gain: 0.2 });
+        playTone(ctx, { freq: 3600, type: 'sine', startOffset: 0.01, duration: 0.045, gain: 0.14 });
+        break;
+
+      case 'glassShatter': {
+        playNoiseBurst(ctx, { duration: 0.14, filterFreq: 3400, filterType: 'highpass', gain: 0.24 });
+        const shards = [3200, 2650, 2100, 1750];
+        shards.forEach((freq, idx) => {
+          playTone(ctx, {
+            freq,
+            endFreq: freq * 0.85,
+            type: idx % 2 === 0 ? 'triangle' : 'sine',
+            startOffset: idx * 0.04,
+            duration: 0.14,
+            gain: 0.18,
+          });
+        });
+        break;
+      }
+
+      case 'checkpoint':
+        playTone(ctx, { freq: 523, type: 'triangle', startOffset: 0, duration: 0.11, gain: 0.18 });
+        playTone(ctx, { freq: 659, type: 'triangle', startOffset: 0.08, duration: 0.11, gain: 0.18 });
+        playTone(ctx, { freq: 784, type: 'sine', startOffset: 0.16, duration: 0.22, gain: 0.22 });
+        break;
+
+      case 'glassLift':
+        playTone(ctx, { freq: 320, endFreq: 480, type: 'sine', duration: 0.09, gain: 0.06 });
+        break;
     }
   } catch {
     // Ignore Web Audio errors in restricted environments

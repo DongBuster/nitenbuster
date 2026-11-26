@@ -6,11 +6,13 @@ import {
 } from '../scene3d/accessoryCatalog.ts';
 import { calculateCookieReward } from '../blockblast/engine/game.ts';
 import { verifyMatchReceipt, type MatchReceipt } from '../blockblast/engine/verify.ts';
+import { calculateGlassResult, isNewGlassBest } from '../glass/sim/scoring.ts';
 
 export const MAX_COOKIES = 1_000_000;
 export const MAX_BLOCK_BLAST_SCORE = 10_000_000;
 export const MAX_GAMES = 1_000_000;
 export const MAX_SETTLED_MATCH_IDS = 20;
+export const MAX_GLASS_TIME_SEC = 86_400;
 
 export interface ProfileSettings {
   sfxEnabled: boolean;
@@ -27,6 +29,8 @@ export interface PlayerProfile {
   gamesPlayed: number;
   gamesWon: number;
   blockBlastBestScore: number;
+  glassBestTimeSec: number | null;
+  glassBestStars: number;
   settledMatchIds: string[];
   selectedAnimal: AnimalId;
   unlockedAccessories: string[];
@@ -40,6 +44,14 @@ export interface BlockBlastSettlementResult {
   reward: number;
   isNewBest: boolean;
   verifiedScore: number;
+}
+
+export interface GlassSettlementResult {
+  nextProfile: PlayerProfile;
+  ok: boolean;
+  reward: number;
+  stars: 1 | 2 | 3;
+  isNewBest: boolean;
 }
 
 export const VALID_ANIMALS: AnimalId[] = [
@@ -58,6 +70,8 @@ export const DEFAULT_PROFILE: PlayerProfile = {
   gamesPlayed: 0,
   gamesWon: 0,
   blockBlastBestScore: 0,
+  glassBestTimeSec: null,
+  glassBestStars: 0,
   settledMatchIds: [],
   selectedAnimal: 'dog',
   unlockedAccessories: [...DEFAULT_UNLOCKED_ACCESSORIES],
@@ -176,6 +190,16 @@ export function sanitizeProfileData(
     clampNonNegInt(safeRaw.gamesWon, MAX_GAMES, 0),
   );
 
+  const glassBestTimeSec =
+    typeof safeRaw.glassBestTimeSec === 'number' &&
+    Number.isFinite(safeRaw.glassBestTimeSec) &&
+    safeRaw.glassBestTimeSec > 0
+      ? Math.min(
+          MAX_GLASS_TIME_SEC,
+          Math.round(safeRaw.glassBestTimeSec * 100) / 100,
+        )
+      : null;
+
   return {
     cookies: clampNonNegInt(
       safeRaw.cookies,
@@ -189,6 +213,8 @@ export function sanitizeProfileData(
       MAX_BLOCK_BLAST_SCORE,
       0,
     ),
+    glassBestTimeSec,
+    glassBestStars: clampNonNegInt(safeRaw.glassBestStars, 3, 0),
     settledMatchIds: sanitizeSettledMatchIds(safeRaw.settledMatchIds),
     selectedAnimal,
     unlockedAccessories: Array.from(unlockedSet),
@@ -261,5 +287,83 @@ export function settleBlockBlastMatch(
     reward,
     isNewBest,
     verifiedScore: verified.verifiedScore,
+  };
+}
+
+export function settleGlassCarryMatch(
+  profile: PlayerProfile,
+  payload: { matchId: string; elapsedSec: number; shatters: number },
+): GlassSettlementResult {
+  const fail: GlassSettlementResult = {
+    nextProfile: profile,
+    ok: false,
+    reward: 0,
+    stars: 1,
+    isNewBest: false,
+  };
+
+  if (
+    !payload ||
+    typeof payload !== 'object' ||
+    typeof payload.matchId !== 'string' ||
+    payload.matchId.trim().length < 4 ||
+    payload.matchId.length > 80 ||
+    typeof payload.elapsedSec !== 'number' ||
+    !Number.isFinite(payload.elapsedSec) ||
+    payload.elapsedSec <= 0 ||
+    payload.elapsedSec > MAX_GLASS_TIME_SEC ||
+    typeof payload.shatters !== 'number' ||
+    !Number.isFinite(payload.shatters) ||
+    payload.shatters < 0 ||
+    payload.shatters > 10_000
+  ) {
+    return fail;
+  }
+
+  if (profile.settledMatchIds.includes(payload.matchId)) {
+    return fail;
+  }
+
+  const res = calculateGlassResult(payload.elapsedSec, Math.floor(payload.shatters));
+  const isNewBest = isNewGlassBest(
+    profile.glassBestTimeSec,
+    profile.glassBestStars,
+    payload.elapsedSec,
+    res.stars,
+  );
+  const roundedElapsedSec = Math.min(
+    MAX_GLASS_TIME_SEC,
+    Math.round(payload.elapsedSec * 100) / 100,
+  );
+  const nextBestStars = Math.max(profile.glassBestStars, res.stars);
+  const nextBestTimeSec =
+    profile.glassBestTimeSec === null
+      ? roundedElapsedSec
+      : Math.min(profile.glassBestTimeSec, roundedElapsedSec);
+  const nextGamesPlayed = Math.min(MAX_GAMES, profile.gamesPlayed + 1);
+  const nextGamesWon = Math.min(
+    nextGamesPlayed,
+    Math.min(MAX_GAMES, profile.gamesWon + 1),
+  );
+  const nextSettled = [...profile.settledMatchIds, payload.matchId].slice(
+    -MAX_SETTLED_MATCH_IDS,
+  );
+
+  const nextProfile: PlayerProfile = {
+    ...profile,
+    cookies: Math.min(MAX_COOKIES, profile.cookies + res.cookies),
+    gamesPlayed: nextGamesPlayed,
+    gamesWon: nextGamesWon,
+    glassBestStars: nextBestStars,
+    glassBestTimeSec: nextBestTimeSec,
+    settledMatchIds: nextSettled,
+  };
+
+  return {
+    nextProfile,
+    ok: true,
+    reward: res.cookies,
+    stars: res.stars,
+    isNewBest,
   };
 }
