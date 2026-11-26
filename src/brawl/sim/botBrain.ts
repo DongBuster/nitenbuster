@@ -1,5 +1,11 @@
 import { getSafeRadiusAt } from './arenaLayout';
-import { GRAB_RANGE, PUNCH_RANGE, SHOVEL_RANGE } from './constants';
+import { canTriggerWeaponSpin } from './combat';
+import {
+  GRAB_RANGE,
+  PUNCH_RANGE,
+  SHOVEL_RANGE,
+  SWORD_RANGE,
+} from './constants';
 import type {
   BrawlDifficulty,
   FighterInput,
@@ -97,21 +103,17 @@ export function computeBotInput(params: {
     ) {
       roll = true;
     }
-    return applyInversionIfNeeded(
-      {
-        moveX: memory.moveX,
-        moveZ: memory.moveZ,
-        sprint,
-        jump,
-        punch,
-        headbutt,
-        grabHeld,
-        roll,
-        emote: null,
-      },
-      self.status,
-      nowSec,
-    );
+    return {
+      moveX: memory.moveX,
+      moveZ: memory.moveZ,
+      sprint,
+      jump,
+      punch,
+      headbutt,
+      grabHeld,
+      roll,
+      emote: null,
+    };
   }
 
   // Priority 2: Currently grabbing someone -> drag toward nearest edge and throw
@@ -127,21 +129,17 @@ export function computeBotInput(params: {
     const closeToEdge = distFromCenter > safeRadius - 2.3;
     grabHeld = !(closeToEdge || grabAge > 1.35);
 
-    return applyInversionIfNeeded(
-      {
-        moveX: memory.moveX,
-        moveZ: memory.moveZ,
-        sprint: false,
-        jump: false,
-        punch: false,
-        headbutt: false,
-        grabHeld,
-        roll: false,
-        emote: null,
-      },
-      self.status,
-      nowSec,
-    );
+    return {
+      moveX: memory.moveX,
+      moveZ: memory.moveZ,
+      sprint: false,
+      jump: false,
+      punch: false,
+      headbutt: false,
+      grabHeld,
+      roll: false,
+      emote: null,
+    };
   }
 
   // Pick nearest/best target
@@ -218,8 +216,13 @@ export function computeBotInput(params: {
     const distToEnemy = Math.hypot(chosenTarget.x - self.x, chosenTarget.z - self.z);
     const holdingRanged =
       self.status.heldItem === 'snowball' || self.status.heldItem === 'candy_bomb';
+    const canSpin = canTriggerWeaponSpin(self.status.heldItem, self.status.heldAmmo);
     const meleeRange =
-      self.status.heldItem === 'shovel' ? SHOVEL_RANGE : PUNCH_RANGE;
+      self.status.heldItem === 'shovel'
+        ? SHOVEL_RANGE
+        : self.status.heldItem === 'sword'
+          ? SWORD_RANGE
+          : PUNCH_RANGE;
 
     if (holdingRanged && distToEnemy <= 8.5 && Math.random() < (difficulty === 'easy' ? 0.12 : 0.32)) {
       const dx = chosenTarget.x - self.x;
@@ -228,6 +231,15 @@ export function computeBotInput(params: {
       memory.moveX = dx / d;
       memory.moveZ = dz / d;
       punch = true;
+    } else if (
+      canSpin &&
+      difficulty !== 'easy' &&
+      distToEnemy <= 2.75 &&
+      self.status.spinCooldownUntil <= nowSec &&
+      Math.random() < (difficulty === 'hard' ? 0.36 : 0.2)
+    ) {
+      // Trigger 360° Sword/Shovel Whirlwind Spin via H slot
+      headbutt = true;
     } else if (
       !holdingRanged &&
       difficulty !== 'easy' &&
@@ -278,34 +290,15 @@ export function computeBotInput(params: {
     grabHeld = true;
   }
 
-  return applyInversionIfNeeded(
-    {
-      moveX: memory.moveX,
-      moveZ: memory.moveZ,
-      sprint,
-      jump,
-      punch,
-      headbutt,
-      grabHeld,
-      roll,
-      emote: null,
-    },
-    self.status,
-    nowSec,
-  );
-}
-
-function applyInversionIfNeeded(
-  input: FighterInput,
-  status: FighterStatus,
-  nowSec: number,
-): FighterInput {
-  if (status.invertedUntil > nowSec) {
-    return {
-      ...input,
-      moveX: -input.moveX,
-      moveZ: -input.moveZ,
-    };
-  }
-  return input;
+  return {
+    moveX: memory.moveX,
+    moveZ: memory.moveZ,
+    sprint,
+    jump,
+    punch,
+    headbutt,
+    grabHeld,
+    roll,
+    emote: null,
+  };
 }

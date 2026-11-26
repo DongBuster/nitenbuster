@@ -5,12 +5,12 @@ import {
   Footprints,
   Grab,
   Hand,
-  RotateCcw,
+  RotateCw,
   Shield,
   Wind,
   Zap,
 } from 'lucide-react';
-import { ITEM_META } from '../sim/combat';
+import { canTriggerWeaponSpin, ITEM_META } from '../sim/combat';
 import { formatCooldownLabel } from '../sim/cooldowns';
 import type {
   BrawlSkillId,
@@ -130,6 +130,8 @@ export function BrawlSkillBar({
   const headbuttReady = hud.playerHeadbuttReadyPct >= 0.99;
   const rollReady = hud.playerRollReadyPct >= 0.99;
   const isAirDropkick = !hud.playerGrounded && !heldMeta;
+  const canWeaponSpin = canTriggerWeaponSpin(hud.playerHeldItem, hud.playerHeldAmmo);
+  const isSwordSpin = canWeaponSpin && hud.playerHeldItem === 'sword';
 
   const skills: readonly SkillSlotDescriptor[] = [
     {
@@ -178,19 +180,44 @@ export function BrawlSkillBar({
     {
       id: 'headbutt',
       keyBadge: 'H',
-      label: 'Húc đầu',
-      title: 'Lao người húc đầu hất văng đối thủ (Phím H hoặc Chuột phải)',
-      ariaLabel: 'Húc đầu hất văng (Phím H)',
-      icon: <Flame className="h-4 w-4 text-orange-300" aria-hidden="true" />,
+      label: canWeaponSpin
+        ? isSwordSpin
+          ? 'Xoay kiếm'
+          : 'Xoay xẻng'
+        : 'Húc đầu',
+      title: canWeaponSpin
+        ? 'Xoay 360° quét văng mọi đối thủ xung quanh (Phím H hoặc Chuột phải)'
+        : 'Lao người húc đầu hất văng đối thủ (Phím H hoặc Chuột phải)',
+      ariaLabel: canWeaponSpin
+        ? isSwordSpin
+          ? 'Xoay kiếm 360 độ (Phím H)'
+          : 'Xoay xẻng 360 độ (Phím H)'
+        : 'Húc đầu hất văng (Phím H)',
+      icon: canWeaponSpin ? (
+        <RotateCw
+          className={`h-4 w-4 ${isSwordSpin ? 'text-sky-300' : 'text-amber-300'}`}
+          aria-hidden="true"
+        />
+      ) : (
+        <Flame className="h-4 w-4 text-orange-300" aria-hidden="true" />
+      ),
       readyPct: hud.playerHeadbuttReadyPct,
       cooldownLeft: hud.playerHeadbuttCooldownLeft,
       disabled: actionsLocked || isGrabbing,
       active: pressedSkills.headbutt,
       isToggleOrHold: false,
-      accentClass: headbuttReady
-        ? 'border-orange-400/55 bg-slate-900/90 text-orange-100 hover:border-orange-300'
-        : 'border-white/15 bg-slate-900/80 text-slate-300',
-      fillClass: 'bg-orange-400/22',
+      accentClass: canWeaponSpin
+        ? isSwordSpin
+          ? 'border-sky-300/80 bg-sky-500/20 text-sky-100 hover:border-sky-200'
+          : 'border-amber-300/80 bg-amber-500/20 text-amber-100 hover:border-amber-200'
+        : headbuttReady
+          ? 'border-orange-400/55 bg-slate-900/90 text-orange-100 hover:border-orange-300'
+          : 'border-white/15 bg-slate-900/80 text-slate-300',
+      fillClass: canWeaponSpin
+        ? isSwordSpin
+          ? 'bg-sky-400/24'
+          : 'bg-amber-400/24'
+        : 'bg-orange-400/22',
     },
     {
       id: 'grab',
@@ -419,11 +446,10 @@ export function BrawlSkillBar({
         })}
       </div>
 
-      {/* Grab Target Notice + Active Buffs / Debuffs */}
+      {/* Grab Target Notice + Active Buffs */}
       {(hud.playerGrabbingName ||
         hud.playerSpeedLeft > 0 ||
-        hud.playerShieldLeft > 0 ||
-        hud.playerInverted) && (
+        hud.playerShieldLeft > 0) && (
         <>
           <span
             role="separator"
@@ -446,12 +472,6 @@ export function BrawlSkillBar({
               <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/25 px-2 py-0.5 text-amber-200">
                 <Shield className="h-3 w-3" aria-hidden="true" />
                 <span>{hud.playerShieldLeft.toFixed(1)}s</span>
-              </span>
-            )}
-            {hud.playerInverted && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-purple-500/35 px-2 py-0.5 text-purple-200">
-                <RotateCcw className="h-3 w-3" aria-hidden="true" />
-                <span>Đảo phím!</span>
               </span>
             )}
           </div>

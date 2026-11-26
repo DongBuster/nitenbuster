@@ -107,11 +107,50 @@ export function ItemPickups({ runtime }: { runtime: BrawlWorldRuntime }) {
         </group>
       ))}
 
-      {/* Transient Impact Bursts */}
+      {/* Transient Impact Bursts, Spin Rings & Movement Snow Dust */}
       {effects.map((fx) => {
         const age = Math.max(0, runtime.nowSec - fx.createdAt);
+        const opacity = Math.max(0, 1 - age / 0.48);
+
+        if (fx.kind === 'dust') {
+          const dustScale = 0.28 + age * 1.15;
+          return (
+            <mesh
+              key={fx.id}
+              position={[fx.x, fx.y + age * 0.6, fx.z]}
+              scale={dustScale}
+            >
+              <sphereGeometry args={[0.32, 8, 6]} />
+              <meshBasicMaterial
+                color={fx.color}
+                transparent
+                opacity={opacity * 0.42}
+              />
+            </mesh>
+          );
+        }
+
+        if (fx.kind === 'spin') {
+          const ringScale = 0.9 + age * 3.8;
+          return (
+            <mesh
+              key={fx.id}
+              position={[fx.x, fx.y, fx.z]}
+              rotation={[-Math.PI / 2, 0, age * 10]}
+              scale={ringScale}
+            >
+              <ringGeometry args={[0.55, 0.85, 24]} />
+              <meshBasicMaterial
+                color={fx.color}
+                transparent
+                opacity={opacity * 0.7}
+                side={2}
+              />
+            </mesh>
+          );
+        }
+
         const scale = fx.kind === 'bomb' ? 1 + age * 8 : 0.7 + age * 3.5;
-        const opacity = Math.max(0, 1 - age / 0.5);
         return (
           <mesh key={fx.id} position={[fx.x, fx.y, fx.z]} scale={scale}>
             <sphereGeometry args={[0.55, 14, 12]} />
@@ -119,7 +158,7 @@ export function ItemPickups({ runtime }: { runtime: BrawlWorldRuntime }) {
               color={fx.color}
               transparent
               opacity={opacity * 0.65}
-              wireframe={fx.kind === 'taser' || fx.kind === 'boomerang'}
+              wireframe={fx.kind === 'taser'}
             />
           </mesh>
         );

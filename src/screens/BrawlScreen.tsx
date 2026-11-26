@@ -30,7 +30,6 @@ const INITIAL_HUD: HudSnapshot = {
   playerMaxBalance: 100,
   playerStunned: false,
   playerFrozen: false,
-  playerInverted: false,
   playerSpeedLeft: 0,
   playerShieldLeft: 0,
   playerRollReadyPct: 1,

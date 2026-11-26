@@ -13,6 +13,7 @@ import { BrawlMotionContext } from '../../scene3d/CharacterRig3D';
 import { getSpawnPoints } from '../sim/arenaLayout';
 import type { PartyMotionState } from '../sim/partyMotion';
 import type { EmoteKind, FighterConfig, HeldWeaponKind } from '../sim/types';
+import { HeldWeapon3D } from './ItemModel3D';
 import type { BrawlWorldRuntime } from './worldRuntime';
 
 const EMOTE_ICONS: Record<EmoteKind, string> = {
@@ -33,11 +34,12 @@ export function FighterActor({
 }) {
   const bodyRef = useRef<RapierRigidBody | null>(null);
   const visualRef = useRef<THREE.Group | null>(null);
+  const weaponRef = useRef<THREE.Group | null>(null);
+  const spinSlashRef = useRef<THREE.Mesh | null>(null);
   const partyMotionRef = useRef<PartyMotionState | null>(null);
   const freezeShellRef = useRef<THREE.Mesh | null>(null);
   const shieldShellRef = useRef<THREE.Mesh | null>(null);
   const stunStarsRef = useRef<THREE.Group | null>(null);
-  const invertRingRef = useRef<THREE.Mesh | null>(null);
 
   const [emotion, setEmotion] = useState<Emotion>('idle');
   const [heldItem, setHeldItem] = useState<HeldWeaponKind>(null);
@@ -76,18 +78,22 @@ export function FighterActor({
     const isWakeupImmune = entry.status.stunImmuneUntil > now;
     const isFrozen = entry.status.frozenUntil > now;
     const hasShield = entry.status.shieldUntil > now || isWakeupImmune;
-    const isInverted = entry.status.invertedUntil > now;
     const pm = entry.partyMotion;
     const act = pm.action;
     const prog = pm.actionProgress;
 
     if (visualRef.current) {
-      visualRef.current.rotation.y = entry.yaw;
+      visualRef.current.rotation.y =
+        act === 'spin_attack' ? entry.yaw + prog * Math.PI * 5 : entry.yaw;
 
       if (act === 'roll') {
         visualRef.current.rotation.x = prog * Math.PI * 2;
         visualRef.current.rotation.z = pm.tiltZ.value * 0.5;
         visualRef.current.position.y = 0;
+      } else if (act === 'spin_attack') {
+        visualRef.current.rotation.x = 0.14;
+        visualRef.current.rotation.z = Math.sin(prog * Math.PI * 5) * 0.14;
+        visualRef.current.position.y = Math.sin(prog * Math.PI) * 0.14;
       } else if (act === 'dropkick') {
         const kickPitch = -1.28 * Math.sin(Math.min(1, prog * 1.6) * (Math.PI / 2));
         visualRef.current.rotation.x = kickPitch;
@@ -131,15 +137,41 @@ export function FighterActor({
       }
     }
 
+    // Animate held weapon swing arc & horizontal 360° whirlwind sweep
+    if (weaponRef.current) {
+      if (act === 'spin_attack') {
+        weaponRef.current.position.set(0.75, 0.92, 0.48);
+        weaponRef.current.rotation.set(Math.PI / 2, 0, -Math.PI / 2);
+      } else if (act === 'punch_left' || act === 'punch_right') {
+        const swing = Math.sin(prog * Math.PI);
+        weaponRef.current.position.set(0.55, 0.9 + swing * 0.12, 0.48 + swing * 0.35);
+        weaponRef.current.rotation.set(
+          0.55 + swing * 1.15,
+          (act === 'punch_left' ? 0.65 : -0.65) * swing,
+          -0.28,
+        );
+      } else {
+        const idleBob = Math.sin(clock.elapsedTime * 4) * 0.04;
+        weaponRef.current.position.set(0.54, 0.88 + idleBob, 0.46);
+        weaponRef.current.rotation.set(0.55, 0, -0.24);
+      }
+    }
+
+    if (spinSlashRef.current) {
+      const spinning = act === 'spin_attack';
+      spinSlashRef.current.visible = spinning;
+      if (spinning) {
+        spinSlashRef.current.rotation.z -= 0.45;
+        const pulse = 1 + Math.sin(prog * Math.PI) * 0.22;
+        spinSlashRef.current.scale.set(pulse, pulse, 1);
+      }
+    }
+
     if (freezeShellRef.current) freezeShellRef.current.visible = isFrozen;
     if (shieldShellRef.current) shieldShellRef.current.visible = hasShield;
     if (stunStarsRef.current) {
       stunStarsRef.current.visible = isStunned;
       if (isStunned) stunStarsRef.current.rotation.y += 0.12;
-    }
-    if (invertRingRef.current) {
-      invertRingRef.current.visible = isInverted;
-      if (isInverted) invertRingRef.current.rotation.z -= 0.08;
     }
 
     // Throttle low-frequency React UI state sync
@@ -193,38 +225,29 @@ export function FighterActor({
           />
         </BrawlMotionContext.Provider>
 
-        {/* Held weapon mesh in front hand */}
-        {heldItem === 'snowball' && (
-          <mesh position={[0.45, 0.75, 0.55]} castShadow>
-            <sphereGeometry args={[0.28, 16, 14]} />
-            <meshStandardMaterial color="#E0F2FE" roughness={0.4} />
-          </mesh>
-        )}
-        {heldItem === 'candy_bomb' && (
-          <group position={[0.45, 0.82, 0.55]}>
-            <mesh castShadow>
-              <sphereGeometry args={[0.3, 16, 14]} />
-              <meshStandardMaterial color="#F43F5E" roughness={0.35} />
-            </mesh>
-            <mesh position={[0, 0.34, 0]}>
-              <cylinderGeometry args={[0.04, 0.04, 0.2, 8]} />
-              <meshStandardMaterial color="#FACC15" emissive="#F59E0B" emissiveIntensity={0.8} />
-            </mesh>
-          </group>
-        )}
-        {heldItem === 'shovel' && (
-          <group position={[0.52, 0.88, 0.45]} rotation={[0.6, 0, -0.25]}>
-            <mesh position={[0, 0.3, 0]} castShadow>
-              <cylinderGeometry args={[0.05, 0.05, 1.15, 8]} />
-              <meshStandardMaterial color="#B45309" roughness={0.65} />
-            </mesh>
-            <mesh position={[0, 0.95, 0]} castShadow>
-              <boxGeometry args={[0.42, 0.46, 0.08]} />
-              <meshStandardMaterial color="#94A3B8" metalness={0.55} roughness={0.35} />
-            </mesh>
+        {/* Held sculpted weapon mesh animated in useFrame */}
+        {heldItem && (
+          <group ref={weaponRef} position={[0.54, 0.88, 0.46]} rotation={[0.55, 0, -0.24]}>
+            <HeldWeapon3D kind={heldItem} nowSec={runtime.nowSec} />
           </group>
         )}
       </group>
+
+      {/* 360° Whirlwind Spin slash ring */}
+      <mesh
+        ref={spinSlashRef}
+        position={[0, 0.72, 0]}
+        rotation={[-Math.PI / 2, 0, 0]}
+        visible={false}
+      >
+        <ringGeometry args={[1.05, 1.85, 28]} />
+        <meshBasicMaterial
+          color={heldItem === 'shovel' ? '#F59E0B' : '#38BDF8'}
+          transparent
+          opacity={0.55}
+          side={2}
+        />
+      </mesh>
 
       {/* Freeze ice cube shell */}
       <mesh ref={freezeShellRef} position={[0, 0.75, 0]} visible={false}>
@@ -267,21 +290,6 @@ export function FighterActor({
           );
         })}
       </group>
-
-      {/* Boomerang control inversion halo */}
-      <mesh
-        ref={invertRingRef}
-        position={[0, 1.62, 0]}
-        rotation={[Math.PI / 2, 0, 0]}
-        visible={false}
-      >
-        <torusGeometry args={[0.46, 0.045, 8, 24]} />
-        <meshStandardMaterial
-          color="#C084FC"
-          emissive="#A855F7"
-          emissiveIntensity={0.9}
-        />
-      </mesh>
 
       {/* Floating nameplate + balance meter + emote */}
       {alive && (

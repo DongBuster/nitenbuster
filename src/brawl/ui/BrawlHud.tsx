@@ -156,8 +156,8 @@ export function BrawlHud({
                 <div className="grid grid-cols-1 gap-y-1 sm:grid-cols-2 sm:gap-x-4">
                   <span><strong>WASD + Shift</strong>: Chạy / Nước rút</span>
                   <span><strong>Space</strong>: Nhảy</span>
-                  <span><strong>J / Chuột trái</strong>: Đấm (Trên không: Đá bay!)</span>
-                  <span><strong>H / Chuột phải</strong>: Húc đầu</span>
+                  <span><strong>J / Chuột trái</strong>: Đấm / Dùng vũ khí (Trên không: Đá bay!)</span>
+                  <span><strong>H / Chuột phải</strong>: Húc đầu (Kiếm/Xẻng: Xoay 360°)</span>
                   <span><strong>Giữ/Nhả K</strong>: Nắm & Xoay ném</span>
                   <span><strong>L</strong>: Lăn né · <strong>1–4</strong>: Emote</span>
                 </div>
@@ -282,7 +282,7 @@ export function BrawlHud({
               Tạm Dừng
             </h2>
             <p className="mt-2 text-xs text-slate-300">
-              WASD + Shift chạy · Space nhảy · J đấm (trên không: đá bay) · H húc đầu · K nắm ném · L lăn né
+              WASD + Shift chạy · Space nhảy · J đấm / đá bay · H húc đầu (Kiếm/Xẻng: xoay 360°) · K nắm ném · L lăn né
             </p>
             <div className="mt-5 flex flex-col gap-2.5">
               <button

@@ -225,7 +225,8 @@ export function BrawlSetupPanel({
                   <li>• Đúng <strong>3 hiệp đấu</strong>: Hạng 1 <strong>+3đ</strong> · Hạng 2 <strong>+2đ</strong> · Hạng 3 <strong>+1đ</strong>.</li>
                   <li>• Đánh hết thanh thăng bằng để đối phương <strong>choáng ngã</strong>, sau đó <strong>giữ K</strong> kéo ném ra khỏi mép sàn!</li>
                   <li>• Vành đai sàn lục giác <strong>sụp dần sau mỗi 12s</strong> thu hẹp diện tích.</li>
-                  <li>• Nhặt lá bài PAWS rơi tự do: Kem Đá, Tia Chớp, Vỏ Chuối để lật ngược tình thế.</li>
+                  <li>• Nhặt <strong>Kiếm Băng</strong> hoặc <strong>Xẻng Tuyết</strong> rồi bấm <strong>H</strong> để <strong>Xoay 360°</strong> quét văng đối thủ!</li>
+                  <li>• Nhặt Thẻ Kem Đá, Thẻ Tia Chớp, Bom Kẹo để lật ngược tình thế.</li>
                 </ul>
               </div>
             </div>

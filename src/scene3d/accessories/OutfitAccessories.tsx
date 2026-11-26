@@ -1,5 +1,11 @@
 import * as THREE from 'three';
 import type { OutfitAnchor } from '../accessoryAnchors';
+import {
+  computeJerseyChestMount,
+  getCurvedBadgeGeometry,
+  getMuCrestTexture,
+  getMuKitMarkTexture,
+} from './muCrestGeometry';
 
 let cachedShirtShellGeo: THREE.LatheGeometry | null = null;
 
@@ -44,11 +50,13 @@ function ShoulderSleeveCap({
   anchor,
   sleeveColor,
   cuffColor,
+  stripeColor,
 }: {
   side: -1 | 1;
   anchor: OutfitAnchor;
   sleeveColor: string;
   cuffColor: string;
+  stripeColor?: string;
 }) {
   return (
     <group
@@ -67,6 +75,17 @@ function ShoulderSleeveCap({
         <torusGeometry args={[0.14, 0.018, 10, 20]} />
         <meshStandardMaterial color={cuffColor} roughness={0.65} />
       </mesh>
+      {stripeColor &&
+        ([-0.032, 0, 0.032] as const).map((zOff) => (
+          <mesh
+            key={zOff}
+            position={[side * 0.133, -0.025, zOff]}
+            rotation={[0, 0, -side * 0.15]}
+          >
+            <boxGeometry args={[0.012, 0.145, 0.014]} />
+            <meshStandardMaterial color={stripeColor} roughness={0.55} />
+          </mesh>
+        ))}
     </group>
   );
 }
@@ -74,8 +93,15 @@ function ShoulderSleeveCap({
 export function MuJerseyMesh({ anchor }: { anchor: OutfitAnchor }) {
   const shellGeo = getShirtShellGeometry();
   const [sx, sy, sz] = anchor.scale;
-  const frontZ = anchor.z + 0.97 * sz;
   const backZ = anchor.z - 1.068 * sz;
+
+  const crestMount = computeJerseyChestMount(anchor, 1, 0.155, 0.018);
+  const crestGeo = getCurvedBadgeGeometry(0.185, 0.195, 0.95);
+  const crestTex = getMuCrestTexture();
+
+  const kitMarkMount = computeJerseyChestMount(anchor, -1, 0.165, 0.017);
+  const kitMarkGeo = getCurvedBadgeGeometry(0.115, 0.115, 0.95);
+  const kitMarkTex = getMuKitMarkTexture();
 
   return (
     <group name="accessory-mu-jersey">
@@ -119,7 +145,7 @@ export function MuJerseyMesh({ anchor }: { anchor: OutfitAnchor }) {
         <meshStandardMaterial color="#F8FAFC" roughness={0.7} />
       </mesh>
 
-      {/* Short red-and-white shoulder sleeve cuffs */}
+      {/* Short red-and-white shoulder sleeve cuffs with 3 athletic stripes */}
       {([-1, 1] as const).map((side) => (
         <ShoulderSleeveCap
           key={side}
@@ -127,46 +153,49 @@ export function MuJerseyMesh({ anchor }: { anchor: OutfitAnchor }) {
           anchor={anchor}
           sleeveColor="#DA291C"
           cuffColor="#F8FAFC"
+          stripeColor="#F8FAFC"
         />
       ))}
 
-      {/* Front-left golden & red MU crest shield emblem */}
-      <group
-        position={[0.145, anchor.y + 0.17 * sy, frontZ]}
-        rotation={[-0.14, 0.25, 0]}
-      >
-        <mesh castShadow>
-          <cylinderGeometry args={[0.068, 0.052, 0.022, 6]} />
+      {/* Front-left curved Manchester United club crest badge */}
+      {crestTex && (
+        <mesh
+          name="mu-jersey-club-crest"
+          geometry={crestGeo}
+          position={crestMount.position}
+          rotation={crestMount.rotation}
+        >
           <meshStandardMaterial
-            color="#FACC15"
-            metalness={0.55}
-            roughness={0.28}
+            map={crestTex}
+            transparent
+            alphaTest={0.18}
+            roughness={0.34}
+            metalness={0.12}
+            polygonOffset
+            polygonOffsetFactor={-1}
           />
         </mesh>
-        <mesh position={[0, 0, 0.008]} rotation={[Math.PI / 2, 0, 0]}>
-          <cylinderGeometry args={[0.044, 0.034, 0.016, 6]} />
-          <meshStandardMaterial color="#B91C1C" roughness={0.5} />
-        </mesh>
-        <mesh position={[0, 0.006, 0.016]}>
-          <octahedronGeometry args={[0.022, 0]} />
-          <meshStandardMaterial
-            color="#FEF08A"
-            emissive="#F59E0B"
-            emissiveIntensity={0.25}
-            metalness={0.6}
-            roughness={0.2}
-          />
-        </mesh>
-      </group>
+      )}
 
-      {/* Front-right subtle white sponsor stripe */}
-      <mesh
-        position={[-0.135, anchor.y + 0.17 * sy, frontZ]}
-        rotation={[-0.14, -0.25, 0]}
-      >
-        <boxGeometry args={[0.08, 0.028, 0.018]} />
-        <meshStandardMaterial color="#F8FAFC" roughness={0.5} />
-      </mesh>
+      {/* Front-right curved 3-bar white athletic kit emblem */}
+      {kitMarkTex && (
+        <mesh
+          name="mu-jersey-kit-mark"
+          geometry={kitMarkGeo}
+          position={kitMarkMount.position}
+          rotation={kitMarkMount.rotation}
+        >
+          <meshStandardMaterial
+            map={kitMarkTex}
+            transparent
+            alphaTest={0.18}
+            roughness={0.45}
+            metalness={0.05}
+            polygonOffset
+            polygonOffsetFactor={-1}
+          />
+        </mesh>
+      )}
 
       {/* Iconic #7 white numeral accent on upper-mid back of jersey */}
       <group

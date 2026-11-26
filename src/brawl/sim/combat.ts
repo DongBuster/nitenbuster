@@ -3,8 +3,8 @@ import {
   SHIELD_KNOCKBACK_MULT,
   STUN_BASE_SEC,
   STUN_MAX_SEC,
-} from './constants';
-import type { FighterStatus, ItemKind } from './types';
+} from './constants.ts';
+import type { FighterStatus, HeldWeaponKind, ItemKind } from './types.ts';
 
 export interface ItemMetaInfo {
   label: string;
@@ -22,19 +22,19 @@ export const ITEM_META: Record<ItemKind, ItemMetaInfo> = {
     isPawsCard: false,
     shortHint: 'Ném đẩy lùi (x3)',
   },
+  sword: {
+    label: 'Kiếm Băng',
+    emoji: '⚔️',
+    color: '#38BDF8',
+    isPawsCard: false,
+    shortHint: 'Chém nhanh + H xoay 360° (x5)',
+  },
   shovel: {
     label: 'Xẻng Tuyết',
     emoji: '⛏️',
     color: '#F59E0B',
     isPawsCard: false,
-    shortHint: 'Đánh xa + lực mạnh (x4)',
-  },
-  cocoa: {
-    label: 'Ca Cao Nóng',
-    emoji: '☕',
-    color: '#D97706',
-    isPawsCard: false,
-    shortHint: 'Hồi đầy thăng bằng',
+    shortHint: 'Đập mạnh + H xoay 360° (x4)',
   },
   skates: {
     label: 'Giày Trượt Băng',
@@ -71,14 +71,14 @@ export const ITEM_META: Record<ItemKind, ItemMetaInfo> = {
     isPawsCard: true,
     shortHint: 'Choáng xung quanh',
   },
-  card_boomerang: {
-    label: 'Thẻ Vòng Xoay',
-    emoji: '🪃',
-    color: '#C084FC',
-    isPawsCard: true,
-    shortHint: 'Đảo phím đối thủ 5s',
-  },
 };
+
+export function canTriggerWeaponSpin(
+  heldItem: HeldWeaponKind,
+  heldAmmo: number,
+): boolean {
+  return (heldItem === 'sword' || heldItem === 'shovel') && heldAmmo > 0;
+}
 
 export function createInitialFighterStatus(id: string): FighterStatus {
   return {
@@ -89,12 +89,12 @@ export function createInitialFighterStatus(id: string): FighterStatus {
     stunnedUntil: 0,
     stunImmuneUntil: 0,
     frozenUntil: 0,
-    invertedUntil: 0,
     speedBoostUntil: 0,
     shieldUntil: 0,
     rollCooldownUntil: 0,
     punchCooldownUntil: 0,
     headbuttCooldownUntil: 0,
+    spinCooldownUntil: 0,
     dropkickCooldownUntil: 0,
     heldItem: null,
     heldAmmo: 0,
@@ -169,15 +169,14 @@ export function computeHitOutcome(params: {
 }
 
 const WEIGHTED_POOL: Array<{ kind: ItemKind; weight: number }> = [
-  { kind: 'snowball', weight: 16 },
-  { kind: 'shovel', weight: 15 },
+  { kind: 'sword', weight: 17 },
+  { kind: 'shovel', weight: 16 },
+  { kind: 'snowball', weight: 15 },
   { kind: 'candy_bomb', weight: 14 },
-  { kind: 'cocoa', weight: 10 },
-  { kind: 'skates', weight: 10 },
-  { kind: 'shield', weight: 10 },
-  { kind: 'card_freeze', weight: 9 },
+  { kind: 'skates', weight: 11 },
+  { kind: 'shield', weight: 11 },
+  { kind: 'card_freeze', weight: 8 },
   { kind: 'card_taser', weight: 8 },
-  { kind: 'card_boomerang', weight: 8 },
 ];
 
 const TOTAL_WEIGHT = WEIGHTED_POOL.reduce((acc, e) => acc + e.weight, 0);

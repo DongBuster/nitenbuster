@@ -50,6 +50,8 @@ describe('partyMotion spring & action solver', () => {
           punchHand: 'right',
           headbuttUntil: 0,
           headbuttDuration: 0.34,
+          spinUntil: 0,
+          spinDuration: 0.56,
           dropkickUntil: 0,
           dropkickDuration: 0.52,
           dropkickSlideUntil: 0,
@@ -93,6 +95,8 @@ describe('partyMotion spring & action solver', () => {
         punchHand: 'left',
         headbuttUntil: 0,
         headbuttDuration: 0.34,
+        spinUntil: 0,
+        spinDuration: 0.56,
         dropkickUntil: 0,
         dropkickDuration: 0.52,
         dropkickSlideUntil: 0,
@@ -130,6 +134,8 @@ describe('partyMotion spring & action solver', () => {
       punchHand: 'left' as const,
       headbuttUntil: 0,
       headbuttDuration: 0.34,
+      spinUntil: 0,
+      spinDuration: 0.56,
       dropkickUntil: 0,
       dropkickDuration: 0.52,
       dropkickSlideUntil: 0,
@@ -146,8 +152,13 @@ describe('partyMotion spring & action solver', () => {
     stepPartyMotion(state, { ...base, punchUntil: 2.12, headbuttUntil: 2.17 }, 0.016);
     assert.equal(state.action, 'headbutt');
 
-    // Dropkick overrides headbutt
-    stepPartyMotion(state, { ...base, headbuttUntil: 2.17, dropkickUntil: 2.26, grounded: false }, 0.016);
+    // Spin attack overrides headbutt & punch
+    stepPartyMotion(state, { ...base, headbuttUntil: 2.17, spinUntil: 2.28 }, 0.016);
+    assert.equal(state.action, 'spin_attack');
+    assert.ok(state.actionProgress > 0.45 && state.actionProgress < 0.55);
+
+    // Dropkick overrides spin_attack
+    stepPartyMotion(state, { ...base, spinUntil: 2.28, dropkickUntil: 2.26, grounded: false }, 0.016);
     assert.equal(state.action, 'dropkick');
 
     // Stunned overrides everything

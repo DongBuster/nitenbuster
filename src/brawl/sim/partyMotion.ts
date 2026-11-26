@@ -6,6 +6,7 @@ export type PartyActionKind =
   | 'punch_left'
   | 'punch_right'
   | 'headbutt'
+  | 'spin_attack'
   | 'dropkick'
   | 'dropkick_slide'
   | 'roll'
@@ -65,6 +66,8 @@ export interface PartyMotionFrameInput {
   punchHand: 'left' | 'right';
   headbuttUntil: number;
   headbuttDuration: number;
+  spinUntil: number;
+  spinDuration: number;
   dropkickUntil: number;
   dropkickDuration: number;
   dropkickSlideUntil: number;
@@ -177,6 +180,9 @@ export function stepPartyMotion(
   } else if (now < input.rollUntil) {
     action = 'roll';
     progress = clamp(1 - (input.rollUntil - now) / Math.max(0.05, input.rollDuration), 0, 1);
+  } else if (now < input.spinUntil) {
+    action = 'spin_attack';
+    progress = clamp(1 - (input.spinUntil - now) / Math.max(0.05, input.spinDuration), 0, 1);
   } else if (now < input.headbuttUntil) {
     action = 'headbutt';
     progress = clamp(1 - (input.headbuttUntil - now) / Math.max(0.05, input.headbuttDuration), 0, 1);
@@ -236,10 +242,12 @@ export function stepPartyMotion(
   const targetSquash =
     action === 'headbutt'
       ? 1.1
-      : action === 'dropkick'
-        ? 1.08
-        : state.sprinting
-          ? 1 + Math.sin(state.walkPhase * 2) * 0.05
-          : 1.0;
+      : action === 'spin_attack'
+        ? 0.94
+        : action === 'dropkick'
+          ? 1.08
+          : state.sprinting
+            ? 1 + Math.sin(state.walkPhase * 2) * 0.05
+            : 1.0;
   stepSpring(state.squashY, targetSquash, 180, 17, safeDt);
 }

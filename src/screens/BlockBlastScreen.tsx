@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
   type PointerEvent as ReactPointerEvent,
+  type ReactNode,
   type RefObject,
 } from 'react';
 import {
@@ -19,8 +20,10 @@ import {
   Layers,
   Music,
   RotateCcw,
+  ShieldCheck,
   Sparkles,
   Trophy,
+  Users,
   Volume2,
   VolumeX,
   X,
@@ -52,6 +55,7 @@ import {
   type TrayPiece,
 } from '../blockblast/engine/types';
 import type { MatchAction, MatchReceipt } from '../blockblast/engine/verify';
+import type { BbEmoteEvent } from '../blockblast/online/protocol';
 import {
   GameOverDialog,
   HelpDialog,
@@ -74,8 +78,29 @@ import {
 import type { Emotion } from '../engine/types';
 import { useProfileStore } from '../store/profileStore';
 
+export interface BlockBlastRoomModeConfig {
+  roomCode: string;
+  matchId: string;
+  seed: number;
+  roundNumber: number;
+  isCountingDown: boolean;
+  countdownSeconds: number;
+  leaderboardDesktop: ReactNode;
+  leaderboardMobile: ReactNode;
+  lastEmote: BbEmoteEvent | null;
+  onProgress: (state: BlastGameState) => void;
+  onFinish: (
+    receipt: MatchReceipt,
+    finalState: BlastGameState,
+    settlement: { reward: number; isNewBest: boolean; valid: boolean },
+  ) => void;
+  onLeaveRoom: () => void;
+}
+
 export interface BlockBlastScreenProps {
   onBackToModeSelect: () => void;
+  onOpenRoomMode?: () => void;
+  roomMode?: BlockBlastRoomModeConfig;
 }
 
 interface MatchSession {
@@ -196,7 +221,18 @@ function generateMatchId(): string {
   return `bb-${Date.now().toString(36)}-${rand}`;
 }
 
-function createMatchSession(cookiesAtStart: number): MatchSession {
+function createMatchSession(
+  cookiesAtStart: number,
+  roomConfig?: BlockBlastRoomModeConfig,
+): MatchSession {
+  if (roomConfig) {
+    return {
+      matchId: roomConfig.matchId,
+      seed: roomConfig.seed,
+      initialCookies: cookiesAtStart,
+      rescueEligible: false,
+    };
+  }
   return {
     matchId: generateMatchId(),
     seed: generateSeed32(),
@@ -506,6 +542,8 @@ function useIsDesktopLg(): boolean {
  */
 export default function BlockBlastScreen({
   onBackToModeSelect,
+  onOpenRoomMode,
+  roomMode,
 }: BlockBlastScreenProps) {
   const {
     cookies,
@@ -521,9 +559,11 @@ export default function BlockBlastScreen({
   } = useProfileStore();
 
   const isDesktop = useIsDesktopLg();
+  const roomModeRef = useRef<BlockBlastRoomModeConfig | undefined>(roomMode);
+  roomModeRef.current = roomMode;
 
   const [match, setMatch] = useState<MatchBundle>(() => {
-    const initialSession = createMatchSession(cookies);
+    const initialSession = createMatchSession(cookies, roomMode);
     return {
       session: initialSession,
       state: createInitialState(initialSession.seed),
@@ -541,8 +581,17 @@ export default function BlockBlastScreen({
 
   const actionsRef = useRef<MatchAction[]>([]);
   const matchStartRef = useRef<number>(performance.now());
+  const wasCountingDownRef = useRef<boolean>(Boolean(roomMode?.isCountingDown));
   const bombPaidCountRef = useRef<number>(0);
   const settledRef = useRef<boolean>(false);
+
+  useEffect(() => {
+    const isCountingDown = Boolean(roomMode?.isCountingDown);
+    if (wasCountingDownRef.current && !isCountingDown) {
+      matchStartRef.current = performance.now();
+    }
+    wasCountingDownRef.current = isCountingDown;
+  }, [roomMode?.isCountingDown]);
 
   const boardRef = useRef<HTMLDivElement | null>(null);
   const floatingDragRef = useRef<HTMLDivElement | null>(null);
@@ -659,12 +708,14 @@ export default function BlockBlastScreen({
       };
 
       const result = recordBlockBlastResult(receipt);
-      setSettlement({
+      const summary: SettlementSummary = {
         reward: result.reward,
         isNewBest: result.isNewBest,
         valid: result.ok,
-      });
+      };
+      setSettlement(summary);
       playSfx(result.isNewBest ? 'win' : 'lose');
+      roomModeRef.current?.onFinish(receipt, finalState, summary);
     },
     [recordBlockBlastResult],
   );
@@ -921,34 +972,37 @@ export default function BlockBlastScreen({
           `Kết thúc ván! Tổng điểm ${outcome.nextState.score.toLocaleString('vi-VN')}.`,
         );
         settleMatch(outcome.nextState, activeSession);
-      } else if (outcome.nextState.phase === 'rescuePrompt') {
-        setLiveAnnouncement(
-          'Hết nước đi hợp lệ. Có thể dùng Bom Kẹo 3×3 để giải cứu bàn cờ.',
-        );
-      } else if (isBombBlast) {
-        setLiveAnnouncement(
-          `Đã kích nổ Bom Kẹo 3×3 tại hàng ${options.anchorRow + 1} cột ${options.anchorCol + 1}, phá ${outcome.destroyedByBomb.length} ô, cộng ${outcome.pointsEarned} điểm.${
-            outcome.stageUp
-              ? ` Lên Stage ${outcome.stageAfter}: ${stageThemeAfter.name}.`
-              : ''
-          } Tổng điểm ${outcome.nextState.score}.`,
-        );
-      } else if (lineCount > 0) {
-        setLiveAnnouncement(
-          `Đã đặt khối và ăn ${lineCount} dòng, cộng ${outcome.pointsEarned} điểm.${
-            outcome.allClear ? ' Quét sạch cả bàn!' : ''
-          }${
-            outcome.stageUp
-              ? ` Lên Stage ${outcome.stageAfter}: ${stageThemeAfter.name}.`
-              : ''
-          }${
-            outcome.streakAfter >= 2 ? ` Combo ${outcome.streakAfter}×.` : ''
-          } Tổng điểm ${outcome.nextState.score}.`,
-        );
       } else {
-        setLiveAnnouncement(
-          `Đã đặt khối, cộng ${outcome.pointsEarned} điểm. Tổng điểm ${outcome.nextState.score}.`,
-        );
+        roomModeRef.current?.onProgress(outcome.nextState);
+        if (outcome.nextState.phase === 'rescuePrompt') {
+          setLiveAnnouncement(
+            'Hết nước đi hợp lệ. Có thể dùng Bom Kẹo 3×3 để giải cứu bàn cờ.',
+          );
+        } else if (isBombBlast) {
+          setLiveAnnouncement(
+            `Đã kích nổ Bom Kẹo 3×3 tại hàng ${options.anchorRow + 1} cột ${options.anchorCol + 1}, phá ${outcome.destroyedByBomb.length} ô, cộng ${outcome.pointsEarned} điểm.${
+              outcome.stageUp
+                ? ` Lên Stage ${outcome.stageAfter}: ${stageThemeAfter.name}.`
+                : ''
+            } Tổng điểm ${outcome.nextState.score}.`,
+          );
+        } else if (lineCount > 0) {
+          setLiveAnnouncement(
+            `Đã đặt khối và ăn ${lineCount} dòng, cộng ${outcome.pointsEarned} điểm.${
+              outcome.allClear ? ' Quét sạch cả bàn!' : ''
+            }${
+              outcome.stageUp
+                ? ` Lên Stage ${outcome.stageAfter}: ${stageThemeAfter.name}.`
+                : ''
+            }${
+              outcome.streakAfter >= 2 ? ` Combo ${outcome.streakAfter}×.` : ''
+            } Tổng điểm ${outcome.nextState.score}.`,
+          );
+        } else {
+          setLiveAnnouncement(
+            `Đã đặt khối, cộng ${outcome.pointsEarned} điểm. Tổng điểm ${outcome.nextState.score}.`,
+          );
+        }
       }
     },
     [settleMatch, spawnBurst, triggerBoardShake, triggerPlacedPop],
@@ -998,6 +1052,11 @@ export default function BlockBlastScreen({
 
   const handleBombDetonate = useCallback(
     (r: number, c: number) => {
+      if (roomModeRef.current) {
+        setBombAiming(false);
+        updateBombHoverIfChanged(null);
+        return;
+      }
       const current = matchRef.current;
       if (!bombAimingRef.current) return;
       if (current.state.phase === 'gameOver' || current.state.candyBombUsed) {
@@ -1041,6 +1100,7 @@ export default function BlockBlastScreen({
   );
 
   const handleStartBombAim = useCallback(() => {
+    if (roomModeRef.current) return;
     const current = matchRef.current;
     if (
       current.state.phase === 'gameOver' ||
@@ -1107,6 +1167,7 @@ export default function BlockBlastScreen({
   }, [settleMatch, updateBombHoverIfChanged]);
 
   const handleReroll = useCallback(() => {
+    if (roomModeRef.current?.isCountingDown) return;
     const current = matchRef.current;
     if (
       current.state.phase !== 'playing' ||
@@ -1143,16 +1204,19 @@ export default function BlockBlastScreen({
         `Đã đổi khay mới nhưng không còn nước đi hợp lệ. Kết thúc ván với ${nextState.score} điểm.`,
       );
       settleMatch(nextState, current.session);
-    } else if (nextState.phase === 'rescuePrompt') {
-      setEmotion('shock');
-      setQuip('Khay mới hơi khó đặt! Thử Bom Kẹo 3×3 giải cứu không?');
-      setLiveAnnouncement(
-        'Đã đổi khay mới nhưng hết nước đi hợp lệ. Có thể dùng Bom Kẹo 3×3 giải cứu.',
-      );
     } else {
-      setEmotion('happy');
-      setQuip('Đổi gió 3 mảnh mới tinh! Xem đặt đâu cho đẹp nào.');
-      setLiveAnnouncement('Đã đổi khay 3 mảnh ghép mới miễn phí.');
+      roomModeRef.current?.onProgress(nextState);
+      if (nextState.phase === 'rescuePrompt') {
+        setEmotion('shock');
+        setQuip('Khay mới hơi khó đặt! Thử Bom Kẹo 3×3 giải cứu không?');
+        setLiveAnnouncement(
+          'Đã đổi khay mới nhưng hết nước đi hợp lệ. Có thể dùng Bom Kẹo 3×3 giải cứu.',
+        );
+      } else {
+        setEmotion('happy');
+        setQuip('Đổi gió 3 mảnh mới tinh! Xem đặt đâu cho đẹp nào.');
+        setLiveAnnouncement('Đã đổi khay 3 mảnh ghép mới miễn phí.');
+      }
     }
   }, [
     cancelActiveDrag,
@@ -1212,7 +1276,11 @@ export default function BlockBlastScreen({
 
   const handleSlotPointerDown = useCallback(
     (slotIndex: number, e: ReactPointerEvent<HTMLButtonElement>) => {
-      if (matchRef.current.state.phase !== 'playing' || bombAimingRef.current) {
+      if (
+        matchRef.current.state.phase !== 'playing' ||
+        bombAimingRef.current ||
+        roomModeRef.current?.isCountingDown
+      ) {
         return;
       }
       if (e.pointerType === 'mouse' && e.button !== 0) return;
@@ -1342,7 +1410,11 @@ export default function BlockBlastScreen({
   );
 
   const handleSlotKeySelect = useCallback((slotIndex: number) => {
-    if (matchRef.current.state.phase !== 'playing' || bombAimingRef.current) {
+    if (
+      matchRef.current.state.phase !== 'playing' ||
+      bombAimingRef.current ||
+      roomModeRef.current?.isCountingDown
+    ) {
       return;
     }
     if (!matchRef.current.state.tray[slotIndex]) return;
@@ -1398,6 +1470,7 @@ export default function BlockBlastScreen({
 
   const handleBoardCellClick = useCallback(
     (r: number, c: number) => {
+      if (roomModeRef.current?.isCountingDown) return;
       if (bombAimingRef.current) {
         handleBombDetonate(r, c);
         return;
@@ -1435,8 +1508,10 @@ export default function BlockBlastScreen({
     [commitPlace, handleBombDetonate, selectedSlot],
   );
 
-  const rescueModalOpen = state.phase === 'rescuePrompt' && !bombAiming;
-  const gameOverModalOpen = state.phase === 'gameOver' && !gameOverDismissed;
+  const rescueModalOpen =
+    !roomMode && state.phase === 'rescuePrompt' && !bombAiming;
+  const gameOverModalOpen =
+    !roomMode && state.phase === 'gameOver' && !gameOverDismissed;
   const anyDialogOpen =
     showHelp || showRestartConfirm || rescueModalOpen || gameOverModalOpen;
 
@@ -1538,8 +1613,10 @@ export default function BlockBlastScreen({
     state.phase === 'playing' &&
     !state.rerollUsed &&
     !bombAiming &&
-    !isTrayEmpty;
+    !isTrayEmpty &&
+    !roomMode?.isCountingDown;
   const canStartBomb =
+    !roomMode &&
     state.phase !== 'gameOver' &&
     !state.candyBombUsed &&
     cookies >= CANDY_BOMB_COST;
@@ -1554,22 +1631,35 @@ export default function BlockBlastScreen({
       <div className="mx-auto flex min-h-screen max-w-6xl flex-col gap-2 px-2.5 py-2.5 sm:gap-4 sm:px-6 sm:py-4 lg:px-8">
         {/* Top Bar */}
         <header className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-amber-500/25 bg-[#24150e]/95 px-2.5 py-2 shadow-lg sm:rounded-3xl sm:px-4 sm:py-3">
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             <button
               type="button"
               onClick={() => {
                 playSfx('click');
-                onBackToModeSelect();
+                if (roomMode) {
+                  roomMode.onLeaveRoom();
+                } else {
+                  onBackToModeSelect();
+                }
               }}
               className={`btn-tactile-wood inline-flex min-h-[36px] cursor-pointer items-center gap-1.5 rounded-xl border border-amber-900/60 px-2.5 py-1 text-xs font-extrabold text-amber-100 sm:rounded-2xl sm:px-3.5 sm:py-1.5 ${FOCUS_RING_CLASS}`}
             >
               <ArrowLeft aria-hidden="true" className="h-3.5 w-3.5 text-amber-300" />
-              <span>Đổi Chế Độ</span>
+              <span>{roomMode ? 'Rời Phòng' : 'Đổi Chế Độ'}</span>
             </button>
 
             <h1 className="font-display text-base font-black tracking-tight text-[#FFFBF4] sm:text-2xl">
               Block Blast PAWS
             </h1>
+
+            {roomMode && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/40 bg-emerald-950/75 px-2.5 py-1 text-[11px] font-black text-emerald-200">
+                <Users aria-hidden="true" className="h-3 w-3 text-emerald-300" />
+                <span>
+                  Phòng {roomMode.roomCode} · Ván #{roomMode.roundNumber}
+                </span>
+              </span>
+            )}
           </div>
 
           <div className="flex flex-wrap items-center gap-1 sm:gap-2">
@@ -1660,15 +1750,32 @@ export default function BlockBlastScreen({
               <HelpCircle aria-hidden="true" className="h-4 w-4" />
             </button>
 
-            <button
-              type="button"
-              onClick={handleRestartRequest}
-              aria-label="Chơi lại ván mới"
-              className={`btn-tactile-wood inline-flex min-h-[36px] min-w-[36px] cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-amber-800/60 px-2 py-1 text-xs font-extrabold text-amber-100 sm:px-3 ${FOCUS_RING_CLASS}`}
-            >
-              <RotateCcw aria-hidden="true" className="h-3.5 w-3.5 text-amber-300" />
-              <span className="hidden sm:inline">Chơi Lại</span>
-            </button>
+            {!roomMode && onOpenRoomMode && (
+              <button
+                type="button"
+                onClick={() => {
+                  playSfx('click');
+                  onOpenRoomMode();
+                }}
+                aria-label="Mở phòng đấu so tài điểm với bạn bè"
+                className={`btn-tactile-emerald inline-flex min-h-[36px] cursor-pointer items-center justify-center gap-1.5 rounded-xl px-2.5 py-1 text-xs font-black text-white sm:rounded-2xl sm:px-3.5 ${FOCUS_RING_CLASS}`}
+              >
+                <Users aria-hidden="true" className="h-3.5 w-3.5" />
+                <span>Phòng Đấu</span>
+              </button>
+            )}
+
+            {!roomMode && (
+              <button
+                type="button"
+                onClick={handleRestartRequest}
+                aria-label="Chơi lại ván mới"
+                className={`btn-tactile-wood inline-flex min-h-[36px] min-w-[36px] cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-amber-800/60 px-2 py-1 text-xs font-extrabold text-amber-100 sm:px-3 ${FOCUS_RING_CLASS}`}
+              >
+                <RotateCcw aria-hidden="true" className="h-3.5 w-3.5 text-amber-300" />
+                <span className="hidden sm:inline">Chơi Lại</span>
+              </button>
+            )}
           </div>
         </header>
 
@@ -1709,8 +1816,12 @@ export default function BlockBlastScreen({
               emotion={emotion}
               quip={quip}
               paused={anyDialogOpen}
-              compact={!isDesktop}
+              compact={!isDesktop || Boolean(roomMode)}
             />
+
+            {roomMode && (
+              <div className="hidden lg:block">{roomMode.leaderboardDesktop}</div>
+            )}
 
             {/* Stage & Lines Progress Card */}
             <section
@@ -1793,7 +1904,16 @@ export default function BlockBlastScreen({
                 </span>
               </button>
 
-              {bombAiming ? (
+              {roomMode ? (
+                <div
+                  aria-label="Luật phòng đấu công bằng Pure Skill"
+                  className="inline-flex min-h-[42px] items-center justify-center gap-1.5 rounded-2xl border border-emerald-400/35 bg-emerald-950/55 px-2.5 py-2 text-xs font-bold text-emerald-200 sm:min-h-[46px] sm:px-3"
+                >
+                  <ShieldCheck aria-hidden="true" className="h-4 w-4 shrink-0 text-emerald-300" />
+                  <span className="sm:hidden">Pure Skill</span>
+                  <span className="hidden sm:inline">Chung Seed · Không Bom Cookies</span>
+                </div>
+              ) : bombAiming ? (
                 <button
                   type="button"
                   onClick={handleCancelBombAim}
@@ -1835,6 +1955,12 @@ export default function BlockBlastScreen({
             aria-label="Bảng điểm, bàn cờ và khay mảnh ghép"
             className="flex flex-col items-center justify-center gap-2.5 lg:col-span-8 lg:gap-3.5"
           >
+            {roomMode && (
+              <div className="flex w-full justify-center lg:hidden">
+                {roomMode.leaderboardMobile}
+              </div>
+            )}
+
             <ScoreHeaderCard
               score={state.score}
               bestScore={blockBlastBestScore}
@@ -1844,6 +1970,18 @@ export default function BlockBlastScreen({
               pulse={scorePulse}
               reducedMotion={settings.reducedMotion}
             />
+
+            {roomMode?.lastEmote && (
+              <div
+                role="status"
+                className="flex items-center gap-2 rounded-full border border-amber-300/60 bg-[#2b180e]/95 px-4 py-1.5 text-xs font-black text-amber-100 shadow-lg"
+              >
+                <span className="text-base">{roomMode.lastEmote.emote}</span>
+                <span>
+                  {roomMode.lastEmote.name}: {roomMode.lastEmote.text}
+                </span>
+              </div>
+            )}
 
             {/* Contextual interaction banner */}
             {bombAiming && (
@@ -1922,29 +2060,51 @@ export default function BlockBlastScreen({
                 </div>
               )}
 
-            <BlockBoard
-              boardRef={boardRef}
-              grid={state.grid}
-              preview={preview}
-              bombHoverCell={bombHoverCell}
-              bombAiming={bombAiming}
-              colorblindMode={settings.colorblindMode}
-              reducedMotion={settings.reducedMotion}
-              bursts={bursts}
-              stageTheme={stageTheme}
-              boardShake={boardShake}
-              recentPlacedCells={recentPlacedCells}
-              onBoardCellClick={handleBoardCellClick}
-              onBoardPointerMove={handleBoardPointerMove}
-              onBoardPointerLeave={handleBoardPointerLeave}
-            />
+            <div className="relative flex w-full justify-center">
+              <BlockBoard
+                boardRef={boardRef}
+                grid={state.grid}
+                preview={preview}
+                bombHoverCell={bombHoverCell}
+                bombAiming={bombAiming}
+                colorblindMode={settings.colorblindMode}
+                reducedMotion={settings.reducedMotion}
+                bursts={bursts}
+                stageTheme={stageTheme}
+                boardShake={boardShake}
+                recentPlacedCells={recentPlacedCells}
+                onBoardCellClick={handleBoardCellClick}
+                onBoardPointerMove={handleBoardPointerMove}
+                onBoardPointerLeave={handleBoardPointerLeave}
+              />
+
+              {roomMode?.isCountingDown && (
+                <div
+                  aria-live="assertive"
+                  className="absolute inset-0 z-30 flex items-center justify-center rounded-3xl bg-[#120905]/80 backdrop-blur-[3px]"
+                >
+                  <div className="rounded-3xl border-2 border-emerald-300/60 bg-[#152820]/95 px-8 py-6 text-center shadow-2xl">
+                    <div className="text-xs font-black uppercase tracking-widest text-emerald-300">
+                      Chung Seed · Chuẩn Bị Xuất Phát
+                    </div>
+                    <div className="mt-1 font-display text-6xl font-black text-amber-200 tabular-nums drop-shadow">
+                      {Math.max(1, roomMode.countdownSeconds)}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
 
             <BlockTray
               tray={state.tray}
               draggingSlot={dragView?.slotIndex ?? null}
               selectedSlot={selectedSlot}
               fitStatus={fitStatus}
-              disabled={state.phase !== 'playing' || bombAiming}
+              disabled={
+                state.phase !== 'playing' ||
+                bombAiming ||
+                Boolean(roomMode?.isCountingDown)
+              }
               colorblindMode={settings.colorblindMode}
               stageTheme={stageTheme}
               onSlotPointerDown={handleSlotPointerDown}

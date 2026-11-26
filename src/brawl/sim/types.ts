@@ -11,16 +11,15 @@ export type MatchPhase =
 
 export type ItemKind =
   | 'snowball'
+  | 'sword'
   | 'shovel'
-  | 'cocoa'
   | 'skates'
   | 'shield'
   | 'candy_bomb'
   | 'card_freeze'
-  | 'card_taser'
-  | 'card_boomerang';
+  | 'card_taser';
 
-export type HeldWeaponKind = 'snowball' | 'shovel' | 'candy_bomb' | null;
+export type HeldWeaponKind = 'snowball' | 'sword' | 'shovel' | 'candy_bomb' | null;
 
 export type EmoteKind = 'wave' | 'dance' | 'taunt' | 'cheer';
 
@@ -42,12 +41,12 @@ export interface FighterStatus {
   stunnedUntil: number;
   stunImmuneUntil: number;
   frozenUntil: number;
-  invertedUntil: number;
   speedBoostUntil: number;
   shieldUntil: number;
   rollCooldownUntil: number;
   punchCooldownUntil: number;
   headbuttCooldownUntil: number;
+  spinCooldownUntil: number;
   dropkickCooldownUntil: number;
   heldItem: HeldWeaponKind;
   heldAmmo: number;
@@ -145,7 +144,7 @@ export interface HitEffect {
   y: number;
   z: number;
   color: string;
-  kind: 'punch' | 'bomb' | 'freeze' | 'taser' | 'boomerang' | 'pickup';
+  kind: 'punch' | 'bomb' | 'freeze' | 'taser' | 'pickup' | 'spin' | 'dust';
   createdAt: number;
 }
 
@@ -182,7 +181,6 @@ export interface HudSnapshot {
   playerMaxBalance: number;
   playerStunned: boolean;
   playerFrozen: boolean;
-  playerInverted: boolean;
   playerSpeedLeft: number;
   playerShieldLeft: number;
   playerRollReadyPct: number;

@@ -17,10 +17,11 @@ export const RING_SCHEDULE: Record<number, { warnAt: number; collapseAt: number 
 export const SUDDEN_DEATH_START_SEC = 82;
 export const SUDDEN_DEATH_INTERVAL_SEC = 4.0;
 
-export const MOVE_SPEED = 4.3;
-export const SPRINT_MULTIPLIER = 1.28;
+export const MOVE_SPEED = 4.45;
+export const SPRINT_MULTIPLIER = 1.3;
 export const SKATES_MULTIPLIER = 1.35;
-export const JUMP_VELOCITY = 6.6;
+export const JUMP_VELOCITY = 6.75;
+export const COYOTE_TIME_SEC = 0.11;
 export const GRAVITY = -24;
 export const ROLL_SPEED = 8.6;
 export const ROLL_DURATION = 0.28;
@@ -56,11 +57,32 @@ export const DROPKICK_BALANCE_DMG = 58;
 
 export const WAKEUP_ANIM_SEC = 0.38;
 
+export const SWORD_RANGE = 2.55;
+export const SWORD_COOLDOWN = 0.32;
+export const SWORD_KNOCKBACK = 6.8;
+export const SWORD_UP_BOOST = 2.1;
+export const SWORD_BALANCE_DMG = 40;
+export const SWORD_AMMO = 5;
+
 export const SHOVEL_RANGE = 2.65;
 export const SHOVEL_KNOCKBACK = 8.2;
 export const SHOVEL_UP_BOOST = 2.8;
 export const SHOVEL_BALANCE_DMG = 50;
 export const SHOVEL_AMMO = 4;
+
+export const SPIN_DURATION = 0.56;
+export const SPIN_COOLDOWN = 1.1;
+export const SPIN_AMMO_COST = 2;
+export const SWORD_SPIN_RANGE = 2.85;
+export const SWORD_SPIN_KNOCKBACK = 8.8;
+export const SWORD_SPIN_UP_BOOST = 2.6;
+export const SWORD_SPIN_BALANCE_DMG = 52;
+export const SWORD_SPIN_MOVE_MULT = 0.85;
+export const SHOVEL_SPIN_RANGE = 2.95;
+export const SHOVEL_SPIN_KNOCKBACK = 10.2;
+export const SHOVEL_SPIN_UP_BOOST = 3.6;
+export const SHOVEL_SPIN_BALANCE_DMG = 62;
+export const SHOVEL_SPIN_MOVE_MULT = 0.68;
 
 export const SNOWBALL_SPEED = 16;
 export const SNOWBALL_KNOCKBACK = 5.8;
@@ -89,8 +111,6 @@ export const CARD_FREEZE_RANGE = 6.5;
 export const CARD_FREEZE_SEC = 2.0;
 export const CARD_TASER_RADIUS = 4.0;
 export const CARD_TASER_STUN_SEC = 2.2;
-export const CARD_BOOMERANG_RANGE = 9.0;
-export const CARD_BOOMERANG_SEC = 5.0;
 
 export const HIT_STOP_SEC = 0.06;
 export const ITEM_SPAWN_INTERVAL_SEC = 4.5;

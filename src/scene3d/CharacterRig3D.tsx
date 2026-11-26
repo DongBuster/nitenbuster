@@ -242,6 +242,15 @@ export function useAnimalMotion(
         armRRotZ = 0.45 * p;
         earLRotX -= 0.45 * p;
         earRRotX -= 0.45 * p;
+      } else if (act === 'spin_attack') {
+        // Arms outstretched holding weapon horizontally while whirling 360°
+        armRRotX = -1.35;
+        armRRotZ = 0.65;
+        armLRotX = -0.35;
+        armLRotZ = -1.05;
+        earLRotZ -= 0.38;
+        earRRotZ += 0.38;
+        tailRotY += Math.sin(t * 28) * 0.65;
       } else if (act === 'dropkick' || act === 'dropkick_slide') {
         armLRotX = -0.95;
         armRRotX = -0.95;

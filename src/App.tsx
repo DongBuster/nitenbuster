@@ -1,4 +1,4 @@
-import { Component, Suspense, lazy, useState, type ReactNode } from 'react';
+import { Component, Suspense, lazy, useEffect, useState, type ReactNode } from 'react';
 import { AlertTriangle, ArrowLeft, Boxes, Home } from 'lucide-react';
 import { MainMenuScreen } from './screens/MainMenuScreen';
 import { Game3DScreen } from './screens/Game3DScreen';
@@ -6,10 +6,14 @@ import { Showcase3D } from './screens/Showcase3D';
 import { OnlineLobbyScreen } from './screens/OnlineLobbyScreen';
 import { OnlineGame3DScreen } from './screens/OnlineGame3DScreen';
 import { ModeSelectScreen } from './screens/ModeSelectScreen';
+import { normalizeRoomCode } from './online/sanitize';
 import { useOnlineRoom } from './online/useOnlineRoom';
 
 const LazyBrawlScreen = lazy(() => import('./screens/BrawlScreen'));
 const LazyBlockBlastScreen = lazy(() => import('./screens/BlockBlastScreen'));
+const LazyBlockBlastRoomContainer = lazy(
+  () => import('./blockblast/ui/BlockBlastRoomContainer'),
+);
 
 type AppScreen =
   | 'modeSelect'
@@ -18,7 +22,8 @@ type AppScreen =
   | 'online'
   | 'studio3d'
   | 'brawl'
-  | 'blockblast';
+  | 'blockblast'
+  | 'blockblastRoom';
 
 function OnlineModeContainer({ onBackToMenu }: { onBackToMenu: () => void }) {
   const room = useOnlineRoom();
@@ -120,8 +125,29 @@ function ModeLoadingFallback({
   );
 }
 
+function readInitialBbRoomCode(): string {
+  if (typeof window === 'undefined') return '';
+  const raw = new URLSearchParams(window.location.search).get('bbRoom') ?? '';
+  const clean = normalizeRoomCode(raw);
+  return clean.length >= 4 ? clean : '';
+}
+
 export function App() {
-  const [screen, setScreen] = useState<AppScreen>('modeSelect');
+  const [initialBbRoomCode] = useState<string>(() => readInitialBbRoomCode());
+  const [screen, setScreen] = useState<AppScreen>(() =>
+    readInitialBbRoomCode() ? 'blockblastRoom' : 'modeSelect',
+  );
+
+  useEffect(() => {
+    if (!initialBbRoomCode || typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.has('bbRoom')) {
+      params.delete('bbRoom');
+      const nextSearch = params.toString();
+      const nextUrl = `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ''}${window.location.hash}`;
+      window.history.replaceState({}, '', nextUrl);
+    }
+  }, [initialBbRoomCode]);
 
   return (
     <div className="relative min-h-screen">
@@ -219,6 +245,33 @@ export function App() {
             }
           >
             <LazyBlockBlastScreen
+              onBackToModeSelect={() => setScreen('modeSelect')}
+              onOpenRoomMode={() => setScreen('blockblastRoom')}
+            />
+          </Suspense>
+        </ModeErrorBoundary>
+      )}
+
+      {screen === 'blockblastRoom' && (
+        <ModeErrorBoundary
+          title="Không thể mở Phòng Đấu Block Blast"
+          fallbackMessage="Không thể khởi tạo phòng đấu trực tuyến Block Blast PAWS."
+          bgClass="bg-[#1a100b]"
+          onBack={() => setScreen('modeSelect')}
+        >
+          <Suspense
+            fallback={
+              <ModeLoadingFallback
+                label="Đang tải Phòng Đấu Block Blast..."
+                bgClass="bg-[#1a100b]"
+                spinnerClass="border-emerald-400"
+                textClass="text-emerald-200"
+              />
+            }
+          >
+            <LazyBlockBlastRoomContainer
+              initialRoomCode={initialBbRoomCode}
+              onSwitchToSolo={() => setScreen('blockblast')}
               onBackToModeSelect={() => setScreen('modeSelect')}
             />
           </Suspense>

@@ -127,7 +127,7 @@ export function ModeSelectScreen({
       genreBadge: 'Giải Đố Xếp Khối · 8×8',
       badgeIcon: <LayoutGrid className="h-3.5 w-3.5 text-emerald-300" />,
       description:
-        'Kéo thả 29 hình khối kẹo gỗ lên lưới 8×8, kích hoạt chuỗi Combo, Đổi Khay và Bom Kẹo 3×3 cùng thú bông 3D cổ vũ!',
+        'Kéo thả 29 hình khối kẹo gỗ lên lưới 8×8, dọn sạch bàn lên Stage mới hoặc tạo Phòng Đấu chung seed so tài với bạn bè!',
       bannerWebp: '/banners/block-blast-banner.webp',
       bannerJpg: '/banners/block-blast-banner.jpg',
       bannerAlt:
@@ -141,7 +141,7 @@ export function ModeSelectScreen({
       ctaTextClass: 'text-white',
       specs: [
         { label: 'Lối chơi', value: 'Giải đố lưới 8×8' },
-        { label: 'PAWS Twist', value: 'Đổi Khay · Bom Kẹo 3×3' },
+        { label: 'Phòng đấu', value: 'Solo & 2–8 người Online' },
         { label: 'Kỷ lục', value: `${blockBlastBestScore.toLocaleString()} điểm` },
       ],
       onEnter: onSelectBlockBlast,

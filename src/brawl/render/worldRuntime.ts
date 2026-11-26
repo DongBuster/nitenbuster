@@ -13,6 +13,7 @@ import {
   type BotMemory,
 } from '../sim/botBrain';
 import {
+  canTriggerWeaponSpin,
   computeHitOutcome,
   createInitialFighterStatus,
   ITEM_META,
@@ -25,12 +26,11 @@ import {
   BOMB_KNOCKBACK,
   BOMB_RADIUS,
   BOMB_UP_BOOST,
-  CARD_BOOMERANG_RANGE,
-  CARD_BOOMERANG_SEC,
   CARD_FREEZE_RANGE,
   CARD_FREEZE_SEC,
   CARD_TASER_RADIUS,
   CARD_TASER_STUN_SEC,
+  COYOTE_TIME_SEC,
   DROPKICK_BALANCE_DMG,
   DROPKICK_COOLDOWN,
   DROPKICK_DURATION,
@@ -70,6 +70,11 @@ import {
   SHOVEL_BALANCE_DMG,
   SHOVEL_KNOCKBACK,
   SHOVEL_RANGE,
+  SHOVEL_SPIN_BALANCE_DMG,
+  SHOVEL_SPIN_KNOCKBACK,
+  SHOVEL_SPIN_MOVE_MULT,
+  SHOVEL_SPIN_RANGE,
+  SHOVEL_SPIN_UP_BOOST,
   SHOVEL_UP_BOOST,
   SKATES_DURATION,
   SKATES_MULTIPLIER,
@@ -78,9 +83,23 @@ import {
   SNOWBALL_KNOCKBACK,
   SNOWBALL_SPEED,
   SHIELD_DURATION,
+  SPIN_AMMO_COST,
+  SPIN_COOLDOWN,
+  SPIN_DURATION,
   SPRINT_MULTIPLIER,
   SUDDEN_DEATH_INTERVAL_SEC,
   SUDDEN_DEATH_START_SEC,
+  SWORD_AMMO,
+  SWORD_BALANCE_DMG,
+  SWORD_COOLDOWN,
+  SWORD_KNOCKBACK,
+  SWORD_RANGE,
+  SWORD_SPIN_BALANCE_DMG,
+  SWORD_SPIN_KNOCKBACK,
+  SWORD_SPIN_MOVE_MULT,
+  SWORD_SPIN_RANGE,
+  SWORD_SPIN_UP_BOOST,
+  SWORD_UP_BOOST,
   THROW_IMPULSE,
   THROW_UP_IMPULSE,
   WAKEUP_ANIM_SEC,
@@ -124,6 +143,8 @@ export interface FighterRuntime {
   walkPhase: number;
   grounded: boolean;
   wasGrounded: boolean;
+  coyoteUntil: number;
+  lastDustAt: number;
   rollUntil: number;
   rollDirX: number;
   rollDirZ: number;
@@ -133,6 +154,9 @@ export interface FighterRuntime {
   headbuttDirX: number;
   headbuttDirZ: number;
   headbuttHitIds: Set<string>;
+  spinUntil: number;
+  spinWeaponKind: 'sword' | 'shovel' | null;
+  spinHitIds: Set<string>;
   dropkickUntil: number;
   dropkickSlideUntil: number;
   dropkickDirX: number;
@@ -194,6 +218,8 @@ export class BrawlWorldRuntime {
         walkPhase: Math.random() * Math.PI * 2,
         grounded: true,
         wasGrounded: true,
+        coyoteUntil: 0,
+        lastDustAt: 0,
         rollUntil: 0,
         rollDirX: 0,
         rollDirZ: 1,
@@ -203,6 +229,9 @@ export class BrawlWorldRuntime {
         headbuttDirX: 0,
         headbuttDirZ: 1,
         headbuttHitIds: new Set<string>(),
+        spinUntil: 0,
+        spinWeaponKind: null,
+        spinHitIds: new Set<string>(),
         dropkickUntil: 0,
         dropkickSlideUntil: 0,
         dropkickDirX: 0,
@@ -376,24 +405,28 @@ export class BrawlWorldRuntime {
       playSfx('pickup');
       return;
     }
+    if (kind === 'sword') {
+      fighter.status.heldItem = 'sword';
+      fighter.status.heldAmmo = SWORD_AMMO;
+      playSfx('pickup');
+      if (!fighter.config.isBot) {
+        this.setBanner('⚔️ Nhặt Kiếm Băng! J chém nhanh · H xoay 360°!');
+      }
+      return;
+    }
     if (kind === 'shovel') {
       fighter.status.heldItem = 'shovel';
       fighter.status.heldAmmo = SHOVEL_AMMO;
       playSfx('pickup');
+      if (!fighter.config.isBot) {
+        this.setBanner('⛏️ Nhặt Xẻng Tuyết! J đập mạnh · H xoay 360°!');
+      }
       return;
     }
     if (kind === 'candy_bomb') {
       fighter.status.heldItem = 'candy_bomb';
       fighter.status.heldAmmo = 1;
       playSfx('pickup');
-      return;
-    }
-    if (kind === 'cocoa') {
-      fighter.status.balance = fighter.status.maxBalance;
-      playSfx('potion');
-      if (!fighter.config.isBot) {
-        this.setBanner('☕ Uống Ca Cao nóng! Hồi đầy thăng bằng!');
-      }
       return;
     }
     if (kind === 'skates') {
@@ -476,26 +509,6 @@ export class BrawlWorldRuntime {
       );
       return;
     }
-
-    if (kind === 'card_boomerang') {
-      const target = this.findNearestEnemy(fighter, CARD_BOOMERANG_RANGE);
-      playSfx('boomerang');
-      if (target) {
-        target.status.invertedUntil = now + CARD_BOOMERANG_SEC;
-        this.spawnHitEffect(
-          target.pos.x,
-          target.pos.y + 0.9,
-          target.pos.z,
-          '#C084FC',
-          'boomerang',
-        );
-        this.setBanner(
-          `🪃 ${fighter.config.name} ném Vòng Xoay! ${target.config.name} bị đảo phím 5s!`,
-        );
-      } else {
-        this.setBanner(`🪃 ${fighter.config.name} nhặt Thẻ Vòng Xoay!`);
-      }
-    }
   }
 
   private findNearestEnemy(
@@ -520,9 +533,14 @@ export class BrawlWorldRuntime {
 
   private performPunchOrUseItem(fighter: FighterRuntime): void {
     const now = this.nowSec;
-    if (fighter.status.punchCooldownUntil > now) return;
-    fighter.status.punchCooldownUntil = now + PUNCH_COOLDOWN;
-    fighter.punchAnimUntil = now + 0.24;
+    if (fighter.status.punchCooldownUntil > now || now < fighter.spinUntil) return;
+    const usingSword =
+      fighter.status.heldItem === 'sword' && fighter.status.heldAmmo > 0;
+    const usingShovel =
+      fighter.status.heldItem === 'shovel' && fighter.status.heldAmmo > 0;
+    fighter.status.punchCooldownUntil =
+      now + (usingSword ? SWORD_COOLDOWN : PUNCH_COOLDOWN);
+    fighter.punchAnimUntil = now + (usingSword ? 0.22 : 0.24);
     fighter.punchHand = fighter.punchHand === 'left' ? 'right' : 'left';
 
     const fwdX = Math.sin(fighter.yaw);
@@ -582,13 +600,32 @@ export class BrawlWorldRuntime {
       );
     }
 
-    // Melee attack: regular punch or Snow Shovel swing
-    const usingShovel =
-      fighter.status.heldItem === 'shovel' && fighter.status.heldAmmo > 0;
-    const range = usingShovel ? SHOVEL_RANGE : PUNCH_RANGE;
-    const knockback = usingShovel ? SHOVEL_KNOCKBACK : PUNCH_KNOCKBACK;
-    const upBoost = usingShovel ? SHOVEL_UP_BOOST : PUNCH_UP_BOOST;
-    const balanceDmg = usingShovel ? SHOVEL_BALANCE_DMG : PUNCH_BALANCE_DMG;
+    // Melee attack: regular punch, Ice Sword slash, or Snow Shovel swing
+    const range = usingShovel
+      ? SHOVEL_RANGE
+      : usingSword
+        ? SWORD_RANGE
+        : PUNCH_RANGE;
+    const knockback = usingShovel
+      ? SHOVEL_KNOCKBACK
+      : usingSword
+        ? SWORD_KNOCKBACK
+        : PUNCH_KNOCKBACK;
+    const upBoost = usingShovel
+      ? SHOVEL_UP_BOOST
+      : usingSword
+        ? SWORD_UP_BOOST
+        : PUNCH_UP_BOOST;
+    const balanceDmg = usingShovel
+      ? SHOVEL_BALANCE_DMG
+      : usingSword
+        ? SWORD_BALANCE_DMG
+        : PUNCH_BALANCE_DMG;
+    const hitColor = usingShovel
+      ? '#F59E0B'
+      : usingSword
+        ? '#38BDF8'
+        : '#FFF7ED';
 
     let hitCount = 0;
     for (const target of this.fighters.values()) {
@@ -599,7 +636,8 @@ export class BrawlWorldRuntime {
       if (dist > range || Math.abs(target.pos.y - fighter.pos.y) > 1.7) continue;
 
       const dot = dist > 0.05 ? (dx * fwdX + dz * fwdZ) / dist : 1;
-      if (dot < PUNCH_ARC_COS && dist > 0.9) continue;
+      const arcCos = usingSword ? -0.05 : PUNCH_ARC_COS;
+      if (dot < arcCos && dist > 0.9) continue;
 
       hitCount += 1;
       this.applyKnockbackHit(
@@ -609,13 +647,13 @@ export class BrawlWorldRuntime {
         knockback,
         upBoost,
         balanceDmg,
-        usingShovel ? '#F59E0B' : '#FFF7ED',
+        hitColor,
         'punch',
       );
     }
 
     if (hitCount > 0) {
-      if (usingShovel) {
+      if (usingShovel || usingSword) {
         fighter.status.heldAmmo -= 1;
         if (fighter.status.heldAmmo <= 0) fighter.status.heldItem = null;
         playSfx('shovel');
@@ -625,11 +663,40 @@ export class BrawlWorldRuntime {
       this.hitStopUntil = now + HIT_STOP_SEC;
       this.shakeIntensity = Math.max(
         this.shakeIntensity,
-        usingShovel ? 0.36 : 0.2,
+        usingShovel ? 0.36 : usingSword ? 0.28 : 0.2,
       );
     } else {
       playSfx('draw');
     }
+  }
+
+  private performWeaponSpin(fighter: FighterRuntime): void {
+    const now = this.nowSec;
+    const weapon = fighter.status.heldItem;
+    if (
+      (weapon !== 'sword' && weapon !== 'shovel') ||
+      fighter.status.heldAmmo <= 0 ||
+      fighter.status.spinCooldownUntil > now ||
+      now < fighter.spinUntil ||
+      now < fighter.dropkickUntil ||
+      now < fighter.rollUntil
+    ) {
+      return;
+    }
+
+    fighter.status.spinCooldownUntil = now + SPIN_COOLDOWN;
+    fighter.status.heldAmmo = Math.max(0, fighter.status.heldAmmo - SPIN_AMMO_COST);
+    fighter.spinUntil = now + SPIN_DURATION;
+    fighter.spinWeaponKind = weapon;
+    fighter.spinHitIds.clear();
+    this.spawnHitEffect(
+      fighter.pos.x,
+      fighter.pos.y + 0.72,
+      fighter.pos.z,
+      weapon === 'sword' ? '#38BDF8' : '#F59E0B',
+      'spin',
+    );
+    playSfx('shovel');
   }
 
   private performHeadbutt(fighter: FighterRuntime): void {
@@ -683,16 +750,46 @@ export class BrawlWorldRuntime {
   private stepActiveLungeHits(fighter: FighterRuntime): void {
     const now = this.nowSec;
     const isDropkicking = now < fighter.dropkickUntil;
-    const isHeadbutting = !isDropkicking && now < fighter.headbuttUntil;
-    if (!isDropkicking && !isHeadbutting) return;
+    const isSpinning = !isDropkicking && now < fighter.spinUntil;
+    const isHeadbutting = !isDropkicking && !isSpinning && now < fighter.headbuttUntil;
+    if (!isDropkicking && !isSpinning && !isHeadbutting) return;
 
+    const isSwordSpin = fighter.spinWeaponKind === 'sword';
     const dirX = isDropkicking ? fighter.dropkickDirX : fighter.headbuttDirX;
     const dirZ = isDropkicking ? fighter.dropkickDirZ : fighter.headbuttDirZ;
-    const range = isDropkicking ? DROPKICK_RANGE : HEADBUTT_RANGE;
-    const knockback = isDropkicking ? DROPKICK_KNOCKBACK : HEADBUTT_KNOCKBACK;
-    const upBoost = isDropkicking ? DROPKICK_UP_BOOST : HEADBUTT_UP_BOOST;
-    const balanceDmg = isDropkicking ? DROPKICK_BALANCE_DMG : HEADBUTT_BALANCE_DMG;
-    const hitSet = isDropkicking ? fighter.dropkickHitIds : fighter.headbuttHitIds;
+    const range = isDropkicking
+      ? DROPKICK_RANGE
+      : isSpinning
+        ? isSwordSpin
+          ? SWORD_SPIN_RANGE
+          : SHOVEL_SPIN_RANGE
+        : HEADBUTT_RANGE;
+    const knockback = isDropkicking
+      ? DROPKICK_KNOCKBACK
+      : isSpinning
+        ? isSwordSpin
+          ? SWORD_SPIN_KNOCKBACK
+          : SHOVEL_SPIN_KNOCKBACK
+        : HEADBUTT_KNOCKBACK;
+    const upBoost = isDropkicking
+      ? DROPKICK_UP_BOOST
+      : isSpinning
+        ? isSwordSpin
+          ? SWORD_SPIN_UP_BOOST
+          : SHOVEL_SPIN_UP_BOOST
+        : HEADBUTT_UP_BOOST;
+    const balanceDmg = isDropkicking
+      ? DROPKICK_BALANCE_DMG
+      : isSpinning
+        ? isSwordSpin
+          ? SWORD_SPIN_BALANCE_DMG
+          : SHOVEL_SPIN_BALANCE_DMG
+        : HEADBUTT_BALANCE_DMG;
+    const hitSet = isDropkicking
+      ? fighter.dropkickHitIds
+      : isSpinning
+        ? fighter.spinHitIds
+        : fighter.headbuttHitIds;
 
     let hitAny = false;
     for (const target of this.fighters.values()) {
@@ -707,10 +804,12 @@ export class BrawlWorldRuntime {
       const dx = target.pos.x - fighter.pos.x;
       const dz = target.pos.z - fighter.pos.z;
       const dist = Math.hypot(dx, dz);
-      if (dist > range || Math.abs(target.pos.y - fighter.pos.y) > 1.7) continue;
+      if (dist > range || Math.abs(target.pos.y - fighter.pos.y) > 1.75) continue;
 
-      const dot = dist > 0.05 ? (dx * dirX + dz * dirZ) / dist : 1;
-      if (dot < 0.05 && dist > 0.95) continue;
+      if (!isSpinning) {
+        const dot = dist > 0.05 ? (dx * dirX + dz * dirZ) / dist : 1;
+        if (dot < 0.05 && dist > 0.95) continue;
+      }
 
       hitSet.add(target.config.id);
       hitAny = true;
@@ -721,17 +820,23 @@ export class BrawlWorldRuntime {
         knockback,
         upBoost,
         balanceDmg,
-        isDropkicking ? '#38BDF8' : '#FBBF24',
-        'punch',
+        isDropkicking
+          ? '#38BDF8'
+          : isSpinning
+            ? isSwordSpin
+              ? '#38BDF8'
+              : '#F59E0B'
+            : '#FBBF24',
+        isSpinning ? 'spin' : 'punch',
       );
     }
 
     if (hitAny) {
-      playSfx('punch');
+      playSfx(isSpinning ? 'shovel' : 'punch');
       this.hitStopUntil = now + HIT_STOP_SEC;
       this.shakeIntensity = Math.max(
         this.shakeIntensity,
-        isDropkicking ? 0.42 : 0.3,
+        isDropkicking ? 0.42 : isSpinning ? 0.4 : 0.3,
       );
     }
   }
@@ -769,6 +874,8 @@ export class BrawlWorldRuntime {
         punchHand: fighter.punchHand,
         headbuttUntil: fighter.headbuttUntil,
         headbuttDuration: HEADBUTT_DURATION,
+        spinUntil: fighter.spinUntil,
+        spinDuration: SPIN_DURATION,
         dropkickUntil: fighter.dropkickUntil,
         dropkickDuration: DROPKICK_DURATION,
         dropkickSlideUntil: fighter.dropkickSlideUntil,
@@ -1056,13 +1163,21 @@ export class BrawlWorldRuntime {
         });
       } else {
         input = params.humanInput;
-        if (fighter.status.invertedUntil > this.nowSec) {
-          input = {
-            ...input,
-            moveX: -input.moveX,
-            moveZ: -input.moveZ,
-          };
-        }
+      }
+
+      // Clear depleted melee weapon cleanly once spin animation finishes
+      if (
+        fighter.status.heldItem &&
+        fighter.status.heldAmmo <= 0 &&
+        this.nowSec >= fighter.spinUntil
+      ) {
+        fighter.status.heldItem = null;
+        fighter.spinWeaponKind = null;
+      }
+
+      // Refresh coyote-time jump window while grounded
+      if (fighter.grounded) {
+        fighter.coyoteUntil = this.nowSec + COYOTE_TIME_SEC;
       }
 
       // Trigger emote anytime while alive
@@ -1108,14 +1223,18 @@ export class BrawlWorldRuntime {
       ) {
         fighter.dropkickUntil = 0;
         fighter.dropkickSlideUntil = this.nowSec + DROPKICK_SLIDE_DURATION;
+        this.spawnHitEffect(fighter.pos.x, 0.16, fighter.pos.z, '#E0F2FE', 'dust');
+      } else if (fighter.grounded && !fighter.wasGrounded && curVel.y < -3.0) {
+        this.spawnHitEffect(fighter.pos.x, 0.14, fighter.pos.z, '#E2E8F0', 'dust');
       }
 
       // Check item pickups
       this.tryPickUpItem(fighter);
 
-      // Update facing yaw smoothly (approx 1/3 sec for 180 deg) with momentum slowdown on sharp turns
+      // Update facing yaw smoothly with crisp ground responsiveness
       const moveLen = Math.hypot(input.moveX, input.moveZ);
       let turnSpeedFactor = 1;
+      const isSpinning = this.nowSec < fighter.spinUntil;
       const inLockedLunge =
         this.nowSec <= fighter.rollUntil ||
         this.nowSec <= fighter.dropkickUntil ||
@@ -1127,11 +1246,11 @@ export class BrawlWorldRuntime {
         let diff = targetYaw - fighter.yaw;
         while (diff > Math.PI) diff -= Math.PI * 2;
         while (diff < -Math.PI) diff += Math.PI * 2;
-        const turnRate = fighter.grounded ? (input.sprint ? 7.8 : 9.5) : 3.5;
+        const turnRate = fighter.grounded ? (input.sprint ? 8.8 : 11.2) : 4.2;
         fighter.yaw += diff * Math.min(1, dt * turnRate);
-        // Slow down briefly when reversing direction sharply
+        // Subtle slowdown when reversing direction sharply
         const alignment = Math.cos(diff);
-        turnSpeedFactor = THREE.MathUtils.clamp(0.5 + 0.5 * alignment, 0.42, 1);
+        turnSpeedFactor = THREE.MathUtils.clamp(0.6 + 0.4 * alignment, 0.52, 1);
       }
 
       // Roll dodge activation
@@ -1139,7 +1258,8 @@ export class BrawlWorldRuntime {
         input.roll &&
         fighter.status.rollCooldownUntil <= this.nowSec &&
         !fighter.status.grabbingTargetId &&
-        this.nowSec > fighter.dropkickUntil
+        this.nowSec > fighter.dropkickUntil &&
+        !isSpinning
       ) {
         fighter.status.rollCooldownUntil = this.nowSec + ROLL_COOLDOWN;
         fighter.rollUntil = this.nowSec + ROLL_DURATION;
@@ -1151,12 +1271,23 @@ export class BrawlWorldRuntime {
         playSfx('roll');
       }
 
-      // Horizontal movement with weighty Party Animals inertia (sprint boost + skid on sharp turns)
-      const isSprinting = Boolean(input.sprint && moveLen > 0.08 && !fighter.status.grabbingTargetId);
+      // Horizontal movement with crisp Party Animals inertia (sprint boost + spin steering)
+      const isSprinting = Boolean(
+        input.sprint &&
+          moveLen > 0.08 &&
+          !fighter.status.grabbingTargetId &&
+          !isSpinning,
+      );
+      const spinMoveMult = isSpinning
+        ? fighter.spinWeaponKind === 'sword'
+          ? SWORD_SPIN_MOVE_MULT
+          : SHOVEL_SPIN_MOVE_MULT
+        : 1;
       const speedMult =
         (fighter.status.speedBoostUntil > this.nowSec ? SKATES_MULTIPLIER : 1) *
         (isSprinting ? SPRINT_MULTIPLIER : 1) *
         (fighter.status.grabbingTargetId ? 0.72 : 1) *
+        spinMoveMult *
         turnSpeedFactor;
 
       let nextVx = curVel.x;
@@ -1189,19 +1320,38 @@ export class BrawlWorldRuntime {
         const rate = fighter.grounded
           ? isAccelerating
             ? isSprinting
-              ? 6.8
-              : 8.2
-            : 5.8
-          : 1.7;
+              ? 8.2
+              : 9.6
+            : 6.8
+          : 2.2;
         const alpha = Math.min(1, dt * rate);
         nextVx = THREE.MathUtils.lerp(curVel.x, desiredVx, alpha);
         nextVz = THREE.MathUtils.lerp(curVel.z, desiredVz, alpha);
       }
 
+      // Periodic snow dust puffs while sprinting or sliding
+      if (
+        fighter.grounded &&
+        (isSprinting || this.nowSec <= fighter.dropkickSlideUntil) &&
+        this.nowSec - fighter.lastDustAt > 0.18
+      ) {
+        fighter.lastDustAt = this.nowSec;
+        this.spawnHitEffect(
+          fighter.pos.x - Math.sin(fighter.yaw) * 0.25,
+          0.14,
+          fighter.pos.z - Math.cos(fighter.yaw) * 0.25,
+          '#E2E8F0',
+          'dust',
+        );
+      }
+
       let nextVy = curVel.y;
-      if (input.jump && fighter.grounded && this.nowSec > fighter.dropkickSlideUntil) {
+      const canJump = fighter.grounded || this.nowSec <= fighter.coyoteUntil;
+      if (input.jump && canJump && this.nowSec > fighter.dropkickSlideUntil) {
         nextVy = JUMP_VELOCITY;
         fighter.grounded = false;
+        fighter.coyoteUntil = 0;
+        this.spawnHitEffect(fighter.pos.x, 0.14, fighter.pos.z, '#E2E8F0', 'dust');
       }
 
       fighter.body.setLinvel({ x: nextVx, y: nextVy, z: nextVz }, true);
@@ -1264,9 +1414,13 @@ export class BrawlWorldRuntime {
         fighter.wasGrabHeld = false;
       }
 
-      // Punch / Airborne Dropkick / Headbutt / Weapon attack
+      // Punch / Airborne Dropkick / Headbutt or Weapon Spin (H) / Weapon attack
       if (input.headbutt && !fighter.status.grabbingTargetId) {
-        this.performHeadbutt(fighter);
+        if (canTriggerWeaponSpin(fighter.status.heldItem, fighter.status.heldAmmo)) {
+          this.performWeaponSpin(fighter);
+        } else {
+          this.performHeadbutt(fighter);
+        }
       }
 
       if (input.punch && !fighter.status.grabbingTargetId) {
@@ -1370,15 +1524,21 @@ export class BrawlWorldRuntime {
     const playerGrounded = Boolean(human?.grounded);
     const holdingRanged =
       st?.heldItem === 'snowball' || st?.heldItem === 'candy_bomb';
+    const holdingSpinWeapon = canTriggerWeaponSpin(
+      st?.heldItem ?? null,
+      st?.heldAmmo ?? 0,
+    );
     const useDropkickCd = !playerGrounded && !holdingRanged;
     const punchCd = useDropkickCd
       ? getCooldownState(st?.dropkickCooldownUntil ?? 0, now, DROPKICK_COOLDOWN)
-      : getCooldownState(st?.punchCooldownUntil ?? 0, now, PUNCH_COOLDOWN);
-    const headbuttCd = getCooldownState(
-      st?.headbuttCooldownUntil ?? 0,
-      now,
-      HEADBUTT_COOLDOWN,
-    );
+      : getCooldownState(
+          st?.punchCooldownUntil ?? 0,
+          now,
+          st?.heldItem === 'sword' ? SWORD_COOLDOWN : PUNCH_COOLDOWN,
+        );
+    const headbuttCd = holdingSpinWeapon
+      ? getCooldownState(st?.spinCooldownUntil ?? 0, now, SPIN_COOLDOWN)
+      : getCooldownState(st?.headbuttCooldownUntil ?? 0, now, HEADBUTT_COOLDOWN);
     const rollCd = getCooldownState(
       st?.rollCooldownUntil ?? 0,
       now,
@@ -1401,7 +1561,6 @@ export class BrawlWorldRuntime {
       playerMaxBalance: st?.maxBalance ?? 100,
       playerStunned: Boolean(st && st.stunnedUntil > now),
       playerFrozen: Boolean(st && st.frozenUntil > now),
-      playerInverted: Boolean(st && st.invertedUntil > now),
       playerSpeedLeft: st ? Math.max(0, st.speedBoostUntil - now) : 0,
       playerShieldLeft: st ? Math.max(0, st.shieldUntil - now) : 0,
       playerRollReadyPct: rollCd.readyPct,

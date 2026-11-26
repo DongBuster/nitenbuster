@@ -31,7 +31,7 @@ const FOCUS_RING_CLASS =
  * Ensures HTML `autofocus` content attribute is present on the safe/primary button
  * so native `dialog.showModal()` focuses it reliably even after prior mounts.
  */
-function setNativeAutofocus(el: HTMLButtonElement | null): void {
+export function setNativeAutofocus(el: HTMLButtonElement | null): void {
   if (el) {
     el.autofocus = true;
   }
@@ -112,20 +112,22 @@ function useNativeModal(
   return openRef;
 }
 
-interface NativeModalShellProps {
+export interface NativeModalShellProps {
   open: boolean;
   titleId: string;
   describedById?: string;
   lightDismiss?: boolean;
+  dialogClassName?: string;
   onResult: (returnValue: string) => void;
   children: ReactNode;
 }
 
-function NativeModalShell({
+export function NativeModalShell({
   open,
   titleId,
   describedById,
   lightDismiss = false,
+  dialogClassName,
   onResult,
   children,
 }: NativeModalShellProps) {
@@ -154,7 +156,7 @@ function NativeModalShell({
       aria-describedby={describedById}
       onClose={handleClose}
       {...extraAttrs}
-      className={BASE_DIALOG_CLASS}
+      className={dialogClassName ?? BASE_DIALOG_CLASS}
     >
       <div className="p-6">{children}</div>
     </dialog>
