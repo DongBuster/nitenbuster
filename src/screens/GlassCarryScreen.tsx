@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { playSfx, setAudioPreferences } from '../audio/soundEngine';
+import { MinecartScene } from '../coop/maps/minecart/MinecartScene';
+import { RaftScene } from '../coop/maps/raft/RaftScene';
+import {
+  DEFAULT_COOP_MAP_ID,
+  getCoopMapMeta,
+  type CoopMapId,
+} from '../coop/maps/registry';
+import { RopeScene } from '../coop/maps/rope/RopeScene';
 import { useGlassRoom } from '../glass/online/useGlassRoom';
 import { GlassScene } from '../glass/render/GlassScene';
 import type { GlassHudSnapshot } from '../glass/render/renderTypes';
@@ -22,15 +30,23 @@ interface GlassSettlementSummary {
   isNewBest: boolean;
 }
 
-function createInitialHudSnapshot(): GlassHudSnapshot {
-  const firstStage = GLASS_COURSE.stages[0];
+function createInitialHudSnapshot(
+  mapId: CoopMapId = DEFAULT_COOP_MAP_ID,
+): GlassHudSnapshot {
+  const meta = getCoopMapMeta(mapId);
+  const firstGlassStage = GLASS_COURSE.stages[0];
   return {
+    mapId,
     matchTime: 0,
-    stageNumber: firstStage?.number ?? 1,
-    stageName: firstStage?.name ?? 'Cổng Gỗ Khởi Động',
+    stageNumber: 1,
+    stageName:
+      mapId === 'glass_carry'
+        ? (firstGlassStage?.name ?? meta.title)
+        : meta.title,
     checkpointIndex: 0,
     totalCheckpoints: Math.max(0, GLASS_COURSE.checkpoints.length - 1),
     shatters: 0,
+    failureLabel: meta.failureLabel,
     glassHp: GLASS_MAX_HP,
     glassMaxHp: GLASS_MAX_HP,
     glassStress: 0,
@@ -43,26 +59,27 @@ function createInitialHudSnapshot(): GlassHudSnapshot {
 }
 
 /**
- * Top-level screen orchestrating Glass Carry Co-op lobby, 3D co-op scene,
- * non-blocking HUD, audio sync, and end-of-course settlement.
+ * Top-level screen orchestrating PAWS Duo Co-op 3D lobby, 4-map 3D co-op scenes,
+ * adaptive non-blocking HUD, audio sync, and end-of-course settlement.
  */
 export function GlassCarryScreen({
   initialRoomCode,
   onBackToModeSelect,
 }: GlassCarryScreenProps) {
   const room = useGlassRoom();
-  const { settings, updateSettings, recordGlassMatchResult } = useProfileStore();
+  const { settings, updateSettings, recordCoopMatchResult } = useProfileStore();
+  const { leaveRoom } = room;
 
   const [hud, setHud] = useState<GlassHudSnapshot>(() =>
-    createInitialHudSnapshot(),
+    createInitialHudSnapshot(room.selectedMap),
   );
   const [settlement, setSettlement] = useState<GlassSettlementSummary | null>(
     null,
   );
   const settledMatchIdRef = useRef<string | null>(null);
   const prevPhaseRef = useRef(room.phase);
-  const leaveRoomRef = useRef(room.leaveRoom);
-  leaveRoomRef.current = room.leaveRoom;
+  const leaveRoomRef = useRef(leaveRoom);
+  leaveRoomRef.current = leaveRoom;
 
   // Sync audio preference with profile settings
   useEffect(() => {
@@ -81,12 +98,16 @@ export function GlassCarryScreen({
     }
   }, [room.phase, room.countdownSec]);
 
-  // Reset HUD snapshot between matches or when returning to lobby/idle
+  // Reset HUD snapshot between matches or when entering countdown/lobby/idle
   useEffect(() => {
-    if (room.phase === 'idle' || room.phase === 'lobby') {
-      setHud(createInitialHudSnapshot());
+    if (
+      room.phase === 'idle' ||
+      room.phase === 'lobby' ||
+      room.phase === 'countdown'
+    ) {
+      setHud(createInitialHudSnapshot(room.selectedMap));
     }
-  }, [room.phase, room.matchId]);
+  }, [room.phase, room.matchId, room.selectedMap]);
 
   // Settle cookies & personal best exactly once per finished matchId
   useEffect(() => {
@@ -97,19 +118,20 @@ export function GlassCarryScreen({
       return;
     }
 
-    const { matchId, elapsedSec, shatters } = room.finalResult;
+    const { matchId, mapId, elapsedSec, shatters } = room.finalResult;
     if (!matchId || settledMatchIdRef.current === matchId) {
       return;
     }
 
     settledMatchIdRef.current = matchId;
-    const res = recordGlassMatchResult({
+    const res = recordCoopMatchResult({
       matchId,
+      mapId: mapId ?? room.selectedMap,
       elapsedSec,
-      shatters,
+      failures: shatters,
     });
     setSettlement(res);
-  }, [room.phase, room.finalResult, recordGlassMatchResult]);
+  }, [room.phase, room.finalResult, room.selectedMap, recordCoopMatchResult]);
 
   // Clean up room connection on unmount
   useEffect(() => {
@@ -119,13 +141,13 @@ export function GlassCarryScreen({
   }, []);
 
   const handleBackToModeSelect = useCallback(() => {
-    room.leaveRoom();
+    leaveRoom();
     onBackToModeSelect();
-  }, [onBackToModeSelect, room]);
+  }, [leaveRoom, onBackToModeSelect]);
 
   const handleLeaveRoom = useCallback(() => {
-    room.leaveRoom();
-  }, [room]);
+    leaveRoom();
+  }, [leaveRoom]);
 
   const handleToggleSfx = useCallback(() => {
     updateSettings({ sfxEnabled: !settings.sfxEnabled });
@@ -143,16 +165,51 @@ export function GlassCarryScreen({
 
   const scenePaused =
     room.partnerDisconnectedSec !== null || room.phase === 'countdown';
+  const finalMapId = room.finalResult?.mapId ?? room.selectedMap;
   const finalElapsedSec = room.finalResult?.elapsedSec ?? hud.matchTime;
   const finalShatters = room.finalResult?.shatters ?? hud.shatters;
 
+  const renderActiveScene = () => {
+    switch (room.selectedMap) {
+      case 'raft_rapids':
+        return (
+          <RaftScene
+            room={room}
+            paused={scenePaused}
+            onHudSnapshot={setHud}
+          />
+        );
+      case 'rope_tether':
+        return (
+          <RopeScene
+            room={room}
+            paused={scenePaused}
+            onHudSnapshot={setHud}
+          />
+        );
+      case 'minecart_rails':
+        return (
+          <MinecartScene
+            room={room}
+            paused={scenePaused}
+            onHudSnapshot={setHud}
+          />
+        );
+      case 'glass_carry':
+      default:
+        return (
+          <GlassScene
+            room={room}
+            paused={scenePaused}
+            onHudSnapshot={setHud}
+          />
+        );
+    }
+  };
+
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-[#0d1b2e] select-none">
-      <GlassScene
-        room={room}
-        paused={scenePaused}
-        onHudSnapshot={setHud}
-      />
+      {renderActiveScene()}
 
       {room.phase !== 'finished' && (
         <GlassHud
@@ -168,6 +225,7 @@ export function GlassCarryScreen({
       {room.phase === 'finished' && room.finalResult && (
         <GlassResultModal
           room={room}
+          mapId={finalMapId}
           elapsedSec={finalElapsedSec}
           shatters={finalShatters}
           settlement={settlement}

@@ -18,6 +18,7 @@ import { FIXED_DT, GLASS_MAX_HP } from '../sim/constants';
 import { GLASS_COURSE, getStageNumberForZ } from '../sim/course';
 import {
   NEUTRAL_INPUT,
+  computeSoloStabilizerInput,
   createInitialSimState,
   stepGlassSim,
 } from '../sim/physics';
@@ -41,6 +42,7 @@ export interface GlassSceneProps {
   room: GlassRoomController;
   paused: boolean;
   onHudSnapshot: (hud: GlassHudSnapshot) => void;
+  soloAutoBalance?: boolean;
 }
 
 const FALLBACK_P1_MEMBER: GlassRoomMember = {
@@ -139,15 +141,21 @@ function buildHudSnapshot(
   );
 
   return {
+    mapId: 'glass_carry',
     matchTime: renderState.matchTime,
     stageNumber,
     stageName,
     checkpointIndex: renderState.checkpointIndex,
     totalCheckpoints,
     shatters,
+    failureLabel: 'Vỡ kính',
     glassHp: renderState.glass.hp,
     glassMaxHp: GLASS_MAX_HP,
     glassStress: renderState.glass.stress,
+    primaryMeterPct: Math.round(
+      Math.max(0, Math.min(1, renderState.glass.stress)) * 100,
+    ),
+    primaryMeterLabel: 'Độ căng kính',
     shatterTimer: renderState.glass.shatterTimer,
     shatterReason: renderState.glass.shatterReason,
     p1Lift: renderState.p1.liftOffset,
@@ -204,6 +212,7 @@ interface GlassWorldDriverProps {
   readInput: () => PlayerInput;
   renderRef: RefObject<GlassRenderState>;
   onHudSnapshot: (hud: GlassHudSnapshot) => void;
+  soloAutoBalance?: boolean;
 }
 
 function GlassWorldDriver({
@@ -212,6 +221,7 @@ function GlassWorldDriver({
   readInput,
   renderRef,
   onHudSnapshot,
+  soloAutoBalance = false,
 }: GlassWorldDriverProps) {
   const simRef = useRef<GlassSimState>(createInitialSimState());
   const accumulatorRef = useRef<number>(0);
@@ -233,7 +243,72 @@ function GlassWorldDriver({
   const activeMatchIdRef = useRef<string>(room.matchId);
 
   const isHostRef = useRef<boolean>(room.isHost);
+  const prevIsHostRef = useRef<boolean>(room.isHost);
   isHostRef.current = room.isHost;
+
+  useEffect(() => {
+    const wasHost = prevIsHostRef.current;
+    prevIsHostRef.current = room.isHost;
+    // When a guest takes over simulation (e.g. Solo Auto-Balance failover after partner disconnects),
+    // hydrate simRef from the latest interpolated renderState instead of snapping back to z=0.
+    if (!wasHost && room.isHost && phaseRef.current === 'playing') {
+      const r = renderRef.current;
+      const base = simRef.current;
+      simRef.current = {
+        ...base,
+        phase: 'playing',
+        matchTime: r.matchTime,
+        checkpointIndex: r.checkpointIndex,
+        shatters: shattersRef.current,
+        p1: {
+          ...base.p1,
+          x: r.p1.x,
+          y: r.p1.y,
+          z: r.p1.z,
+          vx: r.p1.vx,
+          vy: r.p1.vy,
+          vz: r.p1.vz,
+          yaw: r.p1.yaw,
+          grounded: r.p1.grounded,
+          liftOffset: r.p1.liftOffset,
+          onIce: r.p1.onIce,
+          inWind: r.p1.inWind,
+        },
+        p2: {
+          ...base.p2,
+          x: r.p2.x,
+          y: r.p2.y,
+          z: r.p2.z,
+          vx: r.p2.vx,
+          vy: r.p2.vy,
+          vz: r.p2.vz,
+          yaw: r.p2.yaw,
+          grounded: r.p2.grounded,
+          liftOffset: r.p2.liftOffset,
+          onIce: r.p2.onIce,
+          inWind: r.p2.inWind,
+        },
+        glass: {
+          ...base.glass,
+          hp: r.glass.hp,
+          stress: r.glass.stress,
+          centerX: r.glass.centerX,
+          centerY: r.glass.centerY,
+          centerZ: r.glass.centerZ,
+          yaw: r.glass.yaw,
+          pitch: r.glass.pitch,
+          length: r.glass.length,
+          invulnTimer: r.glass.invulnTimer,
+          shatterTimer: r.glass.shatterTimer,
+          shatterReason: r.glass.shatterReason,
+          lastImpactX: r.glass.lastImpactX,
+          lastImpactY: r.glass.lastImpactY,
+          lastImpactZ: r.glass.lastImpactZ,
+        },
+      };
+      accumulatorRef.current = 0;
+    }
+  }, [renderRef, room.isHost]);
 
   const phaseRef = useRef(room.phase);
   phaseRef.current = room.phase;
@@ -243,6 +318,9 @@ function GlassWorldDriver({
 
   const pausedRef = useRef<boolean>(paused);
   pausedRef.current = paused;
+
+  const soloAutoBalanceRef = useRef<boolean>(soloAutoBalance);
+  soloAutoBalanceRef.current = soloAutoBalance;
 
   const onHudSnapshotRef = useRef(onHudSnapshot);
   onHudSnapshotRef.current = onHudSnapshot;
@@ -325,6 +403,10 @@ function GlassWorldDriver({
   useEffect(() => {
     setSnapshotListener((snapshot) => {
       if (isHostRef.current) return;
+      if (snapshot.mapId !== undefined && snapshot.mapId !== 'glass_carry') {
+        return;
+      }
+      if (!('glass' in snapshot)) return;
       const expectedMatchId = roomMatchIdRef.current;
       if (expectedMatchId && snapshot.matchId !== expectedMatchId) {
         return;
@@ -405,7 +487,7 @@ function GlassWorldDriver({
     }
 
     if (isHostRef.current) {
-      if (isPlaying) {
+      if (isPlaying && !pausedRef.current) {
         const nowMs = performance.now();
         const guestRec = guestInputRef.current;
         const guestStale =
@@ -425,10 +507,13 @@ function GlassWorldDriver({
 
         while (accumulatorRef.current >= FIXED_DT) {
           accumulatorRef.current -= FIXED_DT;
+          const stepP2Input = soloAutoBalanceRef.current
+            ? computeSoloStabilizerInput(simRef.current, localInput)
+            : p2Input;
           const nextSim = stepGlassSim(
             simRef.current,
             localInput,
-            p2Input,
+            stepP2Input,
             FIXED_DT,
           );
           simRef.current = nextSim;
@@ -480,7 +565,7 @@ function GlassWorldDriver({
       }
     } else {
       // Guest: send local input and sample interpolated snapshots
-      if (isPlaying) {
+      if (isPlaying && !pausedRef.current) {
         room.sendGuestInput(localInput);
       }
 
@@ -517,6 +602,7 @@ export function GlassScene({
   room,
   paused,
   onHudSnapshot,
+  soloAutoBalance = false,
 }: GlassSceneProps) {
   const renderRef = useRef<GlassRenderState>(createInitialRenderState());
 
@@ -598,6 +684,7 @@ export function GlassScene({
         readInput={readInput}
         renderRef={renderRef}
         onHudSnapshot={onHudSnapshot}
+        soloAutoBalance={soloAutoBalance}
       />
 
       <FollowShadowLight renderRef={renderRef} />

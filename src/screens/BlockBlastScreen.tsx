@@ -95,6 +95,8 @@ export interface BlockBlastRoomModeConfig {
     settlement: { reward: number; isNewBest: boolean; valid: boolean },
   ) => void;
   onLeaveRoom: () => void;
+  suppressStandaloneSettlement?: boolean;
+  forceFinishToken?: number;
 }
 
 export interface BlockBlastScreenProps {
@@ -707,18 +709,44 @@ export default function BlockBlastScreen({
         rescueEligible: activeSession.rescueEligible,
       };
 
-      const result = recordBlockBlastResult(receipt);
-      const summary: SettlementSummary = {
-        reward: result.reward,
-        isNewBest: result.isNewBest,
-        valid: result.ok,
-      };
+      const summary: SettlementSummary = roomModeRef.current
+        ?.suppressStandaloneSettlement
+        ? { reward: 0, isNewBest: false, valid: true }
+        : (() => {
+            const result = recordBlockBlastResult(receipt);
+            return {
+              reward: result.reward,
+              isNewBest: result.isNewBest,
+              valid: result.ok,
+            };
+          })();
       setSettlement(summary);
-      playSfx(result.isNewBest ? 'win' : 'lose');
+      playSfx(summary.isNewBest ? 'win' : 'lose');
       roomModeRef.current?.onFinish(receipt, finalState, summary);
     },
     [recordBlockBlastResult],
   );
+
+  // Allow Event mode time-limit expiration to cleanly freeze and submit the board
+  useEffect(() => {
+    const token = roomMode?.forceFinishToken ?? 0;
+    if (token <= 0 || settledRef.current) return;
+    const currentBundle = matchRef.current;
+    setMatch((prev) => {
+      if (prev.state.phase === 'gameOver') return prev;
+      return {
+        ...prev,
+        state: {
+          ...prev.state,
+          phase: 'gameOver',
+        },
+      };
+    });
+    settleMatch(
+      { ...currentBundle.state, phase: 'gameOver' },
+      currentBundle.session,
+    );
+  }, [roomMode?.forceFinishToken, settleMatch]);
 
   const spawnBurst = useCallback(
     (effect: Omit<BurstEffect, 'id'>, lifetimeMs: number) => {

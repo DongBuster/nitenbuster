@@ -1,9 +1,15 @@
+import type { CoopMapId } from '../../coop/maps/registry';
 import type {
   GlassSnapshotPayload,
   PackedPlayerState,
 } from '../online/protocol';
 import { createInitialSimState } from '../sim/physics';
-import type { GlassSimState, PlayerSimState, ShatterReason } from '../sim/types';
+import type {
+  GlassSimState,
+  PlayerSimState,
+  PlayerSlot,
+  ShatterReason,
+} from '../sim/types';
 
 export interface GlassHudSnapshot {
   matchTime: number;
@@ -20,6 +26,13 @@ export interface GlassHudSnapshot {
   p1Lift: number;
   p2Lift: number;
   progressPct: number;
+  mapId?: CoopMapId;
+  failureLabel?: string;
+  primaryMeterPct?: number;
+  primaryMeterLabel?: string;
+  statusBadge?: string | null;
+  pumpTurn?: PlayerSlot | null;
+  boostActive?: boolean;
 }
 
 export interface GlassRenderState {

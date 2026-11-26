@@ -1,7 +1,13 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, type MutableRefObject } from 'react';
 import { Environment, Lightformer } from '@react-three/drei';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { Physics } from '@react-three/rapier';
+import {
+  BRAWL_INPUT_INTERVAL_MS,
+  BRAWL_SNAPSHOT_INTERVAL_MS,
+  type BrawlSnapshotPayload,
+} from '../online/protocol';
+import { BrawlSnapshotInterpolator } from '../online/snapshotInterpolation';
 import { generateHexArena } from '../sim/arenaLayout';
 import { GRAVITY } from '../sim/constants';
 import type {
@@ -17,39 +23,109 @@ import { FighterActor } from './FighterActor';
 import { ItemPickups } from './ItemPickups';
 import { BrawlWorldRuntime } from './worldRuntime';
 
+export interface BrawlArenaOnlineConfig {
+  role: 'host' | 'client';
+  localFighterId: string;
+  /** Host reads remote player inputs here each frame. */
+  getRemoteInputs?: () => Record<string, FighterInput>;
+  /** Host broadcasts packed snapshots at ~20Hz. */
+  onBroadcastSnapshot?: (snapshot: BrawlSnapshotPayload) => void;
+  /** Client sends local inputs at ~20Hz. */
+  onSendClientInput?: (input: FighterInput) => void;
+  /** Client subscribes its interpolator to incoming host snapshots. */
+  interpolatorRef?: MutableRefObject<BrawlSnapshotInterpolator>;
+  /** Optional handle so Host adapter can query tie-break stats on timeout. */
+  runtimeRef?: MutableRefObject<BrawlWorldRuntime | null>;
+}
+
 interface DriverProps {
+  roundKey: string;
   runtime: BrawlWorldRuntime;
   phase: MatchPhase;
   paused: boolean;
   consumeInput: () => FighterInput;
   onEliminateBatch: (ids: string[]) => void;
   onHudSnapshot: (hud: HudSnapshot) => void;
+  onlineConfig?: BrawlArenaOnlineConfig;
 }
 
 function ArenaSimulationDriver({
+  roundKey,
   runtime,
   phase,
   paused,
   consumeInput,
   onEliminateBatch,
   onHudSnapshot,
+  onlineConfig,
 }: DriverProps) {
   const hudAccumRef = useRef<number>(0);
+  const lastBroadcastMsRef = useRef<number>(0);
+  const lastInputSendMsRef = useRef<number>(0);
+  const tickRef = useRef<number>(0);
+
+  useEffect(() => {
+    tickRef.current = 0;
+    lastBroadcastMsRef.current = 0;
+    lastInputSendMsRef.current = 0;
+  }, [roundKey]);
 
   useFrame((_, dt) => {
     if (paused) return;
+
+    const localFighterId = onlineConfig?.localFighterId ?? 'human';
+
+    if (onlineConfig?.role === 'client') {
+      const nowMs = performance.now();
+      if (
+        phase === 'fighting' &&
+        onlineConfig.onSendClientInput &&
+        nowMs - lastInputSendMsRef.current >= BRAWL_INPUT_INTERVAL_MS
+      ) {
+        lastInputSendMsRef.current = nowMs;
+        onlineConfig.onSendClientInput(consumeInput());
+      } else if (phase !== 'fighting') {
+        consumeInput();
+      }
+
+      const sampled = onlineConfig.interpolatorRef?.current.sample(nowMs);
+      if (sampled && sampled.roundKey === roundKey) {
+        runtime.applySnapshot(sampled);
+      }
+
+      hudAccumRef.current += dt;
+      if (hudAccumRef.current >= 0.1) {
+        hudAccumRef.current = 0;
+        onHudSnapshot(runtime.getHudSnapshot(localFighterId));
+      }
+      return;
+    }
+
     const humanInput = consumeInput();
     runtime.stepFrame({
       dt,
       phase,
       humanInput,
+      localFighterId,
+      remoteInputs: onlineConfig?.getRemoteInputs?.(),
       onEliminateBatch,
     });
+
+    if (onlineConfig?.role === 'host' && onlineConfig.onBroadcastSnapshot) {
+      const nowMs = performance.now();
+      if (nowMs - lastBroadcastMsRef.current >= BRAWL_SNAPSHOT_INTERVAL_MS) {
+        lastBroadcastMsRef.current = nowMs;
+        tickRef.current += 1;
+        onlineConfig.onBroadcastSnapshot(
+          runtime.exportSnapshot(roundKey, tickRef.current),
+        );
+      }
+    }
 
     hudAccumRef.current += dt;
     if (hudAccumRef.current >= 0.1) {
       hudAccumRef.current = 0;
-      onHudSnapshot(runtime.getHudSnapshot());
+      onHudSnapshot(runtime.getHudSnapshot(localFighterId));
     }
   });
 
@@ -65,6 +141,7 @@ export interface ArenaSceneProps {
   consumeInput: () => FighterInput;
   onEliminateBatch: (ids: string[]) => void;
   onHudSnapshot: (hud: HudSnapshot) => void;
+  onlineConfig?: BrawlArenaOnlineConfig;
 }
 
 export function ArenaScene({
@@ -76,6 +153,7 @@ export function ArenaScene({
   consumeInput,
   onEliminateBatch,
   onHudSnapshot,
+  onlineConfig,
 }: ArenaSceneProps) {
   const tiles = useMemo(() => generateHexArena(), []);
 
@@ -85,9 +163,20 @@ export function ArenaScene({
     [roundKey],
   );
 
+  const localFighterId = onlineConfig?.localFighterId ?? 'human';
+  const isRemoteClient = onlineConfig?.role === 'client';
+
   useEffect(() => {
-    onHudSnapshot(runtime.getHudSnapshot());
-  }, [runtime, onHudSnapshot]);
+    if (onlineConfig?.runtimeRef) {
+      onlineConfig.runtimeRef.current = runtime;
+    }
+    onHudSnapshot(runtime.getHudSnapshot(localFighterId));
+    return () => {
+      if (onlineConfig?.runtimeRef && onlineConfig.runtimeRef.current === runtime) {
+        onlineConfig.runtimeRef.current = null;
+      }
+    };
+  }, [localFighterId, onlineConfig?.runtimeRef, runtime, onHudSnapshot]);
 
   return (
     <Canvas
@@ -146,6 +235,10 @@ export function ArenaScene({
             config={cfg}
             totalFighters={fighters.length}
             runtime={runtime}
+            isLocalPlayer={
+              onlineConfig ? cfg.id === localFighterId : !cfg.isBot
+            }
+            isRemoteClient={isRemoteClient}
           />
         ))}
       </Physics>
@@ -153,12 +246,14 @@ export function ArenaScene({
       <ItemPickups runtime={runtime} />
 
       <ArenaSimulationDriver
+        roundKey={roundKey}
         runtime={runtime}
         phase={phase}
         paused={paused}
         consumeInput={consumeInput}
         onEliminateBatch={onEliminateBatch}
         onHudSnapshot={onHudSnapshot}
+        onlineConfig={onlineConfig}
       />
     </Canvas>
   );

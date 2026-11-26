@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import {
   ArrowLeft,
   Check,
+  Compass,
   Copy,
   Crown,
   Globe,
@@ -13,6 +14,12 @@ import {
   Users,
 } from 'lucide-react';
 import { playSfx } from '../../audio/soundEngine';
+import {
+  COOP_MAPS,
+  MAX_COOP_STARS,
+  countTotalCoopStars,
+  getCoopMapMeta,
+} from '../../coop/maps/registry';
 import { ANIMALS, type AnimalId } from '../../engine/types';
 import { normalizeRoomCode } from '../../online/sanitize';
 import { formatEquippedSummary } from '../../scene3d/accessoryCatalog';
@@ -164,15 +171,15 @@ function renderSlotCard(
 
       <div className="mt-4 border-t border-white/10 pt-2.5 text-[11px] font-bold text-slate-300/80">
         {isHostSlot
-          ? 'Cầm đầu trái tấm kính · Điều hành phòng'
-          : 'Cầm đầu phải tấm kính · Phối hợp nhịp nhàng'}
+          ? 'Vị trí P1 · Chọn Map & Điều hành phòng'
+          : 'Vị trí P2 · Phối hợp ăn ý cùng đồng đội'}
       </div>
     </div>
   );
 }
 
 /**
- * Create/Join lobby and 2-player waiting room for Glass Carry Co-op.
+ * Create/Join lobby and 2-player waiting room for PAWS Duo Co-op 3D (4 maps).
  */
 export function GlassLobby({
   room,
@@ -182,10 +189,10 @@ export function GlassLobby({
   const {
     selectedAnimal,
     equippedAccessory,
-    glassBestStars,
-    glassBestTimeSec,
+    coopRecords,
     selectAnimal,
   } = useProfileStore();
+  const totalStars = countTotalCoopStars(coopRecords);
 
   const [displayName, setDisplayName] = useState<string>(() => loadSavedName());
   const [joinCodeInput, setJoinCodeInput] = useState<string>(() =>
@@ -263,7 +270,7 @@ export function GlassLobby({
     playSfx('click');
     const text =
       mode === 'link' && typeof window !== 'undefined'
-        ? `${window.location.origin}${window.location.pathname}?glassRoom=${room.roomCode}`
+        ? `${window.location.origin}${window.location.pathname}?coopRoom=${room.roomCode}`
         : room.roomCode;
     try {
       await navigator.clipboard.writeText(text);
@@ -288,7 +295,7 @@ export function GlassLobby({
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="inline-flex items-center gap-1.5 rounded-full border border-cyan-400/35 bg-cyan-950/70 px-3 py-1 text-xs font-black text-cyan-200">
               <Globe aria-hidden="true" className="h-3.5 w-3.5 text-cyan-300" />
-              <span>Glass Carry Co-op · 2 Người Online</span>
+              <span>PAWS Duo Co-op 3D · 4 Map Hợp Tác · 2 Người Online</span>
             </span>
           </div>
 
@@ -296,9 +303,9 @@ export function GlassLobby({
             Cần Cấu Hình Supabase Realtime
           </h1>
           <p className="mt-2 text-sm leading-relaxed text-slate-300">
-            Chế độ Khiêng Kính 2 Người sử dụng{' '}
-            <strong className="text-cyan-200">Supabase Realtime</strong> để
-            đồng bộ vị trí và lực căng tấm kính theo thời gian thực. Vui lòng xem
+            Chế độ <strong className="text-cyan-200">PAWS Duo Co-op 3D</strong>{' '}
+            sử dụng <strong className="text-cyan-200">Supabase Realtime</strong>{' '}
+            để đồng bộ vị trí và cơ chế hợp tác theo thời gian thực. Vui lòng xem
             hướng dẫn trong{' '}
             <code className="rounded bg-white/10 px-1.5 py-0.5 text-amber-200">
               SUPABASE_SETUP.md
@@ -338,7 +345,6 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
     const cleanJoinCode = normalizeRoomCode(joinCodeInput);
     const isConnecting = room.connectionStatus === 'connecting';
     const canJoin = cleanJoinCode.length >= 4 && !isConnecting;
-    const hasPersonalBest = glassBestTimeSec !== null && glassBestStars > 0;
     const equippedSummary = formatEquippedSummary(myAccessory);
 
     return (
@@ -348,54 +354,109 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
             <div>
               <div className="inline-flex items-center gap-1.5 rounded-full border border-cyan-400/35 bg-cyan-950/65 px-3.5 py-1 text-xs font-bold text-cyan-200">
                 <Users aria-hidden="true" className="h-3.5 w-3.5 text-cyan-300" />
-                <span>Glass Carry Co-op · Phối Hợp 2 Người</span>
+                <span>4 Map Hợp Tác · 2 Người Online</span>
               </div>
               <h1 className="mt-2 font-display text-2xl font-black text-white sm:text-3xl">
-                Khiêng Kính Vượt 5 Chặng Cabin
+                PAWS Duo Co-op 3D
               </h1>
             </div>
 
-            <button
-              type="button"
-              onClick={() => {
-                playSfx('click');
-                onBackToModeSelect();
-              }}
-              className={`btn-tactile-wood inline-flex cursor-pointer items-center gap-1.5 rounded-2xl border border-amber-900/50 px-4 py-2 text-xs font-black text-amber-100 ${FOCUS_RING_CLASS}`}
-            >
-              <ArrowLeft aria-hidden="true" className="h-3.5 w-3.5 text-amber-300" />
-              <span>Quay Lại Chọn Chế Độ</span>
-            </button>
+            <div className="flex flex-wrap items-center gap-2.5">
+              <div className="inline-flex items-center gap-1.5 rounded-2xl border border-amber-400/40 bg-[#121d2d] px-3.5 py-2 text-xs font-black text-amber-200 shadow-lg">
+                <Star
+                  aria-hidden="true"
+                  className="h-4 w-4 fill-amber-400 text-amber-300"
+                />
+                <span className="tabular-nums">
+                  {totalStars} / {MAX_COOP_STARS}★
+                </span>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  playSfx('click');
+                  onBackToModeSelect();
+                }}
+                className={`btn-tactile-wood inline-flex cursor-pointer items-center gap-1.5 rounded-2xl border border-amber-900/50 px-4 py-2 text-xs font-black text-amber-100 ${FOCUS_RING_CLASS}`}
+              >
+                <ArrowLeft aria-hidden="true" className="h-3.5 w-3.5 text-amber-300" />
+                <span>Quay Lại Chọn Chế Độ</span>
+              </button>
+            </div>
           </header>
 
-          {hasPersonalBest && (
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-400/35 bg-[#121d2d]/90 px-4 py-2.5 shadow-lg">
-              <div className="flex items-center gap-2 text-xs font-extrabold text-amber-200">
-                <Sparkles aria-hidden="true" className="h-4 w-4 text-amber-300" />
-                <span>Thành Tích Cá Nhân Tốt Nhất</span>
+          {/* 4-Map Preview Strip */}
+          <section
+            aria-label="Xem trước 4 Map Hợp Tác"
+            className="rounded-3xl border border-cyan-400/25 bg-[#121d2d]/90 p-4 shadow-xl"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-cyan-300">
+                <Compass aria-hidden="true" className="h-4 w-4 text-cyan-300" />
+                <span>4 Map Hợp Tác Đặc Trưng</span>
               </div>
-              <div className="flex flex-wrap items-center gap-3">
-                <span className="inline-flex items-center gap-1">
-                  <span className="sr-only">{glassBestStars} trên 3 sao</span>
-                  {[1, 2, 3].map((starIdx) => (
-                    <Star
-                      key={starIdx}
-                      aria-hidden="true"
-                      className={`h-4 w-4 ${
-                        starIdx <= glassBestStars
-                          ? 'fill-amber-400 text-amber-300'
-                          : 'text-slate-600'
-                      }`}
-                    />
-                  ))}
-                </span>
-                <span className="inline-flex items-center gap-1 rounded-xl border border-cyan-400/30 bg-[#0a1320] px-2.5 py-1 font-mono text-xs font-black text-cyan-200 tabular-nums">
-                  <Timer aria-hidden="true" className="h-3.5 w-3.5 text-cyan-300" />
-                  <span>{formatBestTime(glassBestTimeSec)}</span>
-                </span>
-              </div>
+              <span className="text-[11px] font-bold text-slate-300">
+                Chủ phòng chọn Map sau khi tạo phòng
+              </span>
             </div>
-          )}
+
+            <div className="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
+              {COOP_MAPS.map((map) => {
+                const rec = coopRecords[map.id];
+                const bestStars = rec?.bestStars ?? 0;
+                return (
+                  <div
+                    key={map.id}
+                    className="flex flex-col justify-between rounded-2xl border border-white/10 bg-[#0a1320]/90 p-3"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between gap-2">
+                        <span
+                          className="rounded-lg border px-2 py-0.5 text-[10px] font-black uppercase"
+                          style={{
+                            borderColor: `${map.accentHex}66`,
+                            backgroundColor: `${map.accentHex}1f`,
+                            color: map.accentHex,
+                          }}
+                        >
+                          Map {map.order}
+                        </span>
+                        <span className="inline-flex items-center gap-0.5">
+                          <span className="sr-only">{bestStars} trên 3 sao</span>
+                          {[1, 2, 3].map((idx) => (
+                            <Star
+                              key={idx}
+                              aria-hidden="true"
+                              className={`h-3.5 w-3.5 ${
+                                idx <= bestStars
+                                  ? 'fill-amber-400 text-amber-300'
+                                  : 'text-slate-600'
+                              }`}
+                            />
+                          ))}
+                        </span>
+                      </div>
+
+                      <h2 className="mt-2 font-display text-sm font-black text-white">
+                        {map.title}
+                      </h2>
+                      <p className="mt-0.5 text-[11px] font-bold text-cyan-200/85">
+                        {map.mechanicBadge}
+                      </p>
+                    </div>
+
+                    <div className="mt-2 flex items-center justify-between border-t border-white/10 pt-2 text-[11px] font-bold text-slate-400">
+                      <span>Kỷ lục</span>
+                      <span className="font-mono text-cyan-200 tabular-nums">
+                        {rec ? formatBestTime(rec.bestTimeSec) : 'Chưa phá đảo'}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
 
           {room.error && (
             <div
@@ -476,7 +537,7 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
                   </h2>
                   <p className="mt-1.5 text-xs leading-relaxed text-slate-300">
                     Tạo phòng riêng 2 người, nhận mã 6 ký tự hoặc link mời nhanh
-                    cho đồng đội cùng khiêng tấm kính pha lê về đích.
+                    cho đồng đội cùng phối hợp qua 4 map hợp tác về đích.
                   </p>
                 </div>
                 <button
@@ -541,12 +602,13 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
   const bothPresent = room.members.length === 2;
   const bothReady = bothPresent && room.members.every((m) => m.ready);
   const canStart = room.isHost && bothReady;
+  const activeMapMeta = getCoopMapMeta(room.selectedMap);
 
   const hostHintText = !bothPresent
     ? 'Đang chờ đủ 2 người chơi trong phòng...'
     : !bothReady
       ? 'Cả 2 người chơi cần bấm Sẵn Sàng để xuất phát!'
-      : 'Cả đội đã sẵn sàng — bấm để bắt đầu!';
+      : `Cả đội đã sẵn sàng — bấm để bắt đầu ${activeMapMeta.shortTitle}!`;
 
   return (
     <div className="min-h-screen bg-[#0e1827] bg-[radial-gradient(circle_at_18%_0%,_rgba(56,189,248,0.18)_0%,_transparent_46%),radial-gradient(circle_at_84%_0%,_rgba(251,191,36,0.14)_0%,_transparent_46%),linear-gradient(180deg,_#121d2d_0%,_#0e1827_100%)] p-4 text-[#FFF9F0] sm:p-6 lg:p-8">
@@ -554,12 +616,21 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
         <header className="flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-cyan-400/30 bg-[#121d2d]/95 px-5 py-4 shadow-xl">
           <div className="flex flex-wrap items-center gap-3">
             <div>
-              <div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-wider text-cyan-300">
-                <span>Sảnh Chờ Glass Carry Co-op</span>
+              <div className="flex flex-wrap items-center gap-2 text-[11px] font-black uppercase tracking-wider text-cyan-300">
+                <span>Sảnh Chờ PAWS Duo Co-op 3D</span>
                 <span className="rounded-full border border-white/10 bg-[#0a1320] px-2 py-0.5 text-[10px] font-bold text-slate-300 normal-case">
                   {room.connectionStatus === 'connected'
                     ? 'Đã kết nối'
                     : 'Đang kết nối...'}
+                </span>
+                <span className="inline-flex items-center gap-1 rounded-full border border-amber-400/35 bg-amber-400/10 px-2 py-0.5 text-[10px] font-black text-amber-200 normal-case tabular-nums">
+                  <Star
+                    aria-hidden="true"
+                    className="h-3 w-3 fill-amber-400 text-amber-300"
+                  />
+                  <span>
+                    {totalStars} / {MAX_COOP_STARS}★
+                  </span>
                 </span>
               </div>
               <div className="mt-1 flex flex-wrap items-center gap-2">
@@ -641,6 +712,131 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
             </div>
           </section>
 
+          {/* 4-Map Selector Grid */}
+          <section
+            aria-label="Chọn Map Hợp Tác"
+            className="rounded-3xl border border-cyan-400/25 bg-[#121d2d] p-5 shadow-xl"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Compass aria-hidden="true" className="h-4 w-4 text-cyan-300" />
+                <h2 className="text-xs font-black uppercase tracking-wider text-cyan-300">
+                  Chọn Map Hợp Tác (4 Map)
+                </h2>
+              </div>
+              <span
+                className={`rounded-full border px-2.5 py-0.5 text-[11px] font-black ${
+                  room.isHost
+                    ? 'border-amber-400/45 bg-amber-400/15 text-amber-200'
+                    : 'border-cyan-400/35 bg-cyan-950/70 text-cyan-200'
+                }`}
+              >
+                {room.isHost ? 'Chủ phòng chọn Map' : 'Chủ phòng đang chọn'}
+              </span>
+            </div>
+
+            <div className="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
+              {COOP_MAPS.map((map) => {
+                const isSelected = room.selectedMap === map.id;
+                const rec = coopRecords[map.id];
+                const bestStars = rec?.bestStars ?? 0;
+
+                const cardBody = (
+                  <>
+                    <div>
+                      <div className="flex items-center justify-between gap-1.5">
+                        <span
+                          className="rounded-lg border px-2 py-0.5 text-[10px] font-black uppercase"
+                          style={{
+                            borderColor: `${map.accentHex}66`,
+                            backgroundColor: `${map.accentHex}1f`,
+                            color: map.accentHex,
+                          }}
+                        >
+                          Map {map.order}
+                        </span>
+                        <span className="inline-flex items-center gap-0.5">
+                          <span className="sr-only">{bestStars} trên 3 sao</span>
+                          {[1, 2, 3].map((idx) => (
+                            <Star
+                              key={idx}
+                              aria-hidden="true"
+                              className={`h-3.5 w-3.5 ${
+                                idx <= bestStars
+                                  ? 'fill-amber-400 text-amber-300'
+                                  : 'text-slate-600'
+                              }`}
+                            />
+                          ))}
+                        </span>
+                      </div>
+
+                      <div className="mt-2 font-display text-sm font-black text-white">
+                        {map.title}
+                      </div>
+                      <div className="mt-0.5 text-[11px] font-bold text-cyan-200/85">
+                        {map.mechanicBadge}
+                      </div>
+                    </div>
+
+                    <div className="mt-3 flex items-center justify-between border-t border-white/10 pt-2 text-[11px] font-bold">
+                      {rec ? (
+                        <span className="inline-flex items-center gap-1 font-mono text-cyan-200 tabular-nums">
+                          <Timer
+                            aria-hidden="true"
+                            className="h-3 w-3 text-cyan-300"
+                          />
+                          <span>{formatBestTime(rec.bestTimeSec)}</span>
+                        </span>
+                      ) : (
+                        <span className="text-slate-400">Chưa có kỷ lục</span>
+                      )}
+
+                      {isSelected && (
+                        <span className="rounded-md bg-cyan-400/25 px-1.5 py-0.5 text-[10px] font-black text-cyan-200">
+                          Đang chọn
+                        </span>
+                      )}
+                    </div>
+                  </>
+                );
+
+                const cardClass = `flex h-full flex-col justify-between rounded-2xl border-2 p-3.5 text-left transition-all motion-reduce:transition-none ${
+                  isSelected
+                    ? 'border-cyan-300 bg-cyan-500/18 shadow-[0_0_22px_rgba(34,211,238,0.28)]'
+                    : 'border-white/10 bg-[#0a1320]/90'
+                }`;
+
+                if (room.isHost) {
+                  return (
+                    <button
+                      key={map.id}
+                      type="button"
+                      aria-pressed={isSelected}
+                      onClick={() => {
+                        playSfx('click');
+                        room.selectMap(map.id);
+                      }}
+                      className={`${cardClass} cursor-pointer hover:border-cyan-400/60 ${FOCUS_RING_CLASS}`}
+                    >
+                      {cardBody}
+                    </button>
+                  );
+                }
+
+                return (
+                  <div
+                    key={map.id}
+                    aria-current={isSelected ? 'true' : undefined}
+                    className={cardClass}
+                  >
+                    {cardBody}
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+
           {/* Animal Switcher & Ready / Start Actions */}
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-5">
             <section className="rounded-3xl border border-cyan-400/25 bg-[#121d2d] p-5 shadow-xl lg:col-span-3">
@@ -707,7 +903,7 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
                       className={`btn-tactile-sky inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-2xl px-4 py-3.5 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-45 ${FOCUS_RING_CLASS}`}
                     >
                       <Play aria-hidden="true" className="h-4 w-4" />
-                      <span>Bắt Đầu Khiêng Kính!</span>
+                      <span>Bắt Đầu: {activeMapMeta.shortTitle}!</span>
                     </button>
                     <p className="text-center text-xs font-bold text-slate-300">
                       {hostHintText}
@@ -716,7 +912,7 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
                 ) : (
                   <p className="rounded-2xl border border-cyan-500/20 bg-[#0a1320] px-3 py-2.5 text-center text-xs font-bold text-cyan-200/85">
                     {myMember?.ready
-                      ? 'Bạn đã sẵn sàng! Chờ Chủ phòng bắt đầu...'
+                      ? `Bạn đã sẵn sàng! Chờ Chủ phòng bắt đầu ${activeMapMeta.shortTitle}...`
                       : 'Bấm Sẵn Sàng khi bạn đã chuẩn bị xong.'}
                   </p>
                 )}
@@ -724,32 +920,25 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
             </section>
           </div>
 
-          {/* Compact Keyboard Controls Strip */}
+          {/* Dynamic Keyboard Controls Strip */}
           <footer className="rounded-2xl border border-cyan-400/25 bg-[#0a1320]/90 px-4 py-3 text-center text-xs font-bold text-slate-200 shadow-lg">
             <span className="mr-2 font-black uppercase tracking-wider text-amber-300">
-              Hướng Dẫn Phím Tắt:
+              Hướng Dẫn Phím Tắt ({activeMapMeta.shortTitle}):
             </span>
-            <span>
-              <kbd className="rounded bg-white/10 px-1.5 py-0.5 font-mono text-cyan-200">
-                WASD / Mũi tên
-              </kbd>{' '}
-              Di chuyển ·{' '}
-              <kbd className="rounded bg-white/10 px-1.5 py-0.5 font-mono text-cyan-200">
-                Space
-              </kbd>{' '}
-              Nhảy ·{' '}
-              <kbd className="rounded bg-white/10 px-1.5 py-0.5 font-mono text-cyan-200">
-                E / Chuột trái
-              </kbd>{' '}
-              Nâng kính ·{' '}
-              <kbd className="rounded bg-white/10 px-1.5 py-0.5 font-mono text-cyan-200">
-                Q / Chuột phải
-              </kbd>{' '}
-              Hạ kính ·{' '}
-              <kbd className="rounded bg-white/10 px-1.5 py-0.5 font-mono text-cyan-200">
-                1–4
-              </kbd>{' '}
-              Emote
+            <span className="inline-flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
+              {activeMapMeta.controls.map((ctrl, idx) => (
+                <span key={ctrl.keys} className="inline-flex items-center gap-1">
+                  {idx > 0 && (
+                    <span aria-hidden="true" className="text-slate-500">
+                      ·
+                    </span>
+                  )}
+                  <kbd className="rounded bg-white/10 px-1.5 py-0.5 font-mono text-cyan-200">
+                    {ctrl.keys}
+                  </kbd>
+                  <span>{ctrl.label}</span>
+                </span>
+              ))}
             </span>
           </footer>
         </main>

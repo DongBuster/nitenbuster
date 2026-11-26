@@ -10,6 +10,7 @@ import {
   MAX_SETTLED_MATCH_IDS,
   sanitizeProfileData,
   settleBlockBlastMatch,
+  settleCoopMatch,
   settleGlassCarryMatch,
 } from '../profileSchema.ts';
 import {
@@ -528,5 +529,157 @@ describe('settleGlassCarryMatch', () => {
     assert.equal(fasterBest.isNewBest, true);
     assert.equal(fasterBest.nextProfile.glassBestStars, 3);
     assert.equal(fasterBest.nextProfile.glassBestTimeSec, 98.42);
+    assert.deepEqual(fasterBest.nextProfile.coopRecords.glass_carry, {
+      bestStars: 3,
+      bestTimeSec: 98.42,
+    });
+  });
+});
+
+describe('settleCoopMatch & multi-map coopRecords migration', () => {
+  it('defaults coopRecords to {} and sanitizes valid/invalid coopRecords entries', () => {
+    assert.deepEqual(DEFAULT_PROFILE.coopRecords, {});
+
+    const sanitized = sanitizeProfileData({
+      coopRecords: {
+        raft_rapids: { bestStars: 99, bestTimeSec: 125.678 },
+        rope_tether: { bestStars: 2.9, bestTimeSec: MAX_GLASS_TIME_SEC + 100 },
+        minecart_rails: { bestStars: 0, bestTimeSec: 110 },
+        glass_carry: { bestStars: 3, bestTimeSec: -5 },
+        invalid_map: { bestStars: 3, bestTimeSec: 100 },
+      },
+    });
+
+    assert.deepEqual(sanitized.coopRecords, {
+      raft_rapids: { bestStars: 3, bestTimeSec: 125.68 },
+      rope_tether: { bestStars: 2, bestTimeSec: MAX_GLASS_TIME_SEC },
+    });
+  });
+
+  it('migrates legacy glassBestStars/glassBestTimeSec into coopRecords.glass_carry and vice versa', () => {
+    const fromLegacy = sanitizeProfileData({
+      glassBestStars: 2,
+      glassBestTimeSec: 210.5,
+    });
+    assert.deepEqual(fromLegacy.coopRecords.glass_carry, {
+      bestStars: 2,
+      bestTimeSec: 210.5,
+    });
+    assert.equal(fromLegacy.glassBestStars, 2);
+    assert.equal(fromLegacy.glassBestTimeSec, 210.5);
+
+    const fromCoopRecords = sanitizeProfileData({
+      coopRecords: {
+        glass_carry: { bestStars: 3, bestTimeSec: 132.4 },
+      },
+    });
+    assert.equal(fromCoopRecords.glassBestStars, 3);
+    assert.equal(fromCoopRecords.glassBestTimeSec, 132.4);
+    assert.deepEqual(fromCoopRecords.coopRecords.glass_carry, {
+      bestStars: 3,
+      bestTimeSec: 132.4,
+    });
+  });
+
+  it('settles matches across all co-op maps independently, syncing glass_carry legacy fields', () => {
+    const raftRun = settleCoopMatch(DEFAULT_PROFILE, {
+      matchId: 'coop-raft-1',
+      mapId: 'raft_rapids',
+      elapsedSec: 135.456,
+      failures: 1,
+    });
+    assert.equal(raftRun.ok, true);
+    assert.equal(raftRun.mapId, 'raft_rapids');
+    assert.equal(raftRun.stars, 3);
+    assert.equal(raftRun.reward, 50);
+    assert.equal(raftRun.isNewBest, true);
+    assert.equal(raftRun.nextProfile.cookies, DEFAULT_PROFILE.cookies + 50);
+    assert.deepEqual(raftRun.nextProfile.coopRecords.raft_rapids, {
+      bestStars: 3,
+      bestTimeSec: 135.46,
+    });
+    // Legacy glass fields remain untouched for non-glass maps
+    assert.equal(raftRun.nextProfile.glassBestStars, 0);
+    assert.equal(raftRun.nextProfile.glassBestTimeSec, null);
+
+    // Slower run on raft_rapids preserves best time & stars
+    const slowerRaft = settleCoopMatch(raftRun.nextProfile, {
+      matchId: 'coop-raft-2',
+      mapId: 'raft_rapids',
+      elapsedSec: 190,
+      failures: 4,
+    });
+    assert.equal(slowerRaft.ok, true);
+    assert.equal(slowerRaft.stars, 2);
+    assert.equal(slowerRaft.reward, 30);
+    assert.equal(slowerRaft.isNewBest, false);
+    assert.deepEqual(slowerRaft.nextProfile.coopRecords.raft_rapids, {
+      bestStars: 3,
+      bestTimeSec: 135.46,
+    });
+
+    // Settling glass_carry via settleCoopMatch also updates legacy fields
+    const glassRun = settleCoopMatch(slowerRaft.nextProfile, {
+      matchId: 'coop-glass-1',
+      mapId: 'glass_carry',
+      elapsedSec: 150,
+      failures: 0,
+    });
+    assert.equal(glassRun.ok, true);
+    assert.equal(glassRun.mapId, 'glass_carry');
+    assert.equal(glassRun.stars, 3);
+    assert.equal(glassRun.nextProfile.glassBestStars, 3);
+    assert.equal(glassRun.nextProfile.glassBestTimeSec, 150);
+    assert.deepEqual(glassRun.nextProfile.coopRecords.glass_carry, {
+      bestStars: 3,
+      bestTimeSec: 150,
+    });
+  });
+
+  it('rejects duplicate matchId and invalid payloads in settleCoopMatch without mutating profile', () => {
+    const first = settleCoopMatch(DEFAULT_PROFILE, {
+      matchId: 'coop-minecart-1',
+      mapId: 'minecart_rails',
+      elapsedSec: 140,
+      failures: 0,
+    });
+    assert.equal(first.ok, true);
+
+    const dup = settleCoopMatch(first.nextProfile, {
+      matchId: 'coop-minecart-1',
+      mapId: 'minecart_rails',
+      elapsedSec: 100,
+      failures: 0,
+    });
+    assert.equal(dup.ok, false);
+    assert.equal(dup.reward, 0);
+    assert.deepEqual(dup.nextProfile, first.nextProfile);
+
+    const invalidMap = settleCoopMatch(DEFAULT_PROFILE, {
+      matchId: 'coop-bad-map',
+      mapId: 'unknown_map' as never,
+      elapsedSec: 100,
+      failures: 0,
+    });
+    assert.equal(invalidMap.ok, false);
+    assert.deepEqual(invalidMap.nextProfile, DEFAULT_PROFILE);
+
+    const invalidElapsed = settleCoopMatch(DEFAULT_PROFILE, {
+      matchId: 'coop-bad-time',
+      mapId: 'rope_tether',
+      elapsedSec: 0,
+      failures: 0,
+    });
+    assert.equal(invalidElapsed.ok, false);
+    assert.deepEqual(invalidElapsed.nextProfile, DEFAULT_PROFILE);
+
+    const invalidFailures = settleCoopMatch(DEFAULT_PROFILE, {
+      matchId: 'coop-bad-fail',
+      mapId: 'rope_tether',
+      elapsedSec: 120,
+      failures: -1,
+    });
+    assert.equal(invalidFailures.ok, false);
+    assert.deepEqual(invalidFailures.nextProfile, DEFAULT_PROFILE);
   });
 });

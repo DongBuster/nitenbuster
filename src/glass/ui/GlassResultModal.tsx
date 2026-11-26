@@ -7,6 +7,7 @@ import {
 } from 'react';
 import {
   ArrowLeft,
+  ArrowRight,
   Cookie,
   RotateCcw,
   ShieldAlert,
@@ -17,11 +18,17 @@ import {
   Users,
 } from 'lucide-react';
 import { playSfx } from '../../audio/soundEngine';
+import {
+  calculateCoopResult,
+  getCoopMapMeta,
+  getNextCoopMapId,
+  type CoopMapId,
+} from '../../coop/maps/registry';
 import type { GlassRoomController } from '../online/useGlassRoom';
-import { calculateGlassResult } from '../sim/scoring';
 
 export interface GlassResultModalProps {
   room: GlassRoomController;
+  mapId?: CoopMapId;
   elapsedSec: number;
   shatters: number;
   settlement: {
@@ -55,11 +62,12 @@ function formatTotalTime(sec: number): string {
 }
 
 /**
- * End-of-course modal for Glass Carry Co-op displaying 1-3 star rating,
- * completion time, shatter count, Cookies reward, and rematch controls.
+ * End-of-course modal for PAWS Duo Co-op 3D displaying 1-3 star rating,
+ * completion time, map-adaptive failure count, Cookies reward, and next-map/rematch controls.
  */
 export function GlassResultModal({
   room,
+  mapId,
   elapsedSec,
   shatters,
   settlement,
@@ -91,7 +99,11 @@ export function GlassResultModal({
     };
   }, []);
 
-  const fallback = calculateGlassResult(elapsedSec, shatters);
+  const resolvedMapId = mapId ?? room.finalResult?.mapId ?? room.selectedMap;
+  const mapMeta = getCoopMapMeta(resolvedMapId);
+  const nextMapMeta = getCoopMapMeta(getNextCoopMapId(resolvedMapId));
+
+  const fallback = calculateCoopResult(resolvedMapId, elapsedSec, shatters);
   const stars = settlement?.stars ?? fallback.stars;
   const cookies = settlement
     ? settlement.ok
@@ -105,6 +117,12 @@ export function GlassResultModal({
     dialog.returnValue = '';
 
     if (action === PROGRAMMATIC_CLOSE) {
+      return;
+    }
+
+    if (action === 'next' && room.isHost) {
+      playSfx('roundStart');
+      room.startNextMap();
       return;
     }
 
@@ -190,12 +208,12 @@ export function GlassResultModal({
               id={titleId}
               className="mt-3 font-display text-2xl font-black text-white sm:text-3xl"
             >
-              Giao Kính Thành Công!
+              Hoàn Thành: {mapMeta.title}!
             </h1>
 
             <p id={descId} className="mt-1 text-xs font-bold text-slate-300">
               {room.p1Member?.name ?? 'P1'} &amp; {room.p2Member?.name ?? 'P2'}{' '}
-              đã đưa tấm kính về đích an toàn.
+              đã chinh phục chặng {mapMeta.shortTitle} an toàn.
             </p>
 
             {settlement?.isNewBest && (
@@ -224,7 +242,7 @@ export function GlassResultModal({
                   aria-hidden="true"
                   className="h-3.5 w-3.5 text-rose-300"
                 />
-                <span>Số Lần Vỡ Kính</span>
+                <span>{mapMeta.failureLabel}</span>
               </div>
               <div className="mt-1 font-mono text-2xl font-black text-white tabular-nums">
                 {shatters}
@@ -250,32 +268,41 @@ export function GlassResultModal({
           {/* Action Controls */}
           {room.isHost ? (
             <div className="flex flex-col gap-2.5">
+              <button
+                ref={setNativeAutofocus}
+                autoFocus
+                type="submit"
+                value="next"
+                className={`btn-tactile-cyan inline-flex min-h-[48px] w-full cursor-pointer items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-black text-[#06222c] ${FOCUS_RING_CLASS}`}
+              >
+                <span>Map Tiếp Theo ({nextMapMeta.shortTitle})</span>
+                <ArrowRight aria-hidden="true" className="h-4 w-4" />
+              </button>
+
               <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                 <button
-                  ref={setNativeAutofocus}
-                  autoFocus
                   type="submit"
                   value="restart"
-                  className={`btn-tactile-sky inline-flex min-h-[46px] cursor-pointer items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-black text-white ${FOCUS_RING_CLASS}`}
+                  className={`btn-tactile-amber inline-flex min-h-[46px] cursor-pointer items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-black text-[#26160b] ${FOCUS_RING_CLASS}`}
                 >
                   <RotateCcw aria-hidden="true" className="h-4 w-4" />
-                  <span>Chơi Lại Cùng Phòng</span>
+                  <span>Chơi Lại</span>
                 </button>
 
                 <button
                   type="submit"
                   value="lobby"
-                  className={`btn-tactile-amber inline-flex min-h-[46px] cursor-pointer items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-black text-[#26160b] ${FOCUS_RING_CLASS}`}
+                  className={`btn-tactile-wood inline-flex min-h-[46px] cursor-pointer items-center justify-center gap-2 rounded-2xl border border-white/15 px-4 py-3 text-sm font-black text-amber-100 ${FOCUS_RING_CLASS}`}
                 >
-                  <Users aria-hidden="true" className="h-4 w-4" />
-                  <span>Về Sảnh Phòng</span>
+                  <Users aria-hidden="true" className="h-4 w-4 text-amber-300" />
+                  <span>Đổi Map (Về Sảnh)</span>
                 </button>
               </div>
 
               <button
                 type="submit"
                 value="back"
-                className={`btn-tactile-wood inline-flex min-h-[44px] cursor-pointer items-center justify-center gap-2 rounded-2xl border border-white/15 px-4 py-2.5 text-xs font-black text-slate-200 ${FOCUS_RING_CLASS}`}
+                className={`btn-tactile-wood inline-flex min-h-[42px] cursor-pointer items-center justify-center gap-2 rounded-2xl border border-white/15 px-4 py-2 text-xs font-black text-slate-200 ${FOCUS_RING_CLASS}`}
               >
                 <ArrowLeft aria-hidden="true" className="h-4 w-4 text-slate-300" />
                 <span>Về Chọn Chế Độ</span>
@@ -285,7 +312,9 @@ export function GlassResultModal({
             <div className="flex flex-col gap-3">
               <div className="flex items-center justify-center gap-2 rounded-2xl border border-cyan-400/25 bg-[#0a1320] px-4 py-3 text-xs font-bold text-cyan-200">
                 <Users aria-hidden="true" className="h-4 w-4 text-cyan-300" />
-                <span>Đang chờ Chủ phòng bắt đầu ván mới...</span>
+                <span>
+                  Đang chờ Chủ phòng chọn Map tiếp theo hoặc chơi lại...
+                </span>
               </div>
 
               <button

@@ -70,6 +70,36 @@ export const NEUTRAL_INPUT: PlayerInput = {
   lift: 0,
 };
 
+const SOLO_STABILIZER_REST_X = 3.2;
+const SOLO_STABILIZER_GAIN = 1.65;
+
+/**
+ * Generates an automatic stabilizing input for the opposite end of the glass
+ * when an odd player (or disconnected pair survivor) competes solo in Event mode.
+ * Keeps carry spacing safe while preserving full obstacle, wind, ice, and fall physics.
+ */
+export function computeSoloStabilizerInput(
+  state: GlassSimState,
+  p1Input: PlayerInput,
+): PlayerInput {
+  const targetX = state.p1.x + SOLO_STABILIZER_REST_X;
+  const targetZ = state.p1.z;
+  const errX = targetX - state.p2.x;
+  const errZ = targetZ - state.p2.z;
+
+  const rawX = p1Input.moveX + errX * SOLO_STABILIZER_GAIN;
+  const rawZ = p1Input.moveZ + errZ * SOLO_STABILIZER_GAIN;
+  const len = Math.hypot(rawX, rawZ);
+  const scale = len > 1 ? 1 / len : 1;
+
+  return {
+    moveX: clamp(rawX * scale, -1, 1),
+    moveZ: clamp(rawZ * scale, -1, 1),
+    jump: p1Input.jump,
+    lift: p1Input.lift,
+  };
+}
+
 type Vec3 = { x: number; y: number; z: number };
 
 type GlassTransform = {

@@ -51,6 +51,7 @@ import { useProfileStore } from '../store/profileStore';
 export interface OnlineGame3DScreenProps {
   room: OnlineRoomController;
   onBackToMenu: () => void;
+  embeddedEvent?: boolean;
 }
 
 function getCardSfx(type: CardType): SfxType {
@@ -73,6 +74,7 @@ function getCardSfx(type: CardType): SfxType {
 export function OnlineGame3DScreen({
   room,
   onBackToMenu,
+  embeddedEvent = false,
 }: OnlineGame3DScreenProps) {
   const { settings, updateSettings, recordMatchResult } = useProfileStore();
   const gameState = room.gameState;
@@ -159,13 +161,15 @@ export function OnlineGame3DScreen({
       recordedWinnerRef.current = gameState.winnerId;
       const didWin = gameState.winnerId === room.myPeerId;
       playSfx(didWin ? 'win' : 'lose');
-      const earned = recordMatchResult(didWin);
-      setCookiesEarned(earned);
+      if (!embeddedEvent) {
+        const earned = recordMatchResult(didWin);
+        setCookiesEarned(earned);
+      }
     } else if (!gameState.winnerId && recordedWinnerRef.current !== null) {
       recordedWinnerRef.current = null;
       setCookiesEarned(0);
     }
-  }, [gameState, recordMatchResult, room.myPeerId]);
+  }, [embeddedEvent, gameState, recordMatchResult, room.myPeerId]);
 
   const handleCardClick = useCallback(
     (card: CardData) => {
@@ -301,19 +305,21 @@ export function OnlineGame3DScreen({
       {/* Top HUD */}
       <header className="pointer-events-none fixed inset-x-0 top-0 z-20 flex flex-wrap items-start justify-between gap-2 p-3 sm:p-4">
         {/* Left: Leave + Room Code + Timer + Active Color + Direction */}
-        <div className="pointer-events-auto flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => {
-              playSfx('click');
-              room.leaveRoom();
-              onBackToMenu();
-            }}
-            className="btn-tactile-wood inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-white/20 px-3 py-1.5 text-xs font-black text-white shadow-md transition"
-          >
-            <ArrowLeft className="h-3.5 w-3.5 text-amber-300" />
-            <span>Rời Phòng</span>
-          </button>
+        <div className={`pointer-events-auto flex flex-wrap items-center gap-2 ${embeddedEvent ? 'mt-11' : ''}`}>
+          {!embeddedEvent && (
+            <button
+              type="button"
+              onClick={() => {
+                playSfx('click');
+                room.leaveRoom();
+                onBackToMenu();
+              }}
+              className="btn-tactile-wood inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-white/20 px-3 py-1.5 text-xs font-black text-white shadow-md transition"
+            >
+              <ArrowLeft className="h-3.5 w-3.5 text-amber-300" />
+              <span>Rời Phòng</span>
+            </button>
+          )}
 
           <span className="inline-flex items-center gap-1 rounded-xl border border-sky-400/40 bg-sky-950/80 px-2.5 py-1.5 font-mono text-xs font-black text-sky-200 shadow-md">
             <Globe className="h-3.5 w-3.5 text-sky-400" />
@@ -635,30 +641,32 @@ export function OnlineGame3DScreen({
         onCancel={() => setPendingTargetCard(null)}
       />
 
-      <ResultModal
-        isOpen={Boolean(gameState.winnerId)}
-        state={gameState}
-        humanPlayerId={room.myPeerId}
-        cookiesEarned={cookiesEarned}
-        onPlayAgain={() => {
-          playSfx('click');
-          if (room.isHost) {
-            room.startOnlineMatch();
-          } else {
-            room.leaveRoom();
-            onBackToMenu();
-          }
-        }}
-        onBackToMenu={() => {
-          playSfx('click');
-          if (room.isHost) {
-            room.returnToLobby();
-          } else {
-            room.leaveRoom();
-            onBackToMenu();
-          }
-        }}
-      />
+      {!embeddedEvent && (
+        <ResultModal
+          isOpen={Boolean(gameState.winnerId)}
+          state={gameState}
+          humanPlayerId={room.myPeerId}
+          cookiesEarned={cookiesEarned}
+          onPlayAgain={() => {
+            playSfx('click');
+            if (room.isHost) {
+              room.startOnlineMatch();
+            } else {
+              room.leaveRoom();
+              onBackToMenu();
+            }
+          }}
+          onBackToMenu={() => {
+            playSfx('click');
+            if (room.isHost) {
+              room.returnToLobby();
+            } else {
+              room.leaveRoom();
+              onBackToMenu();
+            }
+          }}
+        />
+      )}
 
       <RulesModal isOpen={showRules} onClose={() => setShowRules(false)} />
 

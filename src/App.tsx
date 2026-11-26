@@ -15,6 +15,7 @@ const LazyBlockBlastRoomContainer = lazy(
   () => import('./blockblast/ui/BlockBlastRoomContainer'),
 );
 const LazyGlassCarryScreen = lazy(() => import('./screens/GlassCarryScreen'));
+const LazyEventRoomScreen = lazy(() => import('./screens/EventRoomScreen'));
 
 type AppScreen =
   | 'modeSelect'
@@ -25,7 +26,8 @@ type AppScreen =
   | 'brawl'
   | 'blockblast'
   | 'blockblastRoom'
-  | 'glassCarry';
+  | 'glassCarry'
+  | 'event';
 
 function OnlineModeContainer({ onBackToMenu }: { onBackToMenu: () => void }) {
   const room = useOnlineRoom();
@@ -138,10 +140,16 @@ export function App() {
   const [initialBbRoomCode] = useState<string>(() =>
     readInitialRoomCodeParam('bbRoom'),
   );
-  const [initialGlassRoomCode] = useState<string>(() =>
-    readInitialRoomCodeParam('glassRoom'),
+  const [initialGlassRoomCode] = useState<string>(
+    () =>
+      readInitialRoomCodeParam('coopRoom') ||
+      readInitialRoomCodeParam('glassRoom'),
+  );
+  const [initialEventRoomCode] = useState<string>(() =>
+    readInitialRoomCodeParam('eventRoom'),
   );
   const [screen, setScreen] = useState<AppScreen>(() => {
+    if (initialEventRoomCode) return 'event';
     if (initialBbRoomCode) return 'blockblastRoom';
     if (initialGlassRoomCode) return 'glassCarry';
     return 'modeSelect';
@@ -149,14 +157,14 @@ export function App() {
 
   useEffect(() => {
     if (
-      (!initialBbRoomCode && !initialGlassRoomCode) ||
+      (!initialBbRoomCode && !initialGlassRoomCode && !initialEventRoomCode) ||
       typeof window === 'undefined'
     ) {
       return;
     }
     const params = new URLSearchParams(window.location.search);
     let changed = false;
-    for (const key of ['bbRoom', 'glassRoom']) {
+    for (const key of ['bbRoom', 'coopRoom', 'glassRoom', 'eventRoom']) {
       if (params.has(key)) {
         params.delete(key);
         changed = true;
@@ -167,7 +175,7 @@ export function App() {
       const nextUrl = `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ''}${window.location.hash}`;
       window.history.replaceState({}, '', nextUrl);
     }
-  }, [initialBbRoomCode, initialGlassRoomCode]);
+  }, [initialBbRoomCode, initialEventRoomCode, initialGlassRoomCode]);
 
   return (
     <div className="relative min-h-screen">
@@ -204,6 +212,7 @@ export function App() {
           onSelectBrawlArena={() => setScreen('brawl')}
           onSelectBlockBlast={() => setScreen('blockblast')}
           onSelectGlassCarry={() => setScreen('glassCarry')}
+          onSelectEventCup={() => setScreen('event')}
           onOpenStudio3D={() => setScreen('studio3d')}
         />
       )}
@@ -301,15 +310,15 @@ export function App() {
 
       {screen === 'glassCarry' && (
         <ModeErrorBoundary
-          title="Không thể mở Glass Carry Co-op"
-          fallbackMessage="Không thể khởi tạo màn chơi 3D Glass Carry Co-op."
+          title="Không thể mở PAWS Duo Co-op 3D"
+          fallbackMessage="Không thể khởi tạo màn chơi 3D PAWS Duo Co-op."
           bgClass="bg-[#0d1b2e]"
           onBack={() => setScreen('modeSelect')}
         >
           <Suspense
             fallback={
               <ModeLoadingFallback
-                label="Đang tải cầu kính Glass Carry Co-op..."
+                label="Đang tải sảnh PAWS Duo Co-op 3D..."
                 bgClass="bg-[#0d1b2e]"
                 spinnerClass="border-cyan-400"
                 textClass="text-cyan-200"
@@ -318,6 +327,31 @@ export function App() {
           >
             <LazyGlassCarryScreen
               initialRoomCode={initialGlassRoomCode}
+              onBackToModeSelect={() => setScreen('modeSelect')}
+            />
+          </Suspense>
+        </ModeErrorBoundary>
+      )}
+
+      {screen === 'event' && (
+        <ModeErrorBoundary
+          title="Không thể mở PAWS Event Cup"
+          fallbackMessage="Không thể khởi tạo phòng thi đấu liên hoàn PAWS Event Cup."
+          bgClass="bg-[#1a100b]"
+          onBack={() => setScreen('modeSelect')}
+        >
+          <Suspense
+            fallback={
+              <ModeLoadingFallback
+                label="Đang tải phòng giải đấu PAWS Event Cup..."
+                bgClass="bg-[#1a100b]"
+                spinnerClass="border-amber-400"
+                textClass="text-amber-200"
+              />
+            }
+          >
+            <LazyEventRoomScreen
+              initialRoomCode={initialEventRoomCode}
               onBackToModeSelect={() => setScreen('modeSelect')}
             />
           </Suspense>

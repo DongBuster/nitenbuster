@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { RealtimeChannel } from '@supabase/supabase-js';
+import {
+  DEFAULT_COOP_MAP_ID,
+  getNextCoopMapId,
+  isCoopMapId,
+  type CoopMapId,
+} from '../../coop/maps/registry.ts';
 import type { AnimalId } from '../../engine/types.ts';
 import {
   generateRoomCode,
@@ -20,6 +26,8 @@ import {
   GLASS_EMOTES,
   GLASS_INPUT_INTERVAL_MS,
   GLASS_MAX_PLAYERS,
+  type CoopSelectMapPayload,
+  type CoopSnapshotPayload,
   type GlassConnectionStatus,
   type GlassEmotePayload,
   type GlassFinishPayload,
@@ -27,7 +35,6 @@ import {
   type GlassReturnLobbyPayload,
   type GlassRoomMember,
   type GlassRoomPhase,
-  type GlassSnapshotPayload,
   type GlassStartPayload,
   type GlassSyncRequestPayload,
   type GlassSyncStatePayload,
@@ -44,6 +51,7 @@ export type GlassProfileInput = {
 
 export type GlassFinalResult = {
   matchId: string;
+  mapId: CoopMapId;
   elapsedSec: number;
   shatters: number;
 };
@@ -52,6 +60,7 @@ export interface GlassRoomController {
   isConfigured: boolean;
   connectionStatus: GlassConnectionStatus;
   phase: GlassRoomPhase;
+  selectedMap: CoopMapId;
   roomCode: string;
   matchId: string;
   myPeerId: string;
@@ -71,15 +80,17 @@ export interface GlassRoomController {
   leaveRoom(): void;
   updateMyProfile(patch: Partial<GlassProfileInput>): void;
   toggleReady(): void;
+  selectMap(mapId: CoopMapId): void;
   startMatch(): void;
   restartMatch(): void;
+  startNextMap(): void;
   returnToLobby(): void;
   sendEmote(emoteIndex: number): void;
   sendGuestInput(input: PlayerInput): void;
-  broadcastSnapshot(snapshot: GlassSnapshotPayload): void;
+  broadcastSnapshot(snapshot: CoopSnapshotPayload): void;
   notifyMatchFinished(elapsedSec: number, shatters: number): void;
   setSnapshotListener(
-    fn: ((snapshot: GlassSnapshotPayload) => void) | null,
+    fn: ((snapshot: CoopSnapshotPayload) => void) | null,
   ): void;
   setGuestInputListener(
     fn: ((input: GlassInputPayload) => void) | null,
@@ -126,6 +137,7 @@ function parsePresenceMembers(
         accessory: normalizeAccessories(m.accessory as AccessorySelection),
         ready: Boolean(m.ready),
         joinedAt: typeof m.joinedAt === 'number' ? m.joinedAt : Date.now(),
+        ...(isCoopMapId(m.selectedMap) ? { selectedMap: m.selectedMap } : {}),
       };
       if (!existing || candidate.joinedAt <= existing.joinedAt) {
         byPeer.set(m.peerId, candidate);
@@ -147,6 +159,14 @@ function inputsEqual(a: PlayerInput, b: PlayerInput): boolean {
   );
 }
 
+function getSnapshotFailures(snapshot: CoopSnapshotPayload): number {
+  return 'shatters' in snapshot ? snapshot.shatters : snapshot.failures;
+}
+
+function getSnapshotMapId(snapshot: CoopSnapshotPayload): CoopMapId {
+  return isCoopMapId(snapshot.mapId) ? snapshot.mapId : DEFAULT_COOP_MAP_ID;
+}
+
 /**
  * Manages an ephemeral 2-player Glass Carry Co-op room via Supabase Realtime
  * Presence and Broadcast. High-frequency 15Hz input and snapshot packets are
@@ -159,6 +179,7 @@ export function useGlassRoom(): GlassRoomController {
   const [connectionStatus, setConnectionStatus] =
     useState<GlassConnectionStatus>('disconnected');
   const [phase, setPhase] = useState<GlassRoomPhase>('idle');
+  const [selectedMap, setSelectedMap] = useState<CoopMapId>(DEFAULT_COOP_MAP_ID);
   const [roomCode, setRoomCode] = useState<string>('');
   const [matchId, setMatchId] = useState<string>('');
   const [members, setMembers] = useState<GlassRoomMember[]>([]);
@@ -187,6 +208,7 @@ export function useGlassRoom(): GlassRoomController {
   const myProfileRef = useRef<GlassRoomMember | null>(null);
   const asHostRef = useRef<boolean>(false);
   const phaseRef = useRef<GlassRoomPhase>('idle');
+  const selectedMapRef = useRef<CoopMapId>(DEFAULT_COOP_MAP_ID);
   const roomCodeRef = useRef<string>('');
   const matchIdRef = useRef<string>('');
   const membersRef = useRef<GlassRoomMember[]>([]);
@@ -205,15 +227,20 @@ export function useGlassRoom(): GlassRoomController {
   const partnerLeftPermanentlyRef = useRef<boolean>(false);
   const emoteTimersRef = useRef<Partial<Record<PlayerSlot, number>>>({});
 
-  const lastSnapshotRef = useRef<GlassSnapshotPayload | null>(null);
+  const lastSnapshotRef = useRef<CoopSnapshotPayload | null>(null);
   const finalResultRef = useRef<GlassFinalResult | null>(null);
 
   const snapshotListenerRef = useRef<
-    ((snapshot: GlassSnapshotPayload) => void) | null
+    ((snapshot: CoopSnapshotPayload) => void) | null
   >(null);
   const guestInputListenerRef = useRef<
     ((input: GlassInputPayload) => void) | null
   >(null);
+
+  const updateSelectedMap = useCallback((nextMap: CoopMapId) => {
+    selectedMapRef.current = nextMap;
+    setSelectedMap(nextMap);
+  }, []);
 
   const inputSeqRef = useRef<number>(0);
   const lastGuestSeqRef = useRef<number>(0);
@@ -366,6 +393,17 @@ export function useGlassRoom(): GlassRoomController {
       setFinalResult(null);
       setPhase(nextPhase);
 
+      if (nextPhase === 'lobby' && myProfileRef.current?.ready) {
+        const updated: GlassRoomMember = {
+          ...myProfileRef.current,
+          ready: false,
+        };
+        myProfileRef.current = updated;
+        if (channelRef.current) {
+          void channelRef.current.track(updated);
+        }
+      }
+
       syncRoleStates(membersRef.current, null, asHostRef.current);
     },
     [
@@ -403,8 +441,10 @@ export function useGlassRoom(): GlassRoomController {
         matchId: matchIdRef.current,
         hostPeerId,
         guestPeerId,
+        mapId: selectedMapRef.current,
         phase: activePhase,
         countdownRemainingMs: remainingMs,
+        latestSnapshot: lastSnapshotRef.current,
         snapshot: lastSnapshotRef.current,
         finalResult: finalResultRef.current,
       };
@@ -497,14 +537,21 @@ export function useGlassRoom(): GlassRoomController {
   );
 
   const applyMatchFinished = useCallback(
-    (finishedMatchId: string, elapsedSec: number, shatters: number) => {
+    (
+      finishedMatchId: string,
+      elapsedSec: number,
+      shatters: number,
+      mapId?: CoopMapId,
+    ) => {
       if (!finishedMatchId || finishedMatchId !== matchIdRef.current) return;
       clearCountdownTimer();
       clearDisconnectTimer();
       clearInputThrottle();
 
+      const resolvedMapId = isCoopMapId(mapId) ? mapId : selectedMapRef.current;
       const result: GlassFinalResult = {
         matchId: finishedMatchId,
+        mapId: resolvedMapId,
         elapsedSec,
         shatters,
       };
@@ -570,6 +617,11 @@ export function useGlassRoom(): GlassRoomController {
       clearDisconnectTimer();
       clearInputThrottle();
 
+      const nextMap: CoopMapId = isCoopMapId(evt.mapId)
+        ? evt.mapId
+        : DEFAULT_COOP_MAP_ID;
+      updateSelectedMap(nextMap);
+
       const roster: MatchRoster = {
         hostPeerId: evt.hostPeerId,
         guestPeerId: evt.guestPeerId,
@@ -613,6 +665,7 @@ export function useGlassRoom(): GlassRoomController {
       clearInputThrottle,
       startCountdownOrPlay,
       syncRoleStates,
+      updateSelectedMap,
     ],
   );
 
@@ -620,6 +673,14 @@ export function useGlassRoom(): GlassRoomController {
     (evt: GlassSyncStatePayload) => {
       if (!evt || evt.targetPeerId !== myPeerId || !evt.matchId) return;
       if (myPeerId !== evt.hostPeerId && myPeerId !== evt.guestPeerId) return;
+
+      const incomingSnapshot = evt.latestSnapshot ?? evt.snapshot ?? null;
+      const resolvedMapId: CoopMapId = isCoopMapId(evt.mapId)
+        ? evt.mapId
+        : incomingSnapshot && isCoopMapId(incomingSnapshot.mapId)
+          ? incomingSnapshot.mapId
+          : DEFAULT_COOP_MAP_ID;
+      updateSelectedMap(resolvedMapId);
 
       const roster: MatchRoster = {
         hostPeerId: evt.hostPeerId,
@@ -645,16 +706,22 @@ export function useGlassRoom(): GlassRoomController {
       syncRoleStates(membersRef.current, roster, asHostRef.current);
 
       if (evt.phase === 'finished') {
-        if (evt.snapshot) {
-          lastSnapshotRef.current = evt.snapshot;
-          snapshotListenerRef.current?.(evt.snapshot);
+        if (incomingSnapshot) {
+          lastSnapshotRef.current = incomingSnapshot;
+          snapshotListenerRef.current?.(incomingSnapshot);
         }
         const res = evt.finalResult ?? {
           matchId: evt.matchId,
-          elapsedSec: evt.snapshot?.matchTime ?? 0,
-          shatters: evt.snapshot?.shatters ?? 0,
+          mapId: resolvedMapId,
+          elapsedSec: incomingSnapshot?.matchTime ?? 0,
+          shatters: incomingSnapshot ? getSnapshotFailures(incomingSnapshot) : 0,
         };
-        applyMatchFinished(evt.matchId, res.elapsedSec, res.shatters);
+        applyMatchFinished(
+          evt.matchId,
+          res.elapsedSec,
+          res.shatters,
+          res.mapId ?? resolvedMapId,
+        );
         return;
       }
 
@@ -667,9 +734,9 @@ export function useGlassRoom(): GlassRoomController {
         setPhase('playing');
       }
 
-      if (evt.snapshot) {
-        lastSnapshotRef.current = evt.snapshot;
-        snapshotListenerRef.current?.(evt.snapshot);
+      if (incomingSnapshot) {
+        lastSnapshotRef.current = incomingSnapshot;
+        snapshotListenerRef.current?.(incomingSnapshot);
       }
     },
     [
@@ -679,6 +746,7 @@ export function useGlassRoom(): GlassRoomController {
       myPeerId,
       startCountdownOrPlay,
       syncRoleStates,
+      updateSelectedMap,
     ],
   );
 
@@ -720,8 +788,9 @@ export function useGlassRoom(): GlassRoomController {
     setMembers([]);
     setConnectionStatus('disconnected');
     setError(null);
+    updateSelectedMap(DEFAULT_COOP_MAP_ID);
     resetMatchState('idle');
-  }, [resetMatchState, teardownChannel]);
+  }, [resetMatchState, teardownChannel, updateSelectedMap]);
 
   const connectToRoom = useCallback(
     (
@@ -749,6 +818,7 @@ export function useGlassRoom(): GlassRoomController {
       roomCodeRef.current = code;
       membersRef.current = [];
       setMembers([]);
+      updateSelectedMap(DEFAULT_COOP_MAP_ID);
       resetMatchState('lobby');
 
       setError(null);
@@ -762,6 +832,7 @@ export function useGlassRoom(): GlassRoomController {
         accessory: normalizeAccessories(profile.accessory),
         ready: asHost,
         joinedAt: Date.now(),
+        ...(asHost ? { selectedMap: DEFAULT_COOP_MAP_ID } : {}),
       };
       myProfileRef.current = initialMember;
       syncRoleStates([], null, asHost);
@@ -823,7 +894,35 @@ export function useGlassRoom(): GlassRoomController {
             membersRef.current = capped;
             setMembers(capped);
             syncRoleStates(capped, matchRosterRef.current, asHostRef.current);
+            if (
+              phaseRef.current === 'lobby' &&
+              !isHostRef.current &&
+              capped[0]?.selectedMap &&
+              isCoopMapId(capped[0].selectedMap) &&
+              capped[0].selectedMap !== selectedMapRef.current
+            ) {
+              updateSelectedMap(capped[0].selectedMap);
+            }
             evaluatePartnerPresence(parsed);
+          })
+          .on('broadcast', { event: 'coop:select_map' }, ({ payload }) => {
+            const evt = payload as CoopSelectMapPayload | undefined;
+            if (!evt || !isCoopMapId(evt.mapId)) return;
+            const expectedHostPeerId =
+              matchRosterRef.current?.hostPeerId ??
+              membersRef.current[0]?.peerId;
+            if (!expectedHostPeerId || evt.hostPeerId !== expectedHostPeerId) {
+              return;
+            }
+            updateSelectedMap(evt.mapId);
+            if (phaseRef.current === 'lobby' && myProfileRef.current?.ready) {
+              const updated: GlassRoomMember = {
+                ...myProfileRef.current,
+                ready: false,
+              };
+              myProfileRef.current = updated;
+              void channel.track(updated);
+            }
           })
           .on('broadcast', { event: 'glass:start' }, ({ payload }) => {
             const evt = payload as GlassStartPayload | undefined;
@@ -851,7 +950,7 @@ export function useGlassRoom(): GlassRoomController {
           })
           .on('broadcast', { event: 'glass:snapshot' }, ({ payload }) => {
             if (isHostRef.current) return;
-            const evt = payload as GlassSnapshotPayload | undefined;
+            const evt = payload as CoopSnapshotPayload | undefined;
             if (!evt || !evt.matchId || evt.matchId !== matchIdRef.current) {
               return;
             }
@@ -861,7 +960,12 @@ export function useGlassRoom(): GlassRoomController {
               evt.phase === 'finished' &&
               finalResultRef.current?.matchId !== evt.matchId
             ) {
-              applyMatchFinished(evt.matchId, evt.matchTime, evt.shatters);
+              applyMatchFinished(
+                evt.matchId,
+                evt.matchTime,
+                getSnapshotFailures(evt),
+                getSnapshotMapId(evt),
+              );
             }
           })
           .on('broadcast', { event: 'glass:finish' }, ({ payload }) => {
@@ -869,7 +973,12 @@ export function useGlassRoom(): GlassRoomController {
             if (!evt || !evt.matchId || evt.matchId !== matchIdRef.current) {
               return;
             }
-            applyMatchFinished(evt.matchId, evt.elapsedSec, evt.shatters);
+            applyMatchFinished(
+              evt.matchId,
+              evt.elapsedSec,
+              evt.shatters,
+              evt.mapId,
+            );
           })
           .on('broadcast', { event: 'glass:emote' }, ({ payload }) => {
             const evt = payload as GlassEmotePayload | undefined;
@@ -935,6 +1044,7 @@ export function useGlassRoom(): GlassRoomController {
       sendSyncStateToChannel,
       syncRoleStates,
       teardownChannel,
+      updateSelectedMap,
     ],
   );
 
@@ -994,13 +1104,56 @@ export function useGlassRoom(): GlassRoomController {
     }
   }, []);
 
+  const selectMap = useCallback(
+    (mapId: CoopMapId) => {
+      if (!isHostRef.current || !isCoopMapId(mapId)) return;
+      if (phaseRef.current !== 'lobby' && phaseRef.current !== 'finished') {
+        return;
+      }
+
+      updateSelectedMap(mapId);
+
+      const current = myProfileRef.current;
+      const channel = channelRef.current;
+      if (current) {
+        const updated: GlassRoomMember = {
+          ...current,
+          ready: false,
+          selectedMap: mapId,
+        };
+        myProfileRef.current = updated;
+        if (channel) {
+          void channel.track(updated);
+        }
+      }
+
+      if (channel) {
+        const payload: CoopSelectMapPayload = {
+          hostPeerId: myPeerId,
+          mapId,
+        };
+        void channel.send({
+          type: 'broadcast',
+          event: 'coop:select_map',
+          payload,
+        });
+      }
+    },
+    [myPeerId, updateSelectedMap],
+  );
+
   const launchMatch = useCallback(
-    (eventName: 'glass:start' | 'glass:restart', requireReady: boolean) => {
+    (
+      eventName: 'glass:start' | 'glass:restart',
+      requireReady: boolean,
+      mapIdOverride?: CoopMapId,
+    ) => {
       if (!isHostRef.current) return;
       const active = membersRef.current.slice(0, GLASS_MAX_PLAYERS);
       if (active.length < GLASS_MAX_PLAYERS) return;
       if (requireReady && !active.every((m) => m.ready)) return;
 
+      const targetMap = mapIdOverride ?? selectedMapRef.current;
       const nextMatchId = `glass-${roomCodeRef.current}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
       const payload: GlassStartPayload = {
         matchId: nextMatchId,
@@ -1008,6 +1161,7 @@ export function useGlassRoom(): GlassRoomController {
         guestPeerId: active[1].peerId,
         countdownMs: GLASS_COUNTDOWN_MS,
         startedAt: Date.now(),
+        mapId: targetMap,
       };
 
       applyMatchStart(payload);
@@ -1033,6 +1187,42 @@ export function useGlassRoom(): GlassRoomController {
     if (phaseRef.current === 'idle' || phaseRef.current === 'lobby') return;
     launchMatch('glass:restart', false);
   }, [launchMatch]);
+
+  const startNextMap = useCallback(() => {
+    if (!isHostRef.current || phaseRef.current !== 'finished') return;
+    const active = membersRef.current.slice(0, GLASS_MAX_PLAYERS);
+    if (active.length < GLASS_MAX_PLAYERS) return;
+
+    const nextMap = getNextCoopMapId(selectedMapRef.current);
+    updateSelectedMap(nextMap);
+
+    const current = myProfileRef.current;
+    const channel = channelRef.current;
+    if (current) {
+      const updated: GlassRoomMember = {
+        ...current,
+        selectedMap: nextMap,
+      };
+      myProfileRef.current = updated;
+      if (channel) {
+        void channel.track(updated);
+      }
+    }
+
+    if (channel) {
+      const selectPayload: CoopSelectMapPayload = {
+        hostPeerId: myPeerId,
+        mapId: nextMap,
+      };
+      void channel.send({
+        type: 'broadcast',
+        event: 'coop:select_map',
+        payload: selectPayload,
+      });
+    }
+
+    launchMatch('glass:start', false, nextMap);
+  }, [launchMatch, myPeerId, updateSelectedMap]);
 
   const returnToLobby = useCallback(() => {
     if (!isHostRef.current) return;
@@ -1125,24 +1315,31 @@ export function useGlassRoom(): GlassRoomController {
 
       const now = Date.now();
       const elapsed = now - lastInputSentAtRef.current;
+      const latchedJump = Boolean(pendingInputRef.current?.jump || input.jump);
+      const latchedLift =
+        input.lift !== 0 ? input.lift : (pendingInputRef.current?.lift ?? 0);
+      const mergedInput: PlayerInput =
+        latchedJump === input.jump && latchedLift === input.lift
+          ? input
+          : { ...input, jump: latchedJump, lift: latchedLift };
       const changed =
-        !lastSentInputRef.current || !inputsEqual(input, lastSentInputRef.current);
+        !lastSentInputRef.current ||
+        !inputsEqual(mergedInput, lastSentInputRef.current);
 
       if (
         elapsed >= GLASS_INPUT_INTERVAL_MS &&
         (changed || elapsed >= GLASS_INPUT_INTERVAL_MS * 2)
       ) {
         clearInputThrottle();
-        flushGuestInput(input, now);
+        flushGuestInput(mergedInput, now);
         return;
       }
 
-      const prevPending = pendingInputRef.current;
       pendingInputRef.current = {
-        moveX: input.moveX,
-        moveZ: input.moveZ,
-        jump: Boolean(prevPending?.jump || input.jump),
-        lift: input.lift,
+        moveX: mergedInput.moveX,
+        moveZ: mergedInput.moveZ,
+        jump: latchedJump,
+        lift: latchedLift,
       };
 
       const targetInterval = changed
@@ -1169,7 +1366,7 @@ export function useGlassRoom(): GlassRoomController {
   );
 
   const broadcastSnapshot = useCallback(
-    (snapshot: GlassSnapshotPayload) => {
+    (snapshot: CoopSnapshotPayload) => {
       if (!isHostRef.current) return;
       if (!matchIdRef.current || snapshot.matchId !== matchIdRef.current) return;
 
@@ -1187,7 +1384,12 @@ export function useGlassRoom(): GlassRoomController {
         snapshot.phase === 'finished' &&
         finalResultRef.current?.matchId !== snapshot.matchId
       ) {
-        applyMatchFinished(snapshot.matchId, snapshot.matchTime, snapshot.shatters);
+        applyMatchFinished(
+          snapshot.matchId,
+          snapshot.matchTime,
+          getSnapshotFailures(snapshot),
+          getSnapshotMapId(snapshot),
+        );
       }
     },
     [applyMatchFinished],
@@ -1198,11 +1400,13 @@ export function useGlassRoom(): GlassRoomController {
       const currentMatchId = matchIdRef.current;
       if (!currentMatchId) return;
 
-      applyMatchFinished(currentMatchId, elapsedSec, shatters);
+      const currentMapId = selectedMapRef.current;
+      applyMatchFinished(currentMatchId, elapsedSec, shatters, currentMapId);
 
       if (isHostRef.current && channelRef.current) {
         const payload: GlassFinishPayload = {
           matchId: currentMatchId,
+          mapId: currentMapId,
           elapsedSec,
           shatters,
         };
@@ -1217,7 +1421,7 @@ export function useGlassRoom(): GlassRoomController {
   );
 
   const setSnapshotListener = useCallback(
-    (fn: ((snapshot: GlassSnapshotPayload) => void) | null) => {
+    (fn: ((snapshot: CoopSnapshotPayload) => void) | null) => {
       snapshotListenerRef.current = fn;
     },
     [],
@@ -1240,6 +1444,7 @@ export function useGlassRoom(): GlassRoomController {
     isConfigured,
     connectionStatus,
     phase,
+    selectedMap,
     roomCode,
     matchId,
     myPeerId,
@@ -1259,8 +1464,10 @@ export function useGlassRoom(): GlassRoomController {
     leaveRoom,
     updateMyProfile,
     toggleReady,
+    selectMap,
     startMatch,
     restartMatch,
+    startNextMap,
     returnToLobby,
     sendEmote,
     sendGuestInput,

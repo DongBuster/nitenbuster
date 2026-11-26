@@ -6,7 +6,16 @@ import {
 } from '../scene3d/accessoryCatalog.ts';
 import { calculateCookieReward } from '../blockblast/engine/game.ts';
 import { verifyMatchReceipt, type MatchReceipt } from '../blockblast/engine/verify.ts';
-import { calculateGlassResult, isNewGlassBest } from '../glass/sim/scoring.ts';
+import {
+  COOP_MAP_IDS,
+  DEFAULT_COOP_MAP_ID,
+  calculateCoopResult,
+  isCoopMapId,
+  isNewCoopBest,
+  type CoopMapId,
+  type CoopMapRecord,
+} from '../coop/maps/registry.ts';
+import { getEventCookieReward } from '../event/scoring.ts';
 
 export const MAX_COOKIES = 1_000_000;
 export const MAX_BLOCK_BLAST_SCORE = 10_000_000;
@@ -31,6 +40,7 @@ export interface PlayerProfile {
   blockBlastBestScore: number;
   glassBestTimeSec: number | null;
   glassBestStars: number;
+  coopRecords: Partial<Record<CoopMapId, CoopMapRecord>>;
   settledMatchIds: string[];
   selectedAnimal: AnimalId;
   unlockedAccessories: string[];
@@ -54,6 +64,21 @@ export interface GlassSettlementResult {
   isNewBest: boolean;
 }
 
+export interface CoopSettlementResult {
+  nextProfile: PlayerProfile;
+  ok: boolean;
+  mapId: CoopMapId;
+  reward: number;
+  stars: 1 | 2 | 3;
+  isNewBest: boolean;
+}
+
+export interface EventSettlementResult {
+  nextProfile: PlayerProfile;
+  ok: boolean;
+  reward: number;
+}
+
 export const VALID_ANIMALS: AnimalId[] = [
   'dog',
   'cat',
@@ -72,6 +97,7 @@ export const DEFAULT_PROFILE: PlayerProfile = {
   blockBlastBestScore: 0,
   glassBestTimeSec: null,
   glassBestStars: 0,
+  coopRecords: {},
   settledMatchIds: [],
   selectedAnimal: 'dog',
   unlockedAccessories: [...DEFAULT_UNLOCKED_ACCESSORIES],
@@ -148,6 +174,45 @@ function sanitizeSettings(raw: unknown): ProfileSettings {
   };
 }
 
+function sanitizeCoopRecords(raw: unknown): Partial<Record<CoopMapId, CoopMapRecord>> {
+  const out: Partial<Record<CoopMapId, CoopMapRecord>> = {};
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return out;
+  }
+
+  const rawMap = raw as Record<string, unknown>;
+  for (const mapId of COOP_MAP_IDS) {
+    if (!Object.hasOwn(rawMap, mapId)) continue;
+    const entry = rawMap[mapId];
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) continue;
+
+    const rec = entry as Record<string, unknown>;
+    if (typeof rec.bestStars !== 'number' || !Number.isFinite(rec.bestStars)) {
+      continue;
+    }
+    const flooredStars = Math.floor(rec.bestStars);
+    if (flooredStars < 1) continue;
+    const bestStars = Math.min(3, flooredStars);
+
+    if (
+      typeof rec.bestTimeSec !== 'number' ||
+      !Number.isFinite(rec.bestTimeSec) ||
+      rec.bestTimeSec <= 0
+    ) {
+      continue;
+    }
+    const bestTimeSec = Math.min(
+      MAX_GLASS_TIME_SEC,
+      Math.round(rec.bestTimeSec * 100) / 100,
+    );
+    if (bestTimeSec <= 0) continue;
+
+    out[mapId] = { bestStars, bestTimeSec };
+  }
+
+  return out;
+}
+
 export function sanitizeProfileData(
   raw: Record<string, unknown>,
 ): PlayerProfile {
@@ -200,6 +265,28 @@ export function sanitizeProfileData(
         )
       : null;
 
+  const coopRecords = sanitizeCoopRecords(safeRaw.coopRecords);
+  let glassBestStars = clampNonNegInt(safeRaw.glassBestStars, 3, 0);
+  let syncedGlassBestTimeSec = glassBestTimeSec;
+
+  if (
+    !coopRecords.glass_carry &&
+    glassBestStars > 0 &&
+    syncedGlassBestTimeSec !== null
+  ) {
+    coopRecords.glass_carry = {
+      bestStars: glassBestStars,
+      bestTimeSec: syncedGlassBestTimeSec,
+    };
+  } else if (coopRecords.glass_carry) {
+    if (glassBestStars === 0) {
+      glassBestStars = coopRecords.glass_carry.bestStars;
+      syncedGlassBestTimeSec = coopRecords.glass_carry.bestTimeSec;
+    } else if (syncedGlassBestTimeSec === null) {
+      syncedGlassBestTimeSec = coopRecords.glass_carry.bestTimeSec;
+    }
+  }
+
   return {
     cookies: clampNonNegInt(
       safeRaw.cookies,
@@ -213,8 +300,9 @@ export function sanitizeProfileData(
       MAX_BLOCK_BLAST_SCORE,
       0,
     ),
-    glassBestTimeSec,
-    glassBestStars: clampNonNegInt(safeRaw.glassBestStars, 3, 0),
+    glassBestTimeSec: syncedGlassBestTimeSec,
+    glassBestStars,
+    coopRecords,
     settledMatchIds: sanitizeSettledMatchIds(safeRaw.settledMatchIds),
     selectedAnimal,
     unlockedAccessories: Array.from(unlockedSet),
@@ -290,13 +378,23 @@ export function settleBlockBlastMatch(
   };
 }
 
-export function settleGlassCarryMatch(
+export function settleCoopMatch(
   profile: PlayerProfile,
-  payload: { matchId: string; elapsedSec: number; shatters: number },
-): GlassSettlementResult {
-  const fail: GlassSettlementResult = {
+  payload: {
+    matchId: string;
+    mapId: CoopMapId;
+    elapsedSec: number;
+    failures: number;
+  },
+): CoopSettlementResult {
+  const safeMapId =
+    payload && typeof payload === 'object' && isCoopMapId(payload.mapId)
+      ? payload.mapId
+      : DEFAULT_COOP_MAP_ID;
+  const fail: CoopSettlementResult = {
     nextProfile: profile,
     ok: false,
+    mapId: safeMapId,
     reward: 0,
     stars: 1,
     isNewBest: false,
@@ -308,14 +406,15 @@ export function settleGlassCarryMatch(
     typeof payload.matchId !== 'string' ||
     payload.matchId.trim().length < 4 ||
     payload.matchId.length > 80 ||
+    !isCoopMapId(payload.mapId) ||
     typeof payload.elapsedSec !== 'number' ||
     !Number.isFinite(payload.elapsedSec) ||
     payload.elapsedSec <= 0 ||
     payload.elapsedSec > MAX_GLASS_TIME_SEC ||
-    typeof payload.shatters !== 'number' ||
-    !Number.isFinite(payload.shatters) ||
-    payload.shatters < 0 ||
-    payload.shatters > 10_000
+    typeof payload.failures !== 'number' ||
+    !Number.isFinite(payload.failures) ||
+    payload.failures < 0 ||
+    payload.failures > 10_000
   ) {
     return fail;
   }
@@ -324,22 +423,45 @@ export function settleGlassCarryMatch(
     return fail;
   }
 
-  const res = calculateGlassResult(payload.elapsedSec, Math.floor(payload.shatters));
-  const isNewBest = isNewGlassBest(
-    profile.glassBestTimeSec,
-    profile.glassBestStars,
+  const res = calculateCoopResult(
+    payload.mapId,
     payload.elapsedSec,
-    res.stars,
+    Math.floor(payload.failures),
   );
-  const roundedElapsedSec = Math.min(
-    MAX_GLASS_TIME_SEC,
-    Math.round(payload.elapsedSec * 100) / 100,
+  const roundedElapsedSec = Math.max(
+    0.01,
+    Math.min(
+      MAX_GLASS_TIME_SEC,
+      Math.round(payload.elapsedSec * 100) / 100,
+    ),
   );
-  const nextBestStars = Math.max(profile.glassBestStars, res.stars);
-  const nextBestTimeSec =
-    profile.glassBestTimeSec === null
-      ? roundedElapsedSec
-      : Math.min(profile.glassBestTimeSec, roundedElapsedSec);
+  const existingRecord =
+    profile.coopRecords?.[payload.mapId] ??
+    (payload.mapId === 'glass_carry' &&
+    profile.glassBestStars > 0 &&
+    profile.glassBestTimeSec !== null
+      ? {
+          bestStars: profile.glassBestStars,
+          bestTimeSec: profile.glassBestTimeSec,
+        }
+      : undefined);
+
+  const isNewBest = isNewCoopBest(existingRecord, roundedElapsedSec, res.stars);
+  const nextBestStars = existingRecord
+    ? Math.max(existingRecord.bestStars, res.stars)
+    : res.stars;
+  const nextBestTimeSec = existingRecord
+    ? Math.min(existingRecord.bestTimeSec, roundedElapsedSec)
+    : roundedElapsedSec;
+
+  const nextCoopRecords: Partial<Record<CoopMapId, CoopMapRecord>> = {
+    ...profile.coopRecords,
+    [payload.mapId]: {
+      bestStars: nextBestStars,
+      bestTimeSec: nextBestTimeSec,
+    },
+  };
+
   const nextGamesPlayed = Math.min(MAX_GAMES, profile.gamesPlayed + 1);
   const nextGamesWon = Math.min(
     nextGamesPlayed,
@@ -354,16 +476,102 @@ export function settleGlassCarryMatch(
     cookies: Math.min(MAX_COOKIES, profile.cookies + res.cookies),
     gamesPlayed: nextGamesPlayed,
     gamesWon: nextGamesWon,
-    glassBestStars: nextBestStars,
-    glassBestTimeSec: nextBestTimeSec,
+    glassBestStars:
+      payload.mapId === 'glass_carry'
+        ? Math.max(profile.glassBestStars, nextBestStars)
+        : profile.glassBestStars,
+    glassBestTimeSec:
+      payload.mapId === 'glass_carry'
+        ? profile.glassBestTimeSec === null
+          ? nextBestTimeSec
+          : Math.min(profile.glassBestTimeSec, nextBestTimeSec)
+        : profile.glassBestTimeSec,
+    coopRecords: nextCoopRecords,
     settledMatchIds: nextSettled,
   };
 
   return {
     nextProfile,
     ok: true,
+    mapId: payload.mapId,
     reward: res.cookies,
     stars: res.stars,
     isNewBest,
+  };
+}
+
+export function settleGlassCarryMatch(
+  profile: PlayerProfile,
+  payload: { matchId: string; elapsedSec: number; shatters: number },
+): GlassSettlementResult {
+  const res = settleCoopMatch(profile, {
+    matchId: payload?.matchId,
+    mapId: 'glass_carry',
+    elapsedSec: payload?.elapsedSec,
+    failures: payload?.shatters,
+  });
+
+  return {
+    nextProfile: res.nextProfile,
+    ok: res.ok,
+    reward: res.reward,
+    stars: res.stars,
+    isNewBest: res.isNewBest,
+  };
+}
+
+export function settleEventMatch(
+  profile: PlayerProfile,
+  payload: { matchId: string; rank: number; totalPlayers: number },
+): EventSettlementResult {
+  const fail: EventSettlementResult = {
+    nextProfile: profile,
+    ok: false,
+    reward: 0,
+  };
+
+  if (
+    !payload ||
+    typeof payload !== 'object' ||
+    typeof payload.matchId !== 'string' ||
+    payload.matchId.trim().length < 4 ||
+    payload.matchId.length > 80 ||
+    !Number.isSafeInteger(payload.rank) ||
+    payload.rank < 1 ||
+    payload.rank > 8 ||
+    !Number.isSafeInteger(payload.totalPlayers) ||
+    payload.totalPlayers < 2 ||
+    payload.totalPlayers > 8 ||
+    payload.rank > payload.totalPlayers
+  ) {
+    return fail;
+  }
+
+  if (profile.settledMatchIds.includes(payload.matchId)) {
+    return fail;
+  }
+
+  const reward = getEventCookieReward(payload.rank);
+  const nextGamesPlayed = Math.min(MAX_GAMES, profile.gamesPlayed + 1);
+  const nextGamesWon = Math.min(
+    nextGamesPlayed,
+    profile.gamesWon + (payload.rank === 1 ? 1 : 0),
+  );
+  const nextSettled = [...profile.settledMatchIds, payload.matchId].slice(
+    -MAX_SETTLED_MATCH_IDS,
+  );
+
+  const nextProfile: PlayerProfile = {
+    ...profile,
+    cookies: Math.min(MAX_COOKIES, profile.cookies + reward),
+    gamesPlayed: nextGamesPlayed,
+    gamesWon: nextGamesWon,
+    settledMatchIds: nextSettled,
+  };
+
+  return {
+    nextProfile,
+    ok: true,
+    reward,
   };
 }

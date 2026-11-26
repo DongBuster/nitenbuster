@@ -27,11 +27,16 @@ export function FighterActor({
   config,
   totalFighters,
   runtime,
+  isLocalPlayer,
+  isRemoteClient = false,
 }: {
   config: FighterConfig;
   totalFighters: number;
   runtime: BrawlWorldRuntime;
+  isLocalPlayer?: boolean;
+  isRemoteClient?: boolean;
 }) {
+  const showAsLocal = isLocalPlayer ?? !config.isBot;
   const bodyRef = useRef<RapierRigidBody | null>(null);
   const visualRef = useRef<THREE.Group | null>(null);
   const weaponRef = useRef<THREE.Group | null>(null);
@@ -70,6 +75,13 @@ export function FighterActor({
     if (!entry) return;
     if (bodyRef.current && entry.body !== bodyRef.current) {
       entry.body = bodyRef.current;
+    }
+    if (isRemoteClient && bodyRef.current) {
+      bodyRef.current.setNextKinematicTranslation({
+        x: entry.pos.x,
+        y: entry.pos.y,
+        z: entry.pos.z,
+      });
     }
     partyMotionRef.current = entry.partyMotion;
 
@@ -199,7 +211,7 @@ export function FighterActor({
   return (
     <RigidBody
       ref={bodyRef}
-      type="dynamic"
+      type={isRemoteClient ? 'kinematicPosition' : 'dynamic'}
       position={[spawn.x, spawn.y, spawn.z]}
       colliders={false}
       enabledRotations={[false, false, false]}
@@ -221,7 +233,7 @@ export function FighterActor({
             animal={config.animal}
             accessory={config.accessory}
             emotion={emotion}
-            isActive={!config.isBot && alive}
+            isActive={showAsLocal && alive}
           />
         </BrawlMotionContext.Provider>
 
@@ -307,12 +319,12 @@ export function FighterActor({
             )}
             <div
               className={`rounded-full px-2 py-0.5 text-[10px] font-black whitespace-nowrap shadow-md ${
-                config.isBot
-                  ? 'border border-white/25 bg-[#1B110B]/85 text-amber-100'
-                  : 'border border-amber-200 bg-amber-400 text-[#2C1B11]'
+                showAsLocal
+                  ? 'border border-amber-200 bg-amber-400 text-[#2C1B11]'
+                  : 'border border-white/25 bg-[#1B110B]/85 text-amber-100'
               }`}
             >
-              {config.isBot ? config.name : '▼ BẠN'}
+              {showAsLocal ? '▼ BẠN' : config.name}
             </div>
             {balancePct < 99 && (
               <div className="h-1 w-11 overflow-hidden rounded-full bg-black/50">

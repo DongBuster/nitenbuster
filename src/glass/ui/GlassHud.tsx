@@ -4,17 +4,20 @@ import {
   ArrowLeft,
   CheckCircle2,
   Clock,
+  Heart,
+  Link2,
   ShieldAlert,
   Users,
   Volume2,
   VolumeX,
   WifiOff,
+  Zap,
 } from 'lucide-react';
 import { playSfx } from '../../audio/soundEngine';
+import { getCoopMapMeta, type CoopMapId } from '../../coop/maps/registry';
 import { GLASS_EMOTES } from '../online/protocol';
 import type { GlassRoomController } from '../online/useGlassRoom';
 import type { GlassHudSnapshot } from '../render/renderTypes';
-import { GLASS_COURSE } from '../sim/course';
 import type { ShatterReason } from '../sim/types';
 
 export interface GlassHudProps {
@@ -29,11 +32,29 @@ export interface GlassHudProps {
 const FOCUS_RING_CLASS =
   'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300';
 
+const STAGE_NUMBERS = [1, 2, 3, 4, 5] as const;
+
+const MINECART_JUMP_THRESHOLD_PCT = 35;
+
 const SHATTER_REASON_LABEL: Record<ShatterReason, string> = {
   impact: 'Va chạm chướng ngại vật!',
   stretch: 'Hai người đi quá xa nhau!',
   tilt: 'Độ nghiêng tấm kính quá giới hạn!',
   fall: 'Rơi khỏi đường đua!',
+};
+
+const FAILURE_FLASH_TITLE: Record<CoopMapId, string> = {
+  glass_carry: 'Kính vỡ! Hồi sinh tại Checkpoint...',
+  raft_rapids: 'Phao lật! Hồi sinh tại Checkpoint...',
+  rope_tether: 'Đứt dây / Rơi vực! Hồi sinh tại Checkpoint...',
+  minecart_rails: 'Xe trật bánh! Hồi sinh tại Checkpoint...',
+};
+
+const DURABILITY_LABEL: Record<CoopMapId, string> = {
+  glass_carry: 'Kính',
+  raft_rapids: 'Phao',
+  rope_tether: 'Độ bền dây',
+  minecart_rails: 'Xe ray',
 };
 
 function formatElapsedTenths(sec: number): string {
@@ -147,86 +168,226 @@ export function GlassHud({
     }
   }, [room.partnerLeftPermanently]);
 
+  const activeMapId: CoopMapId = hud.mapId ?? room.selectedMap;
+  const activeMapMeta = getCoopMapMeta(activeMapId);
+
   const stressRatio = Math.max(
     0,
     Math.min(1, Number.isFinite(hud.glassStress) ? hud.glassStress : 0),
   );
-  const stressPct = Math.round(stressRatio * 100);
-  const isDangerStress = stressRatio > 0.72;
-  const isWarnStress = stressRatio > 0.45 && !isDangerStress;
+  const meterPct = Math.max(
+    0,
+    Math.min(100, Math.round(hud.primaryMeterPct ?? stressRatio * 100)),
+  );
+  const meterLabel = hud.primaryMeterLabel ?? 'Độ căng';
+  const failureLabel = hud.failureLabel ?? activeMapMeta.failureLabel;
 
-  const stressBarClass = isDangerStress
-    ? 'bg-rose-500 animate-pulse motion-reduce:animate-none'
-    : isWarnStress
-      ? 'bg-amber-400'
-      : 'bg-cyan-400';
+  const isDangerMeter =
+    activeMapId === 'raft_rapids'
+      ? hud.statusBadge === 'Xoáy Nước!' || hud.shatterTimer > 0
+      : activeMapId === 'minecart_rails'
+        ? hud.shatterTimer > 0
+        : meterPct > 72;
+  const isWarnMeter =
+    activeMapId === 'raft_rapids'
+      ? false
+      : activeMapId === 'minecart_rails'
+        ? meterPct < MINECART_JUMP_THRESHOLD_PCT
+        : meterPct > 45 && !isDangerMeter;
+
+  let meterBarClass = 'bg-cyan-400';
+  if (activeMapId === 'raft_rapids') {
+    meterBarClass = hud.boostActive
+      ? 'bg-sky-400 shadow-[0_0_12px_rgba(56,189,248,0.85)]'
+      : isDangerMeter
+        ? 'bg-rose-500 animate-pulse motion-reduce:animate-none'
+        : 'bg-cyan-400/80';
+  } else if (activeMapId === 'minecart_rails') {
+    meterBarClass = isDangerMeter
+      ? 'bg-rose-500 animate-pulse motion-reduce:animate-none'
+      : meterPct >= MINECART_JUMP_THRESHOLD_PCT
+        ? 'bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.6)]'
+        : 'bg-amber-400';
+  } else {
+    meterBarClass = isDangerMeter
+      ? 'bg-rose-500 animate-pulse motion-reduce:animate-none'
+      : isWarnMeter
+        ? 'bg-amber-400'
+        : 'bg-cyan-400';
+  }
+
+  const meterValueClass =
+    activeMapId === 'raft_rapids' && hud.boostActive
+      ? 'text-sky-300'
+      : isDangerMeter
+        ? 'text-rose-300'
+        : isWarnMeter
+          ? 'text-amber-300'
+          : 'text-cyan-200';
 
   const isHostSlot =
     room.mySlot === 'p1' || (room.mySlot === null && room.isHost);
   const maxHp = Math.max(1, hud.glassMaxHp || 3);
   const totalCheckpoints = Math.max(1, hud.totalCheckpoints || 4);
+  const isDisconnected =
+    room.partnerDisconnectedSec !== null || room.partnerLeftPermanently;
 
   return (
     <div className="pointer-events-none fixed inset-0 z-20 flex flex-col justify-between p-3 sm:p-4">
       {/* TOP HUD */}
       <header className="grid grid-cols-2 items-start gap-2 lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
-        {/* Top-left: Glass Durability + Tension */}
+        {/* Top-left: Adaptive Map Status Card */}
         <div className="order-1 justify-self-start rounded-2xl border border-cyan-400/35 bg-[#0e1827]/90 px-3.5 py-2.5 text-white shadow-xl backdrop-blur-md">
-          <div className="flex items-center gap-2.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <span
+              className="rounded-lg border px-2 py-0.5 text-[10px] font-black uppercase tracking-wide"
+              style={{
+                borderColor: `${activeMapMeta.accentHex}70`,
+                backgroundColor: `${activeMapMeta.accentHex}22`,
+                color: activeMapMeta.accentHex,
+              }}
+            >
+              {activeMapMeta.shortTitle}
+            </span>
+
             <div className="flex items-center gap-1" aria-hidden="true">
-              {Array.from({ length: maxHp }, (_, idx) => (
-                <CrystalPaneIcon key={idx} intact={idx < hud.glassHp} />
-              ))}
+              {Array.from({ length: maxHp }, (_, idx) => {
+                const intact = idx < hud.glassHp;
+                if (activeMapId === 'glass_carry') {
+                  return <CrystalPaneIcon key={idx} intact={intact} />;
+                }
+                if (activeMapId === 'rope_tether') {
+                  return (
+                    <Link2
+                      key={idx}
+                      className={`h-4 w-4 transition-all motion-reduce:transition-none ${
+                        intact
+                          ? 'text-amber-300 drop-shadow-[0_0_5px_rgba(251,191,36,0.65)]'
+                          : 'text-slate-600 opacity-45'
+                      }`}
+                    />
+                  );
+                }
+                return (
+                  <Heart
+                    key={idx}
+                    className={`h-4 w-4 transition-all motion-reduce:transition-none ${
+                      intact
+                        ? activeMapId === 'raft_rapids'
+                          ? 'fill-sky-400 text-sky-300 drop-shadow-[0_0_5px_rgba(56,189,248,0.65)]'
+                          : 'fill-rose-400 text-rose-300 drop-shadow-[0_0_5px_rgba(251,113,133,0.65)]'
+                        : 'fill-slate-800 text-slate-600 opacity-50'
+                    }`}
+                  />
+                );
+              })}
             </div>
+
             <span className="font-mono text-xs font-black text-cyan-200 tabular-nums">
-              Kính {hud.glassHp}/{maxHp}
+              {DURABILITY_LABEL[activeMapId]} {hud.glassHp}/{maxHp}
             </span>
           </div>
 
           <div className="mt-2 flex items-center gap-2">
             <span className="text-[11px] font-extrabold text-slate-300">
-              Độ căng
+              {meterLabel}
             </span>
             <div
               role="progressbar"
-              aria-label="Độ căng tấm kính"
+              aria-label={meterLabel}
               aria-valuemin={0}
               aria-valuemax={100}
-              aria-valuenow={stressPct}
-              className="h-2 w-28 overflow-hidden rounded-full border border-white/10 bg-[#08101b] sm:w-36"
+              aria-valuenow={meterPct}
+              className="relative h-2.5 w-28 overflow-hidden rounded-full border border-white/10 bg-[#08101b] sm:w-36"
             >
               <div
-                className={`h-full rounded-full transition-[width,background-color] duration-100 motion-reduce:transition-none ${stressBarClass}`}
-                style={{ width: `${stressPct}%` }}
+                className={`h-full rounded-full transition-[width,background-color] duration-100 motion-reduce:transition-none ${meterBarClass}`}
+                style={{ width: `${meterPct}%` }}
               />
+              {activeMapId === 'minecart_rails' && (
+                <div
+                  aria-hidden="true"
+                  title="Ngưỡng nhảy ≥ 7.0 m/s"
+                  className="absolute inset-y-0 w-0.5 bg-amber-300 shadow-[0_0_6px_rgba(252,211,77,0.9)]"
+                  style={{ left: `${MINECART_JUMP_THRESHOLD_PCT}%` }}
+                />
+              )}
             </div>
             <span
-              className={`w-9 text-right font-mono text-[11px] font-black tabular-nums ${
-                isDangerStress
-                  ? 'text-rose-300'
-                  : isWarnStress
-                    ? 'text-amber-300'
-                    : 'text-cyan-200'
-              }`}
+              className={`w-9 text-right font-mono text-[11px] font-black tabular-nums ${meterValueClass}`}
             >
-              {stressPct}%
+              {meterPct}%
             </span>
           </div>
+
+          {(activeMapId === 'minecart_rails' ||
+            hud.pumpTurn ||
+            hud.statusBadge ||
+            hud.boostActive) && (
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              {hud.pumpTurn && (
+                <span
+                  className={`inline-flex items-center gap-1 rounded-lg border px-2 py-0.5 text-[11px] font-black ${
+                    hud.pumpTurn === 'p1'
+                      ? 'border-amber-300/60 bg-amber-400/20 text-amber-200'
+                      : 'border-cyan-300/60 bg-cyan-400/20 text-cyan-200'
+                  }`}
+                >
+                  <Zap aria-hidden="true" className="h-3 w-3" />
+                  <span>
+                    LƯỢT BƠM: {hud.pumpTurn === 'p1' ? 'P1' : 'P2'}
+                  </span>
+                </span>
+              )}
+
+              {activeMapId === 'minecart_rails' && (
+                <span
+                  className={`rounded-lg border px-1.5 py-0.5 font-mono text-[10px] font-bold ${
+                    meterPct >= MINECART_JUMP_THRESHOLD_PCT
+                      ? 'border-emerald-400/45 bg-emerald-500/15 text-emerald-200'
+                      : 'border-amber-400/35 bg-amber-500/10 text-amber-200/90'
+                  }`}
+                >
+                  ≥ 7.0 m/s
+                </span>
+              )}
+
+              {hud.statusBadge &&
+                !(hud.pumpTurn && hud.statusBadge.startsWith('Lượt Bơm:')) && (
+                  <span
+                    className={`inline-flex items-center gap-1 rounded-lg border px-2 py-0.5 text-[11px] font-black ${
+                      hud.boostActive
+                        ? 'border-sky-300/60 bg-sky-400/25 text-sky-100'
+                        : hud.statusBadge.includes('Hồi sinh') ||
+                            hud.statusBadge.includes('Cứu') ||
+                            hud.statusBadge.includes('Xoáy')
+                          ? 'border-rose-400/55 bg-rose-500/20 text-rose-200'
+                          : 'border-amber-300/45 bg-amber-400/15 text-amber-200'
+                    }`}
+                  >
+                    {hud.boostActive && (
+                      <Zap aria-hidden="true" className="h-3 w-3" />
+                    )}
+                    <span>{hud.statusBadge}</span>
+                  </span>
+                )}
+            </div>
+          )}
         </div>
 
-        {/* Top-center: 5-Stage Progress Stepper + Time + Shatters */}
+        {/* Top-center: 5-Stage Progress Stepper + Time + Failures */}
         <div className="order-3 col-span-2 justify-self-center rounded-2xl border border-cyan-400/35 bg-[#0e1827]/90 px-3.5 py-2 text-white shadow-xl backdrop-blur-md lg:order-2 lg:col-span-1">
           <div className="flex flex-wrap items-center justify-center gap-2">
             <ol
               aria-label="Tiến độ 5 chặng"
               className="flex items-center gap-1"
             >
-              {GLASS_COURSE.stages.map((stage) => {
-                const isActive = stage.number === hud.stageNumber;
-                const isDone = stage.number < hud.stageNumber;
+              {STAGE_NUMBERS.map((stageNum) => {
+                const isActive = stageNum === hud.stageNumber;
+                const isDone = stageNum < hud.stageNumber;
                 return (
                   <li
-                    key={stage.number}
+                    key={stageNum}
                     aria-current={isActive ? 'step' : undefined}
                     className={`flex h-6 w-6 items-center justify-center rounded-full border text-[11px] font-black transition-colors motion-reduce:transition-none ${
                       isActive
@@ -236,7 +397,7 @@ export function GlassHud({
                           : 'border-white/15 bg-[#08101b] text-slate-400'
                     }`}
                   >
-                    {stage.number}
+                    {stageNum}
                   </li>
                 );
               })}
@@ -260,7 +421,9 @@ export function GlassHud({
                 aria-hidden="true"
                 className="h-3.5 w-3.5 text-rose-400"
               />
-              <span>Vỡ: {hud.shatters}</span>
+              <span>
+                {failureLabel}: {hud.shatters}
+              </span>
             </span>
           </div>
         </div>
@@ -317,7 +480,7 @@ export function GlassHud({
       </header>
 
       {/* CENTER OVERLAYS */}
-      <div className="pointer-events-none fixed inset-0 z-30 flex items-center justify-center p-4">
+      <div className="pointer-events-none fixed inset-0 z-30 flex flex-col items-center justify-center gap-3 p-4">
         {/* Countdown Overlay */}
         {room.phase === 'countdown' && (
           <div
@@ -326,7 +489,7 @@ export function GlassHud({
             className="flex flex-col items-center gap-2 rounded-3xl border-2 border-cyan-300/60 bg-[#0e1827]/90 px-10 py-6 text-center shadow-2xl backdrop-blur-md"
           >
             <span className="text-xs font-black uppercase tracking-widest text-cyan-200">
-              Chuẩn Bị Khiêng Kính
+              Chuẩn Bị: {activeMapMeta.title}
             </span>
             <div className="font-display text-6xl font-black text-amber-300 drop-shadow">
               {room.countdownSec > 0 ? `${room.countdownSec}` : '1!'}
@@ -334,8 +497,8 @@ export function GlassHud({
           </div>
         )}
 
-        {/* Shatter Flash Notice */}
-        {room.phase === 'playing' && hud.shatterTimer > 0 && (
+        {/* Adaptive Failure Flash Notice (suppressed while partner disconnect notice is active) */}
+        {room.phase === 'playing' && hud.shatterTimer > 0 && !isDisconnected && (
           <div
             role="status"
             aria-live="assertive"
@@ -346,9 +509,9 @@ export function GlassHud({
                 aria-hidden="true"
                 className="h-5 w-5 text-rose-300"
               />
-              <span>Kính vỡ! Hồi sinh tại Checkpoint...</span>
+              <span>{FAILURE_FLASH_TITLE[activeMapId]}</span>
             </div>
-            {hud.shatterReason && (
+            {activeMapId === 'glass_carry' && hud.shatterReason && (
               <p className="mt-1 text-xs font-bold text-rose-200/90">
                 {SHATTER_REASON_LABEL[hud.shatterReason]}
               </p>
@@ -359,7 +522,8 @@ export function GlassHud({
         {/* Brief Checkpoint Banner */}
         {room.phase === 'playing' &&
           checkpointBanner !== null &&
-          hud.shatterTimer <= 0 && (
+          hud.shatterTimer <= 0 &&
+          !isDisconnected && (
             <div
               role="status"
               aria-live="polite"
@@ -371,8 +535,9 @@ export function GlassHud({
                   className="h-5 w-5 text-emerald-300"
                 />
                 <span>
-                  Checkpoint {checkpointBanner}/{totalCheckpoints} — Đã sửa kính
-                  3/3!
+                  {activeMapId === 'glass_carry'
+                    ? `Checkpoint ${checkpointBanner}/${totalCheckpoints} — Đã sửa kính 3/3!`
+                    : `Checkpoint ${checkpointBanner}/${totalCheckpoints} — Đã lưu & hồi phục!`}
                 </span>
               </div>
             </div>
@@ -441,7 +606,6 @@ export function GlassHud({
                 onClick={(e) => {
                   e.currentTarget.blur();
                   playSfx('click');
-                  room.leaveRoom();
                   (onBackToModeSelect ?? onLeaveRoom)();
                 }}
                 className={`btn-tactile-wood flex-1 cursor-pointer rounded-2xl border border-white/20 px-4 py-2.5 text-sm font-black text-amber-100 ${FOCUS_RING_CLASS}`}
@@ -453,11 +617,23 @@ export function GlassHud({
         )}
       </div>
 
-      {/* BOTTOM-CENTER: Keybinds + 4 Clickable Emote Buttons */}
+      {/* BOTTOM-CENTER: Dynamic Keybinds + 4 Clickable Emote Buttons */}
       <footer className="flex flex-col items-center gap-2">
         <div className="pointer-events-auto flex flex-wrap items-center justify-center gap-2 rounded-2xl border border-cyan-400/30 bg-[#0e1827]/90 px-3 py-2 shadow-xl backdrop-blur-md">
-          <div className="hidden items-center gap-1.5 pr-2 text-[11px] font-bold text-slate-300 md:flex md:border-r md:border-white/15">
-            <span>WASD · Space · Q Hạ · E Nâng</span>
+          <div className="hidden items-center gap-2 pr-2 text-[11px] font-bold text-slate-300 md:flex md:border-r md:border-white/15">
+            {activeMapMeta.controls.slice(0, 4).map((ctrl, idx) => (
+              <span key={ctrl.keys} className="inline-flex items-center gap-1">
+                {idx > 0 && (
+                  <span aria-hidden="true" className="text-slate-500">
+                    ·
+                  </span>
+                )}
+                <kbd className="rounded bg-black/40 px-1 py-0.5 font-mono text-[10px] text-cyan-200">
+                  {ctrl.keys}
+                </kbd>
+                <span>{ctrl.label}</span>
+              </span>
+            ))}
           </div>
 
           <div className="flex flex-wrap items-center justify-center gap-1.5">

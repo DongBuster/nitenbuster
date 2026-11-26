@@ -73,6 +73,7 @@ function interpolateSnapshots(
   t: number,
 ): GlassSnapshotPayload {
   return {
+    ...(b.mapId !== undefined ? { mapId: b.mapId } : {}),
     matchId: b.matchId,
     tick: b.tick,
     matchTime: lerp(a.matchTime, b.matchTime, t),
@@ -109,6 +110,11 @@ export class SnapshotInterpolator {
   private entries: SnapshotEntry[] = [];
 
   push(snapshot: GlassSnapshotPayload, localNowMs: number): void {
+    const prev = this.entries[this.entries.length - 1];
+    if (prev && prev.snapshot.matchId !== snapshot.matchId) {
+      this.entries = [];
+    }
+
     const last = this.entries[this.entries.length - 1];
     if (last && snapshot.tick <= last.snapshot.tick) {
       return;

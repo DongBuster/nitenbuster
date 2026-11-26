@@ -31,7 +31,11 @@ export type SfxType =
   | 'glassCrack'
   | 'glassShatter'
   | 'checkpoint'
-  | 'glassLift';
+  | 'glassLift'
+  | 'paddleSplash'
+  | 'raftBoost'
+  | 'ropePull'
+  | 'cartClack';
 
 export interface AudioPreferences {
   sfxEnabled?: boolean;
@@ -371,6 +375,42 @@ export function playSfx(type: SfxType, opts?: { combo?: number }): void {
 
       case 'glassLift':
         playTone(ctx, { freq: 320, endFreq: 480, type: 'sine', duration: 0.09, gain: 0.06 });
+        break;
+
+      case 'paddleSplash':
+        playNoiseBurst(ctx, {
+          duration: 0.14,
+          filterFreq: 1350,
+          filterType: 'bandpass',
+          gain: 0.19,
+        });
+        playTone(ctx, { freq: 210, endFreq: 120, type: 'sine', duration: 0.13, gain: 0.12 });
+        break;
+
+      case 'raftBoost':
+        playNoiseBurst(ctx, {
+          duration: 0.18,
+          filterFreq: 1850,
+          filterType: 'bandpass',
+          gain: 0.16,
+        });
+        playTone(ctx, { freq: 392, endFreq: 784, type: 'triangle', startOffset: 0, duration: 0.15, gain: 0.18 });
+        playTone(ctx, { freq: 987.77, type: 'sine', startOffset: 0.08, duration: 0.18, gain: 0.16 });
+        break;
+
+      case 'ropePull':
+        playTone(ctx, { freq: 290, endFreq: 195, type: 'sawtooth', startOffset: 0, duration: 0.05, gain: 0.11 });
+        playTone(ctx, { freq: 410, endFreq: 540, type: 'triangle', startOffset: 0.045, duration: 0.065, gain: 0.14 });
+        break;
+
+      case 'cartClack':
+        playNoiseBurst(ctx, {
+          duration: 0.045,
+          filterFreq: 2600,
+          filterType: 'highpass',
+          gain: 0.16,
+        });
+        playTone(ctx, { freq: 520, endFreq: 860, type: 'triangle', startOffset: 0.01, duration: 0.08, gain: 0.18 });
         break;
     }
   } catch {

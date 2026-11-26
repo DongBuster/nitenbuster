@@ -8,13 +8,18 @@ import {
   toggleSlotAccessory,
   type ShopItem,
 } from '../scene3d/accessoryCatalog.ts';
+import type { CoopMapId, CoopMapRecord } from '../coop/maps/registry.ts';
 import { unwrapSignedProfile, wrapSignedProfile } from './profileIntegrity.ts';
 import {
   DEFAULT_PROFILE,
   sanitizeProfileData,
   settleBlockBlastMatch,
+  settleCoopMatch,
+  settleEventMatch,
   settleGlassCarryMatch,
   type BlockBlastSettlementResult,
+  type CoopSettlementResult,
+  type EventSettlementResult,
   type GlassSettlementResult,
   type PlayerProfile,
   type ProfileSettings,
@@ -23,8 +28,13 @@ import {
 export {
   SHOP_ITEMS,
   settleBlockBlastMatch,
+  settleCoopMatch,
+  settleEventMatch,
   settleGlassCarryMatch,
   type BlockBlastSettlementResult,
+  type CoopMapRecord,
+  type CoopSettlementResult,
+  type EventSettlementResult,
   type GlassSettlementResult,
   type PlayerProfile,
   type ProfileSettings,
@@ -247,6 +257,42 @@ export function useProfileStore() {
     [],
   );
 
+  const recordCoopMatchResult = useCallback(
+    (payload: {
+      matchId: string;
+      mapId: CoopMapId;
+      elapsedSec: number;
+      failures: number;
+    }) => {
+      const settlement = settleCoopMatch(currentProfile, payload);
+      if (settlement.ok) {
+        persistAndNotify(settlement.nextProfile);
+      }
+      return {
+        ok: settlement.ok,
+        mapId: settlement.mapId,
+        reward: settlement.reward,
+        stars: settlement.stars,
+        isNewBest: settlement.isNewBest,
+      };
+    },
+    [],
+  );
+
+  const recordEventResult = useCallback(
+    (payload: { matchId: string; rank: number; totalPlayers: number }) => {
+      const settlement = settleEventMatch(currentProfile, payload);
+      if (settlement.ok) {
+        persistAndNotify(settlement.nextProfile);
+      }
+      return {
+        ok: settlement.ok,
+        reward: settlement.reward,
+      };
+    },
+    [],
+  );
+
   const buyAccessory = useCallback((id: string): boolean => {
     const item = SHOP_ITEMS.find((i) => i.id === id);
     if (!item) return false;
@@ -301,6 +347,8 @@ export function useProfileStore() {
     spendBlockBlastBomb,
     recordBlockBlastResult,
     recordGlassMatchResult,
+    recordCoopMatchResult,
+    recordEventResult,
     buyAccessory,
     equipAccessory,
     clearAccessories,

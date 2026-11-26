@@ -11,6 +11,7 @@ import {
   Users,
 } from 'lucide-react';
 import { playSfx } from '../audio/soundEngine';
+import { MAX_COOP_STARS, countTotalCoopStars } from '../coop/maps/registry';
 import { ANIMALS } from '../engine/types';
 import { formatEquippedSummary } from '../scene3d/accessoryCatalog';
 import { useProfileStore } from '../store/profileStore';
@@ -20,6 +21,7 @@ export interface ModeSelectScreenProps {
   onSelectBrawlArena: () => void;
   onSelectBlockBlast: () => void;
   onSelectGlassCarry: () => void;
+  onSelectEventCup: () => void;
   onOpenStudio3D: () => void;
 }
 
@@ -57,6 +59,7 @@ export function ModeSelectScreen({
   onSelectBrawlArena,
   onSelectBlockBlast,
   onSelectGlassCarry,
+  onSelectEventCup,
   onOpenStudio3D,
 }: ModeSelectScreenProps) {
   const {
@@ -64,8 +67,7 @@ export function ModeSelectScreen({
     gamesWon,
     gamesPlayed,
     blockBlastBestScore,
-    glassBestStars,
-    glassBestTimeSec,
+    coopRecords,
     selectedAnimal,
     equippedAccessory,
   } = useProfileStore();
@@ -153,16 +155,16 @@ export function ModeSelectScreen({
     },
     {
       id: 'glassCarry',
-      title: 'Glass Carry Co-op',
-      genreBadge: 'Co-op Vật Lý · 2 Người Online',
+      title: 'PAWS Duo Co-op 3D',
+      genreBadge: 'Co-op 2 Người · 4 Map Hợp Tác',
       badgeIcon: <Users className="h-3.5 w-3.5 text-cyan-300" />,
       description:
-        'Phối hợp cùng đồng đội Online khiêng tấm kính pha lê vượt 5 chặng cầu gỗ, sàn băng, quạt gió và búa lắc. Nâng/hạ kính ăn ý để không vỡ tan tành!',
+        'Phối hợp cùng đồng đội Online qua 4 kiểu chơi khác hẳn nhau: Bê Kính Pha Lê, Chèo Phao Vượt Thác, Dây Thừng Buộc Chung & Xe Goòng Đường Ray!',
       bannerWebp: '/banners/glass-carry-banner.webp',
       bannerJpg: '/banners/glass-carry-banner.jpg',
       bannerAlt:
         'Hai thú bông 3D cẩn thận khiêng tấm kính pha lê sáng lấp lánh qua cây cầu gỗ tuyết có búa lắc và đèn lồng ấm',
-      ctaLabel: 'Vào Phòng Glass Carry',
+      ctaLabel: 'Vào Sảnh Duo Co-op',
       cardClass:
         'border-cyan-500/35 bg-[#0c212b] hover:border-cyan-400 hover:shadow-[0_22px_46px_rgba(34,211,238,0.22)] has-[button:focus-visible]:outline-cyan-300',
       badgeClass: 'border-cyan-400/35 bg-cyan-400/15 text-cyan-200',
@@ -170,14 +172,11 @@ export function ModeSelectScreen({
       ctaClass: 'btn-tactile-cyan',
       ctaTextClass: 'text-[#06222c]',
       specs: [
-        { label: 'Lối chơi', value: 'Online 2 người Co-op' },
-        { label: 'Đường đua', value: '5 chặng · Checkpoint' },
+        { label: 'Chế độ', value: '4 Map · 2 Người Online' },
+        { label: 'Thử thách', value: '5 chặng · Checkpoint' },
         {
-          label: 'Kỷ lục',
-          value:
-            glassBestStars > 0 && glassBestTimeSec !== null
-              ? `${glassBestStars}★ · ${Math.round(glassBestTimeSec)}s`
-              : 'Chưa phá đảo',
+          label: 'Tổng sao',
+          value: `${countTotalCoopStars(coopRecords)} / ${MAX_COOP_STARS}★`,
         },
       ],
       onEnter: onSelectGlassCarry,
@@ -202,7 +201,7 @@ export function ModeSelectScreen({
                 Chọn <span className="font-bold text-amber-300">Đấu Bài</span> cân não,{' '}
                 <span className="font-bold text-sky-300">Hỗn Chiến</span> vật lý,{' '}
                 <span className="font-bold text-emerald-300">Xếp Khối 8×8</span> hoặc{' '}
-                <span className="font-bold text-cyan-300">Khiêng Kính Co-op</span> cùng thú bông 3D.
+                <span className="font-bold text-cyan-300">Duo Co-op 4 Map</span> cùng thú bông 3D.
               </p>
             </div>
 
@@ -253,6 +252,48 @@ export function ModeSelectScreen({
             </div>
           </div>
         </header>
+
+        {/* Featured Tournament Event Banner */}
+        <section className="relative overflow-hidden rounded-3xl border-2 border-amber-400/50 bg-gradient-to-r from-[#3e1d0f]/95 via-[#2a1929]/95 to-[#102935]/95 px-6 py-4 shadow-[0_18px_42px_rgba(251,191,36,0.16)]">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="min-w-0">
+              <div className="inline-flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-300/55 bg-amber-400/20 px-3 py-1 text-xs font-black text-amber-200">
+                  <Trophy className="h-3.5 w-3.5 text-amber-300" />
+                  <span>CHẾ ĐỘ MỚI · GIẢI ĐẤU LIÊN HOÀN</span>
+                </span>
+                <span className="rounded-full border border-white/15 bg-black/35 px-2.5 py-1 text-[11px] font-bold text-amber-100/85">
+                  2–8 Người Thật · Không Bot · Tùy Chỉnh Thời Gian Từng Game
+                </span>
+              </div>
+              <h2 className="mt-2 font-display text-2xl font-black text-white sm:text-3xl">
+                PAWS Event Cup — Phòng Thi Đấu 4 Trò Chơi
+              </h2>
+              <p className="mt-1 text-sm text-amber-100/85">
+                Tạo 1 phòng duy nhất mời bạn bè thi đấu Grand Prix liên tiếp qua cả{' '}
+                <strong className="text-amber-300">PAWS Cards</strong>,{' '}
+                <strong className="text-emerald-300">Block Blast</strong>,{' '}
+                <strong className="text-sky-300">Brawl Arena Online</strong> và{' '}
+                <strong className="text-cyan-300">Glass Carry</strong> để tranh cúp vô địch!
+              </p>
+            </div>
+
+            <div className="shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  playSfx('click');
+                  onSelectEventCup();
+                }}
+                className="btn-tactile-amber inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-2xl px-6 py-3.5 text-sm font-black text-[#26160b] shadow-lg focus-visible:outline-2 focus-visible:outline-amber-300 lg:w-auto"
+              >
+                <Trophy className="h-4 w-4" />
+                <span>Vào Phòng Event Cup</span>
+                <ArrowRight className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        </section>
 
         {/* Four Distinct Game Mode Cards */}
         <main className="grid flex-1 grid-cols-1 items-stretch gap-5 md:grid-cols-2 xl:grid-cols-4">

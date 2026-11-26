@@ -1,3 +1,7 @@
+import type { CoopMapId } from '../../coop/maps/registry.ts';
+import type { MinecartSnapshotPayload } from '../../coop/maps/minecart/types.ts';
+import type { RaftSnapshotPayload } from '../../coop/maps/raft/types.ts';
+import type { RopeSnapshotPayload } from '../../coop/maps/rope/types.ts';
 import type { AnimalId } from '../../engine/types.ts';
 import type {
   GlassSimState,
@@ -43,6 +47,7 @@ export type GlassRoomMember = {
   accessory: string[];
   ready: boolean;
   joinedAt: number;
+  selectedMap?: CoopMapId;
 };
 
 export type PackedPlayerState = {
@@ -60,6 +65,7 @@ export type PackedPlayerState = {
 };
 
 export type GlassSnapshotPayload = {
+  mapId?: 'glass_carry';
   matchId: string;
   tick: number;
   matchTime: number;
@@ -87,6 +93,17 @@ export type GlassSnapshotPayload = {
   events: SimEvent[];
 };
 
+export type CoopSnapshotPayload =
+  | (GlassSnapshotPayload & { mapId?: 'glass_carry' })
+  | RaftSnapshotPayload
+  | RopeSnapshotPayload
+  | MinecartSnapshotPayload;
+
+export type CoopSelectMapPayload = {
+  hostPeerId: string;
+  mapId: CoopMapId;
+};
+
 export type GlassInputPayload = {
   matchId: string;
   peerId: string;
@@ -103,6 +120,7 @@ export type GlassStartPayload = {
   guestPeerId: string;
   countdownMs: number;
   startedAt: number;
+  mapId?: CoopMapId;
 };
 
 export type GlassEmotePayload = {
@@ -115,6 +133,7 @@ export type GlassEmotePayload = {
 
 export type GlassFinishPayload = {
   matchId: string;
+  mapId?: CoopMapId;
   elapsedSec: number;
   shatters: number;
 };
@@ -133,9 +152,11 @@ export type GlassSyncStatePayload = {
   matchId: string;
   hostPeerId: string;
   guestPeerId: string;
+  mapId?: CoopMapId;
   phase: 'countdown' | 'playing' | 'finished';
   countdownRemainingMs: number;
-  snapshot: GlassSnapshotPayload | null;
+  latestSnapshot: CoopSnapshotPayload | null;
+  snapshot?: CoopSnapshotPayload | null;
   finalResult: GlassFinishPayload | null;
 };
 
@@ -170,6 +191,7 @@ export function packSimSnapshot(
   state: GlassSimState,
 ): GlassSnapshotPayload {
   return {
+    mapId: 'glass_carry',
     matchId,
     tick: state.tick,
     matchTime: round2(state.matchTime),

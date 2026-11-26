@@ -129,6 +129,11 @@ import type {
   Projectile,
   WorldItem,
 } from '../sim/types';
+import {
+  round2,
+  type BrawlFighterSnapshot,
+  type BrawlSnapshotPayload,
+} from '../online/protocol';
 
 export interface FighterRuntime {
   config: FighterConfig;
@@ -924,6 +929,8 @@ export class BrawlWorldRuntime {
     dt: number;
     phase: 'countdown' | 'fighting' | 'roundOver' | 'matchOver' | 'setup';
     humanInput: FighterInput;
+    localFighterId?: string;
+    remoteInputs?: Record<string, FighterInput>;
     onEliminateBatch: (ids: string[]) => void;
   }): void {
     const dt = Math.min(0.05, params.dt);
@@ -1150,6 +1157,7 @@ export class BrawlWorldRuntime {
 
       // Pick input source
       let input: FighterInput;
+      const localId = params.localFighterId ?? 'human';
       if (fighter.config.isBot) {
         const selfView = botViews.find((v) => v.id === fighter.config.id)!;
         input = computeBotInput({
@@ -1161,8 +1169,20 @@ export class BrawlWorldRuntime {
           difficulty: this.difficulty,
           memory: fighter.botMemory,
         });
-      } else {
+      } else if (fighter.config.id === localId) {
         input = params.humanInput;
+      } else {
+        input = params.remoteInputs?.[fighter.config.id] ?? {
+          moveX: 0,
+          moveZ: 0,
+          sprint: false,
+          jump: false,
+          punch: false,
+          headbutt: false,
+          grabHeld: false,
+          roll: false,
+          emote: null,
+        };
       }
 
       // Clear depleted melee weapon cleanly once spin animation finishes
@@ -1510,8 +1530,133 @@ export class BrawlWorldRuntime {
     }
   }
 
-  getHudSnapshot(): HudSnapshot {
-    const human = this.fighters.get('human');
+  exportSnapshot(roundKey: string, tick: number): BrawlSnapshotPayload {
+    const now = this.nowSec;
+    const fighters: BrawlFighterSnapshot[] = [];
+    for (const f of this.fighters.values()) {
+      fighters.push({
+        id: f.config.id,
+        x: round2(f.pos.x),
+        y: round2(f.pos.y),
+        z: round2(f.pos.z),
+        yaw: round2(f.yaw),
+        speedNorm: round2(f.speedNorm),
+        walkPhase: round2(f.walkPhase),
+        grounded: f.grounded,
+        alive: f.status.alive,
+        balance: round2(f.status.balance),
+        maxBalance: f.status.maxBalance,
+        stunned: f.status.stunnedUntil > now,
+        frozen: f.status.frozenUntil > now,
+        shielded: f.status.shieldUntil > now || f.status.stunImmuneUntil > now,
+        speedBoosted: f.status.speedBoostUntil > now,
+        heldItem: f.status.heldItem,
+        heldAmmo: f.status.heldAmmo,
+        emote: f.status.emote,
+        action: f.partyMotion.action,
+        actionProgress: round2(f.partyMotion.actionProgress),
+      });
+    }
+
+    return {
+      roundKey,
+      tick,
+      nowSec: round2(this.nowSec),
+      roundElapsedSec: round2(this.roundElapsedSec),
+      fighters,
+      items: this.items.map((item) => ({
+        id: item.id,
+        kind: item.kind,
+        x: round2(item.x),
+        y: round2(item.y),
+        z: round2(item.z),
+      })),
+      projectiles: this.projectiles.map((p) => ({
+        id: p.id,
+        kind: p.kind,
+        ownerId: p.ownerId,
+        x: round2(p.x),
+        y: round2(p.y),
+        z: round2(p.z),
+        fuseSec: round2(p.fuseSec),
+      })),
+      koFeed: this.koFeed.map(({ id, text }) => ({ id, text })),
+      bannerText: this.bannerText,
+    };
+  }
+
+  applySnapshot(snapshot: BrawlSnapshotPayload): void {
+    this.nowSec = snapshot.nowSec;
+    this.roundElapsedSec = snapshot.roundElapsedSec;
+    this.bannerText = snapshot.bannerText;
+    this.koFeed = snapshot.koFeed.map((item) => ({
+      ...item,
+      expiresAt: snapshot.nowSec + 3,
+    }));
+
+    this.items = snapshot.items.map((item) => ({
+      ...item,
+      spawnedAt: snapshot.nowSec,
+    }));
+
+    this.projectiles = snapshot.projectiles.map((p) => ({
+      ...p,
+      vx: 0,
+      vy: 0,
+      vz: 0,
+      createdAt: snapshot.nowSec,
+    }));
+
+    for (const sf of snapshot.fighters) {
+      const f = this.fighters.get(sf.id);
+      if (!f) continue;
+      f.pos.set(sf.x, sf.y, sf.z);
+      f.yaw = sf.yaw;
+      f.speedNorm = sf.speedNorm;
+      f.walkPhase = sf.walkPhase;
+      f.grounded = sf.grounded;
+      f.status.alive = sf.alive;
+      f.status.balance = sf.balance;
+      f.status.maxBalance = sf.maxBalance;
+      f.status.stunnedUntil = sf.stunned ? snapshot.nowSec + 0.5 : 0;
+      f.status.frozenUntil = sf.frozen ? snapshot.nowSec + 0.5 : 0;
+      f.status.shieldUntil = sf.shielded ? snapshot.nowSec + 0.5 : 0;
+      f.status.speedBoostUntil = sf.speedBoosted ? snapshot.nowSec + 0.5 : 0;
+      f.status.heldItem = sf.heldItem;
+      f.status.heldAmmo = sf.heldAmmo;
+      f.status.emote = sf.emote;
+      f.partyMotion.action = sf.action;
+      f.partyMotion.actionProgress = sf.actionProgress;
+      f.partyMotion.speedNorm = sf.speedNorm;
+      f.partyMotion.walkPhase = sf.walkPhase;
+    }
+  }
+
+  getSurvivorTieBreakStats(): Array<{
+    id: string;
+    alive: boolean;
+    balance: number;
+    distToCenter: number;
+  }> {
+    const out: Array<{
+      id: string;
+      alive: boolean;
+      balance: number;
+      distToCenter: number;
+    }> = [];
+    for (const f of this.fighters.values()) {
+      out.push({
+        id: f.config.id,
+        alive: f.status.alive,
+        balance: f.status.balance,
+        distToCenter: Math.hypot(f.pos.x, f.pos.z),
+      });
+    }
+    return out;
+  }
+
+  getHudSnapshot(localFighterId = 'human'): HudSnapshot {
+    const human = this.fighters.get(localFighterId);
     const st = human?.status;
     const now = this.nowSec;
     const collapseInfo = getNextCollapseInfo(this.roundElapsedSec);
