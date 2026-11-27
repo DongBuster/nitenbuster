@@ -15,6 +15,11 @@ export interface BrawlResultProps {
   onPlayAgain: () => void;
   onChangeSettings: () => void;
   onBackToModeSelect: () => void;
+  localFighterId?: string;
+  isOnline?: boolean;
+  isHost?: boolean;
+  secondaryLabel?: string;
+  exitLabel?: string;
 }
 
 export function BrawlResult({
@@ -23,9 +28,14 @@ export function BrawlResult({
   onPlayAgain,
   onChangeSettings,
   onBackToModeSelect,
+  localFighterId = 'human',
+  isOnline = false,
+  isHost = true,
+  secondaryLabel = 'Đổi Cài Đặt',
+  exitLabel = 'Chọn Chế Độ',
 }: BrawlResultProps) {
   const standings = getSortedStandings(match.scores);
-  const humanRank = getHumanFinalRank(match.scores);
+  const humanRank = getHumanFinalRank(match.scores, localFighterId);
   const champion = standings[0];
 
   return (
@@ -57,7 +67,7 @@ export function BrawlResult({
             <div
               key={entry.id}
               className={`flex items-center justify-between rounded-2xl border px-4 py-2.5 text-sm font-bold ${
-                entry.id === 'human'
+                entry.id === localFighterId
                   ? 'border-amber-400/60 bg-amber-400/15 text-amber-100'
                   : 'border-white/10 bg-white/5 text-slate-200'
               }`}
@@ -85,41 +95,60 @@ export function BrawlResult({
           ))}
         </div>
 
-        <div className="mt-6 grid grid-cols-1 gap-2.5 sm:grid-cols-3">
-          <button
-            type="button"
-            onClick={() => {
-              playSfx('roundStart');
-              onPlayAgain();
-            }}
-            className="btn-tactile-amber inline-flex cursor-pointer items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-black text-[#1B110B]"
-          >
-            <RotateCcw className="h-4 w-4" />
-            <span>Chơi Lại</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              playSfx('click');
-              onChangeSettings();
-            }}
-            className="btn-tactile-wood inline-flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-white/20 px-4 py-3 text-sm font-bold text-white"
-          >
-            <Settings className="h-4 w-4 text-amber-300" />
-            <span>Đổi Cài Đặt</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              playSfx('click');
-              onBackToModeSelect();
-            }}
-            className="btn-tactile-wood inline-flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-white/20 px-4 py-3 text-sm font-bold text-slate-200"
-          >
-            <ArrowLeft className="h-4 w-4 text-slate-400" />
-            <span>Chọn Chế Độ</span>
-          </button>
-        </div>
+        {isOnline && !isHost ? (
+          <div className="mt-6 flex flex-col items-center gap-3">
+            <div className="w-full rounded-2xl border border-sky-400/30 bg-sky-950/50 px-4 py-3 text-center text-xs font-bold text-sky-200">
+              Chờ chủ phòng bắt đầu ván mới hoặc quay về phòng chờ...
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                playSfx('click');
+                onBackToModeSelect();
+              }}
+              className="btn-tactile-wood inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-2xl border border-white/20 px-4 py-3 text-sm font-bold text-slate-200 sm:w-auto sm:px-6"
+            >
+              <ArrowLeft className="h-4 w-4 text-slate-400" />
+              <span>{exitLabel}</span>
+            </button>
+          </div>
+        ) : (
+          <div className="mt-6 grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+            <button
+              type="button"
+              onClick={() => {
+                playSfx('roundStart');
+                onPlayAgain();
+              }}
+              className="btn-tactile-amber inline-flex cursor-pointer items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-black text-[#1B110B]"
+            >
+              <RotateCcw className="h-4 w-4" />
+              <span>Chơi Lại</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                playSfx('click');
+                onChangeSettings();
+              }}
+              className="btn-tactile-wood inline-flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-white/20 px-4 py-3 text-sm font-bold text-white"
+            >
+              <Settings className="h-4 w-4 text-amber-300" />
+              <span>{secondaryLabel}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                playSfx('click');
+                onBackToModeSelect();
+              }}
+              className="btn-tactile-wood inline-flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-white/20 px-4 py-3 text-sm font-bold text-slate-200"
+            >
+              <ArrowLeft className="h-4 w-4 text-slate-400" />
+              <span>{exitLabel}</span>
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

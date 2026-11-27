@@ -9,11 +9,13 @@ import {
 } from '../brawl/sim/matchStore';
 import type { BrawlDifficulty, HudSnapshot } from '../brawl/sim/types';
 import { BrawlHud } from '../brawl/ui/BrawlHud';
+import { BrawlOnlineContainer } from '../brawl/ui/BrawlOnlineContainer';
 import { BrawlResult } from '../brawl/ui/BrawlResult';
 import { BrawlSetupPanel } from '../brawl/ui/BrawlSetupPanel';
 import { useProfileStore } from '../store/profileStore';
 
 export interface BrawlScreenProps {
+  initialRoomCode?: string;
   onBackToModeSelect: () => void;
 }
 
@@ -45,7 +47,13 @@ const INITIAL_HUD: HudSnapshot = {
   koFeed: [],
 };
 
-export function BrawlScreen({ onBackToModeSelect }: BrawlScreenProps) {
+export function BrawlScreen({
+  initialRoomCode = '',
+  onBackToModeSelect,
+}: BrawlScreenProps) {
+  const [playMode, setPlayMode] = useState<'offline' | 'online'>(() =>
+    initialRoomCode ? 'online' : 'offline',
+  );
   const {
     cookies,
     selectedAnimal,
@@ -155,6 +163,16 @@ export function BrawlScreen({ onBackToModeSelect }: BrawlScreenProps) {
     dispatch({ type: 'ELIMINATE_BATCH', ids });
   }, []);
 
+  if (playMode === 'online') {
+    return (
+      <BrawlOnlineContainer
+        initialRoomCode={initialRoomCode}
+        onSwitchToOffline={() => setPlayMode('offline')}
+        onBackToModeSelect={onBackToModeSelect}
+      />
+    );
+  }
+
   if (match.phase === 'setup') {
     return (
       <BrawlSetupPanel
@@ -167,6 +185,7 @@ export function BrawlScreen({ onBackToModeSelect }: BrawlScreenProps) {
         onChangeBotCount={setBotCount}
         onChangeDifficulty={setDifficulty}
         onStart={startNewMatch}
+        onOpenOnline={() => setPlayMode('online')}
         onBackToModeSelect={onBackToModeSelect}
       />
     );

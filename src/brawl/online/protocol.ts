@@ -1,15 +1,47 @@
+import type { AnimalId } from '../../engine/types.ts';
 import type { PartyActionKind } from '../sim/partyMotion.ts';
 import type {
+  BrawlDifficulty,
   EmoteKind,
   FighterInput,
   HeldWeaponKind,
   ItemKind,
+  MatchState,
 } from '../sim/types.ts';
 
 export const BRAWL_SNAPSHOT_INTERVAL_MS = 50; // 20Hz
 export const BRAWL_INPUT_INTERVAL_MS = 50; // 20Hz
 export const BRAWL_INPUT_STALE_MS = 350;
 export const BRAWL_INTERPOLATION_DELAY_MS = 70;
+export const BRAWL_MAX_ROOM_PLAYERS = 8;
+
+export type BrawlRoomPhase = 'idle' | 'lobby' | 'playing';
+
+export interface BrawlRoomMember {
+  peerId: string;
+  name: string;
+  animal: AnimalId;
+  accessory: string[];
+  ready: boolean;
+  joinedAt: number;
+}
+
+export interface BrawlRoomSettings {
+  fillWithBots: boolean;
+  targetPlayers: number;
+  difficulty: BrawlDifficulty;
+}
+
+export interface BrawlRoomConfigPayload {
+  settings: BrawlRoomSettings;
+}
+
+export interface BrawlMatchSyncPayload {
+  matchNonce: number;
+  hostPeerId: string;
+  phase: BrawlRoomPhase;
+  match: MatchState | null;
+}
 
 export interface BrawlInputPayload {
   roundKey: string;

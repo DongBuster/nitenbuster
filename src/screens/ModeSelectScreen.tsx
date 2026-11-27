@@ -128,8 +128,8 @@ export function ModeSelectScreen({
       ctaTextClass: 'text-white',
       specs: [
         { label: 'Lối chơi', value: 'Thời gian thực' },
-        { label: 'Kỹ năng', value: 'Đấm · Tóm · Húc · Lăn' },
-        { label: 'Mục tiêu', value: 'Trụ sàn qua 3 hiệp' },
+        { label: 'Kỹ năng', value: 'Đấm · Xoay · Tóm · Lăn' },
+        { label: 'Phòng đấu', value: 'Bot & Online 2–8 người' },
       ],
       onEnter: onSelectBrawlArena,
     },

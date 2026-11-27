@@ -24,6 +24,11 @@ export type MatchAction =
       botCount: number;
       difficulty: BrawlDifficulty;
     }
+  | {
+      type: 'START_ONLINE_MATCH';
+      fighters: FighterConfig[];
+      difficulty: BrawlDifficulty;
+    }
   | { type: 'TICK_COUNTDOWN' }
   | { type: 'ELIMINATE_BATCH'; ids: string[] }
   | { type: 'ADVANCE_AFTER_ROUND' }
@@ -185,6 +190,37 @@ export function matchReducer(state: MatchState, action: MatchAction): MatchState
       };
     }
 
+    case 'START_ONLINE_MATCH': {
+      const fighters = action.fighters;
+      const scores: Record<string, FighterScore> = {};
+      for (const f of fighters) {
+        scores[f.id] = {
+          id: f.id,
+          name: f.name,
+          animal: f.animal,
+          isBot: f.isBot,
+          points: 0,
+          firstPlaces: 0,
+          lastRoundRank: fighters.length,
+          roundPointsHistory: [],
+        };
+      }
+      const botCount = fighters.filter((f) => f.isBot).length;
+      return {
+        phase: 'countdown',
+        round: 1,
+        totalRounds: TOTAL_ROUNDS,
+        countdownSec: 3,
+        fighters,
+        aliveIds: fighters.map((f) => f.id),
+        eliminationGroups: [],
+        scores,
+        lastRoundRankings: [],
+        difficulty: action.difficulty,
+        botCount,
+      };
+    }
+
     case 'TICK_COUNTDOWN': {
       if (state.phase !== 'countdown') return state;
       const nextCount = state.countdownSec - 1;
@@ -272,8 +308,11 @@ export function getSortedStandings(
   });
 }
 
-export function getHumanFinalRank(scores: Record<string, FighterScore>): number {
+export function getHumanFinalRank(
+  scores: Record<string, FighterScore>,
+  localFighterId = 'human',
+): number {
   const sorted = getSortedStandings(scores);
-  const idx = sorted.findIndex((s) => s.id === 'human');
+  const idx = sorted.findIndex((s) => s.id === localFighterId);
   return idx >= 0 ? idx + 1 : sorted.length;
 }

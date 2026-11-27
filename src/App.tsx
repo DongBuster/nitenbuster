@@ -165,12 +165,16 @@ export function App() {
   const [initialCardsRoomCode] = useState<string>(() =>
     readInitialRoomCodeParam('cardsRoom'),
   );
+  const [initialBrawlRoomCode] = useState<string>(() =>
+    readInitialRoomCodeParam('brawlRoom'),
+  );
   const [initialSurvivalRoomCode, setInitialSurvivalRoomCode] = useState<string>(
     () => readInitialRoomCodeParam('survivalRoom'),
   );
   const [screen, setScreen] = useState<AppScreen>(() => {
     if (initialEventRoomCode) return 'event';
     if (initialCardsRoomCode) return 'online';
+    if (initialBrawlRoomCode) return 'brawl';
     if (initialBbRoomCode) return 'blockblastRoom';
     if (initialGlassRoomCode) return 'glassCarry';
     if (initialSurvivalRoomCode) return 'survival';
@@ -183,6 +187,7 @@ export function App() {
         !initialGlassRoomCode &&
         !initialEventRoomCode &&
         !initialCardsRoomCode &&
+        !initialBrawlRoomCode &&
         !initialSurvivalRoomCode) ||
       typeof window === 'undefined'
     ) {
@@ -196,6 +201,7 @@ export function App() {
       'glassRoom',
       'eventRoom',
       'cardsRoom',
+      'brawlRoom',
       'survivalRoom',
     ]) {
       if (params.has(key)) {
@@ -210,6 +216,7 @@ export function App() {
     }
   }, [
     initialBbRoomCode,
+    initialBrawlRoomCode,
     initialCardsRoomCode,
     initialEventRoomCode,
     initialGlassRoomCode,
@@ -294,6 +301,7 @@ export function App() {
             }
           >
             <LazyBrawlScreen
+              initialRoomCode={initialBrawlRoomCode}
               onBackToModeSelect={() => setScreen('modeSelect')}
             />
           </Suspense>

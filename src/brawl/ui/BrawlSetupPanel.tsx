@@ -5,6 +5,7 @@ import {
   Sparkles,
   Swords,
   Trophy,
+  Wifi,
 } from 'lucide-react';
 import { ANIMALS, type AnimalId } from '../../engine/types';
 import { playSfx } from '../../audio/soundEngine';
@@ -25,6 +26,7 @@ export interface BrawlSetupPanelProps {
   onChangeBotCount: (count: number) => void;
   onChangeDifficulty: (diff: BrawlDifficulty) => void;
   onStart: () => void;
+  onOpenOnline: () => void;
   onBackToModeSelect: () => void;
 }
 
@@ -46,6 +48,7 @@ export function BrawlSetupPanel({
   onChangeBotCount,
   onChangeDifficulty,
   onStart,
+  onOpenOnline,
   onBackToModeSelect,
 }: BrawlSetupPanelProps) {
   const selectedMeta = ANIMALS.find((a) => a.id === selectedAnimal) ?? ANIMALS[0];
@@ -79,9 +82,23 @@ export function BrawlSetupPanel({
             </div>
           </div>
 
-          <div className="inline-flex items-center gap-2 rounded-2xl border border-amber-400/30 bg-[#142030]/90 px-4 py-2 text-sm font-black text-amber-200 shadow-md">
-            <Cookie className="h-4 w-4 text-amber-400" />
-            <span>{cookies.toLocaleString()} Cookies</span>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <button
+              type="button"
+              onClick={() => {
+                playSfx('click');
+                onOpenOnline();
+              }}
+              className="btn-tactile-sky inline-flex cursor-pointer items-center gap-2 rounded-2xl px-4 py-2 text-xs font-black text-white shadow-md focus-visible:outline-2 focus-visible:outline-white"
+            >
+              <Wifi className="h-4 w-4" />
+              <span>Chơi Online (Phòng Bạn Bè)</span>
+            </button>
+
+            <div className="inline-flex items-center gap-2 rounded-2xl border border-amber-400/30 bg-[#142030]/90 px-4 py-2 text-sm font-black text-amber-200 shadow-md">
+              <Cookie className="h-4 w-4 text-amber-400" />
+              <span>{cookies.toLocaleString()} Cookies</span>
+            </div>
           </div>
         </header>
 
@@ -233,17 +250,31 @@ export function BrawlSetupPanel({
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={() => {
-                playSfx('roundStart');
-                onStart();
-              }}
-              className="btn-tactile-amber mt-5 inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-2xl px-6 py-4 text-base font-black text-[#1B110B] focus-visible:outline-2 focus-visible:outline-white"
-            >
-              <Swords className="h-5 w-5" />
-              <span>BẮT ĐẦU ĐẤU TRƯỜNG</span>
-            </button>
+            <div className="mt-5 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => {
+                  playSfx('roundStart');
+                  onStart();
+                }}
+                className="btn-tactile-amber inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-2xl px-5 py-4 text-sm font-black text-[#1B110B] focus-visible:outline-2 focus-visible:outline-white sm:text-base"
+              >
+                <Swords className="h-5 w-5" />
+                <span>ĐẤU OFFLINE ({botCount} BOT)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  playSfx('click');
+                  onOpenOnline();
+                }}
+                className="btn-tactile-sky inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-2xl px-5 py-4 text-sm font-black text-white focus-visible:outline-2 focus-visible:outline-white sm:text-base"
+              >
+                <Wifi className="h-5 w-5" />
+                <span>PHÒNG ONLINE</span>
+              </button>
+            </div>
           </section>
         </main>
       </div>

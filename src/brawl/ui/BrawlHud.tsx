@@ -11,6 +11,7 @@ import {
   Users,
   Volume2,
   VolumeX,
+  Wifi,
 } from 'lucide-react';
 import { playSfx } from '../../audio/soundEngine';
 import { getSortedStandings } from '../sim/matchStore';
@@ -29,6 +30,11 @@ export interface BrawlHudProps {
   onToggleSfx: () => void;
   onTogglePause: () => void;
   onExit: () => void;
+  localFighterId?: string;
+  roomCode?: string;
+  isHost?: boolean;
+  isOnline?: boolean;
+  exitLabel?: string;
 }
 
 export function BrawlHud({
@@ -43,6 +49,11 @@ export function BrawlHud({
   onToggleSfx,
   onTogglePause,
   onExit,
+  localFighterId = 'human',
+  roomCode,
+  isHost = false,
+  isOnline = false,
+  exitLabel = 'Thoát',
 }: BrawlHudProps) {
   const [showHelp, setShowHelp] = useState(false);
   const topScores = getSortedStandings(match.scores).slice(0, 4);
@@ -63,8 +74,18 @@ export function BrawlHud({
               className="btn-tactile-wood inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-white/20 px-3 py-1.5 text-xs font-black text-amber-100 shadow-md transition-colors focus-visible:outline-2 focus-visible:outline-amber-300"
             >
               <ArrowLeft className="h-3.5 w-3.5 text-amber-300" />
-              <span>Thoát</span>
+              <span>{exitLabel}</span>
             </button>
+
+            {roomCode && (
+              <div className="inline-flex items-center gap-1.5 rounded-xl border border-cyan-400/40 bg-cyan-950/85 px-3 py-1.5 text-xs font-black text-cyan-200 shadow-md">
+                <Wifi className="h-3.5 w-3.5 text-cyan-300" />
+                <span className="font-mono tracking-wider">{roomCode}</span>
+                <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-bold text-cyan-100">
+                  {isHost ? 'Chủ phòng' : 'Online'}
+                </span>
+              </div>
+            )}
 
             <div className="inline-flex items-center gap-1.5 rounded-xl border border-amber-400/40 bg-slate-950/85 px-3 py-1.5 text-xs font-black text-amber-200 shadow-md">
               <Swords className="h-3.5 w-3.5 text-amber-400" />
@@ -212,7 +233,7 @@ export function BrawlHud({
               <div className="space-y-0.5">
                 {topScores.map((s, idx) => (
                   <div key={s.id} className="flex items-center justify-between gap-4 font-bold">
-                    <span className={s.id === 'human' ? 'text-amber-300' : 'text-slate-200'}>
+                    <span className={s.id === localFighterId ? 'text-amber-300' : 'text-slate-200'}>
                       #{idx + 1} {s.name}
                     </span>
                     <span className="font-mono font-black text-amber-200">{s.points}đ</span>
@@ -253,7 +274,7 @@ export function BrawlHud({
                 <div
                   key={r.id}
                   className={`flex items-center justify-between rounded-xl px-3 py-2 text-xs font-bold ${
-                    r.id === 'human'
+                    r.id === localFighterId
                       ? 'border border-amber-300/60 bg-amber-400/20 text-amber-200'
                       : 'bg-white/8 text-slate-200'
                   }`}
@@ -279,8 +300,13 @@ export function BrawlHud({
         >
           <div className="w-full max-w-sm rounded-3xl border border-white/20 bg-slate-900 p-6 text-center text-white shadow-2xl">
             <h2 className="font-display text-2xl font-black text-amber-300">
-              Tạm Dừng
+              {isOnline ? 'Menu Đấu Trường Online' : 'Tạm Dừng'}
             </h2>
+            {isOnline && (
+              <p className="mt-1 text-[11px] font-semibold text-sky-300">
+                Trận đấu Online vẫn tiếp tục diễn ra trong nền.
+              </p>
+            )}
             <p className="mt-2 text-xs text-slate-300">
               WASD + Shift chạy · Space nhảy · J đấm / đá bay · H húc đầu (Kiếm/Xẻng: xoay 360°) · K nắm ném · L lăn né
             </p>
