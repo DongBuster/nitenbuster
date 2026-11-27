@@ -468,6 +468,10 @@ const SECONDARY_UNLOCK_SKILLS = new Set<SkillId>([
   'warm_aura',
   'candy_meteor',
   'plush_drone',
+  'frost_nova',
+  'caramel_nova',
+  'prism_chain',
+  'void_pulse',
 ]);
 
 const BASE_SKILL_SCORE: Record<SkillId, number> = {
@@ -478,13 +482,23 @@ const BASE_SKILL_SCORE: Record<SkillId, number> = {
   ricochet: 16,
   orbital_ice: 14,
   warm_aura: 14,
-  candy_meteor: 14,
+  candy_meteor: 16,
   plush_drone: 14,
   team_aura: 20,
   agility: 14,
   vampirism: 12,
   max_hp: 10,
   magnet_range: 8,
+  frost_nova: 16,
+  ice_shatter: 22,
+  sugar_rush: 16,
+  pepper_bomb: 18,
+  caramel_nova: 20,
+  overcharge: 18,
+  crystal_shield: 16,
+  prism_chain: 18,
+  gem_greed: 12,
+  void_pulse: 22,
 };
 
 export function pickBotSkillIndex(

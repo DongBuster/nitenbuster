@@ -215,7 +215,8 @@ function buildClientHudSnapshot(
           maxHp: bossEntity.maxHp,
           tier: bossEntity.bossTier,
           isFinalBoss:
-            !snap.isEndlessActive && bossEntity.kind === 'boss_snow_dragon',
+            !snap.isEndlessActive &&
+            bossEntity.kind === getSurvivalMapMeta(snap.mapId).finalBossKind,
         }
       : null,
     sandstormActive: snap.sandstormActive,
@@ -576,12 +577,12 @@ export const SurvivalCanvas = forwardRef<SurvivalCanvasHandle, SurvivalCanvasPro
       [emitHostStateImmediately],
     );
 
-    // Coarse pointer detection
+    // Coarse pointer detection (bidirectional so toggling DevTools mobile view cleanly switches back)
     useEffect(() => {
       if (typeof window === 'undefined' || !window.matchMedia) return;
       const mq = window.matchMedia('(pointer: coarse)');
       const sync = () => {
-        if (mq.matches) setShowTouchControls(true);
+        setShowTouchControls(mq.matches);
       };
       sync();
       mq.addEventListener('change', sync);
@@ -714,9 +715,14 @@ export const SurvivalCanvas = forwardRef<SurvivalCanvasHandle, SurvivalCanvasPro
           setShowTouchControls(true);
           return;
         }
-        if (e.target === canvasRef.current && e.button === 0) {
-          updatePointerFromMouse(e.clientX, e.clientY);
-          mouseLeftDownRef.current = true;
+        if (e.target === canvasRef.current) {
+          containerRef.current?.focus({ preventScroll: true });
+          if (e.button === 0) {
+            updatePointerFromMouse(e.clientX, e.clientY);
+            mouseLeftDownRef.current = true;
+          } else {
+            e.preventDefault();
+          }
         }
       };
 
@@ -1258,10 +1264,13 @@ export const SurvivalCanvas = forwardRef<SurvivalCanvasHandle, SurvivalCanvasPro
     return (
       <div
         ref={containerRef}
-        className="relative h-dvh w-full overflow-hidden select-none touch-none bg-slate-950"
+        tabIndex={-1}
+        onContextMenu={(e) => e.preventDefault()}
+        className="relative h-dvh w-full overflow-hidden select-none touch-none bg-slate-950 outline-none"
       >
         <canvas
           ref={canvasRef}
+          onContextMenu={(e) => e.preventDefault()}
           className="block h-full w-full"
           aria-label="Khu vực chiến đấu PAWS Survival"
         />
@@ -1274,6 +1283,7 @@ export const SurvivalCanvas = forwardRef<SurvivalCanvasHandle, SurvivalCanvasPro
               onPointerMove={handleJoystickPointerMove}
               onPointerUp={handleJoystickPointerEnd}
               onPointerCancel={handleJoystickPointerEnd}
+              onLostPointerCapture={handleJoystickPointerEnd}
               role="application"
               aria-label="Cần điều khiển di chuyển"
               className="pointer-events-auto fixed bottom-6 left-5 z-20 flex h-28 w-28 touch-none items-center justify-center rounded-full border-2 border-white/25 bg-slate-900/45 shadow-lg backdrop-blur-xs"

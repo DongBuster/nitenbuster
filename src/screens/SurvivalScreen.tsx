@@ -770,7 +770,10 @@ export function SurvivalScreen({
     : isPauseOpen;
 
   return (
-    <div className="relative h-dvh w-full overflow-hidden bg-slate-950 select-none">
+    <div
+      onContextMenu={(e) => e.preventDefault()}
+      className="relative h-dvh w-full overflow-hidden bg-slate-950 select-none"
+    >
       <SurvivalCanvas
         ref={canvasRef}
         config={activeConfig}

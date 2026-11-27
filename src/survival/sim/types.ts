@@ -36,11 +36,40 @@ export type SkillId =
   | 'vampirism'
   | 'magnet_range'
   | 'agility'
-  | 'team_aura';
+  | 'team_aura'
+  // Map 1: Winter Cabin exclusives
+  | 'frost_nova'
+  | 'ice_shatter'
+  // Map 2: Candy Canyon exclusives
+  | 'sugar_rush'
+  | 'pepper_bomb'
+  | 'caramel_nova'
+  // Map 3: Crystal Cavern exclusives
+  | 'overcharge'
+  | 'crystal_shield'
+  | 'prism_chain'
+  | 'gem_greed'
+  | 'void_pulse';
 
 export type SkillCategory = 'weapon' | 'secondary' | 'survival';
 
 export type SkillRarity = 'common' | 'rare' | 'epic';
+
+export type SkillMapScope = 'core' | 'winter_cabin' | 'candy_canyon' | 'crystal_cavern';
+
+export type BossKind =
+  // Winter Cabin
+  | 'boss_slime_king'
+  | 'boss_frost_bear'
+  | 'boss_snow_dragon'
+  // Candy Canyon
+  | 'boss_jelly_king'
+  | 'boss_candy_scorpion'
+  | 'boss_sugar_pharaoh'
+  // Crystal Cavern
+  | 'boss_quartz_lord'
+  | 'boss_crystal_golem'
+  | 'boss_void_dragon';
 
 export type EnemyKind =
   | 'slime'
@@ -49,14 +78,7 @@ export type EnemyKind =
   | 'owl_mage'
   | 'golem'
   | 'bomber'
-  | 'boss_slime_king'
-  | 'boss_frost_bear'
-  | 'boss_snow_dragon';
-
-export type BossKind =
-  | 'boss_slime_king'
-  | 'boss_frost_bear'
-  | 'boss_snow_dragon';
+  | BossKind;
 
 export type SurvivalPhase = 'playing' | 'levelup' | 'victory' | 'gameover';
 
@@ -124,6 +146,8 @@ export interface SkillSpec {
   id: SkillId;
   name: string;
   category: SkillCategory;
+  rarity: SkillRarity;
+  mapScope: SkillMapScope;
   maxLevel: number;
   description: string;
   perLevelSummary: string;
@@ -151,6 +175,16 @@ export interface DerivedPlayerStats {
   droneLevel: number;
   vampirismLevel: number;
   teamAuraLevel: number;
+  frostNovaLevel: number;
+  iceShatterLevel: number;
+  sugarRushLevel: number;
+  pepperBombLevel: number;
+  caramelNovaLevel: number;
+  overchargeLevel: number;
+  crystalShieldLevel: number;
+  prismChainLevel: number;
+  gemGreedLevel: number;
+  voidPulseLevel: number;
 }
 
 export interface MapObstacle {
@@ -180,6 +214,17 @@ export interface SurvivalMapMeta {
   mechanicSummary: string;
   isEndless: boolean;
   targetDurationSec: number;
+  difficultyStars: 1 | 2 | 3 | 4;
+  difficultyLabel: string;
+  difficulty: {
+    hpMult: number;
+    damageMult: number;
+    spawnRateMult: number;
+    bossHpMult: number;
+  };
+  cookieMultiplier: number;
+  bossRotation: readonly BossKind[];
+  finalBossKind: BossKind;
   theme: {
     bg: string;
     grid: string;
@@ -228,6 +273,11 @@ export interface PlayerEntity {
   meteorTimer: number;
   droneTimer: number;
   droneAngle: number;
+  frostNovaTimer: number;
+  caramelNovaTimer: number;
+  prismChainTimer: number;
+  voidPulseTimer: number;
+  crystalShieldCooldown: number;
   teamAuraHealTimer: number;
   teamAuraBuffTimer: number;
   pylonBuffTimer: number;

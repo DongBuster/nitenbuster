@@ -625,7 +625,7 @@ describe('validateSurvivalSnapshotPayload & compact wire snapshot codec', () => 
     world.bossesSlain = 1;
     world.nextBossAtSec = 210;
     world.bossWarningSec = 3.2;
-    world.bossWarningKind = 'boss_frost_bear';
+    world.bossWarningKind = 'boss_sugar_pharaoh';
     world.activeBossId = 'boss_9';
     world.sandstormActiveTimer = 4.5;
     world.levelUpTimerSec = 11.2;
@@ -633,7 +633,7 @@ describe('validateSurvivalSnapshotPayload & compact wire snapshot codec', () => 
     world.pendingOffersByPlayer = {
       'guest-1': [
         {
-          skillId: 'multishot',
+          skillId: 'void_pulse',
           rarity: 'epic',
           currentLevel: 1,
           nextLevel: 3,
@@ -642,7 +642,7 @@ describe('validateSurvivalSnapshotPayload & compact wire snapshot codec', () => 
       ],
     };
 
-    world.players[0].skills = { multishot: 2, orbital_ice: 1 };
+    world.players[0].skills = { multishot: 2, orbital_ice: 1, caramel_nova: 1 };
     world.players[1].downed = true;
     world.players[1].botTakeover = true;
     world.players[1].hp = 0;
@@ -650,7 +650,7 @@ describe('validateSurvivalSnapshotPayload & compact wire snapshot codec', () => 
 
     world.enemies.push(
       makeEnemy('boss_9', {
-        kind: 'boss_frost_bear',
+        kind: 'boss_void_dragon',
         isBoss: true,
         bossTier: 2,
         radius: 46,

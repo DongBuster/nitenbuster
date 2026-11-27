@@ -8,6 +8,7 @@ import {
   createSurvivalWorld,
   stepSurvivalWorld,
 } from '../engine.ts';
+import { getSurvivalMapMeta } from '../maps.ts';
 import type { SurvivalInput, SurvivalWorldState } from '../types.ts';
 
 const IDLE_INPUT: SurvivalInput = {
@@ -210,7 +211,7 @@ describe('survival bosses, waves & endless mode', () => {
     assert.equal(world.enemies.filter((e) => e.isBoss).length, 0);
   });
 
-  it('cycles bosses every 90s on endless_abyss with rising tier and scales endless score', () => {
+  it('cycles all 9 bosses every 90s on endless_abyss with rising tier and scales endless score', () => {
     const world = createSurvivalWorld({
       matchId: 'm-endless',
       mode: 'solo',
@@ -228,12 +229,13 @@ describe('survival bosses, waves & endless mode', () => {
       ],
     });
     assert.equal(world.isEndlessActive, true);
+    const rotation = getSurvivalMapMeta('endless_abyss').bossRotation;
 
     // 90s -> boss_slime_king tier 1
     stepSeconds(world, 91);
     const b1 = world.enemies.find((e) => e.id === world.activeBossId);
     assert.ok(b1);
-    assert.equal(b1.kind, 'boss_slime_king');
+    assert.equal(b1.kind, rotation[0]);
     assert.equal(b1.bossTier, 1);
     const b1MaxHp = b1.maxHp;
 
@@ -249,11 +251,11 @@ describe('survival bosses, waves & endless mode', () => {
     }
     assert.equal(world.nextBossAtSec, 180);
 
-    // 180s -> boss_frost_bear tier 2
+    // 180s -> rotation[1] (boss_jelly_king) tier 2
     stepSeconds(world, 181 - world.elapsedSec);
     const b2 = world.enemies.find((e) => e.id === world.activeBossId);
     assert.ok(b2);
-    assert.equal(b2.kind, 'boss_frost_bear');
+    assert.equal(b2.kind, rotation[1]);
     assert.equal(b2.bossTier, 2);
 
     b2.hp = 1;
@@ -267,11 +269,11 @@ describe('survival bosses, waves & endless mode', () => {
     }
     assert.equal(world.nextBossAtSec, 270);
 
-    // 270s -> boss_snow_dragon tier 3
+    // 270s -> rotation[2] (boss_quartz_lord) tier 3
     stepSeconds(world, 271 - world.elapsedSec);
     const b3 = world.enemies.find((e) => e.id === world.activeBossId);
     assert.ok(b3);
-    assert.equal(b3.kind, 'boss_snow_dragon');
+    assert.equal(b3.kind, rotation[2]);
     assert.equal(b3.bossTier, 3);
 
     b3.hp = 1;
@@ -287,11 +289,11 @@ describe('survival bosses, waves & endless mode', () => {
     assert.equal(world.phase, 'playing');
     assert.equal(world.nextBossAtSec, 360);
 
-    // 360s -> cycles back to boss_slime_king at tier 4 with much higher HP
+    // 360s -> rotation[3] (boss_frost_bear) at tier 4 with much higher HP
     stepSeconds(world, 361 - world.elapsedSec);
     const b4 = world.enemies.find((e) => e.id === world.activeBossId);
     assert.ok(b4);
-    assert.equal(b4.kind, 'boss_slime_king');
+    assert.equal(b4.kind, rotation[3]);
     assert.equal(b4.bossTier, 4);
     assert.ok(b4.maxHp > b1MaxHp * 2, 'tier 4 boss HP should scale substantially over tier 1');
 
@@ -555,5 +557,75 @@ describe('survival bosses, waves & endless mode', () => {
     }
     assert.equal(won, true, 'defeating Final Boss must complete the stage with victory');
     assert.equal(world.phase, 'victory');
+  });
+
+  it('spawns map-exclusive boss progressions and scales enemy/boss stats higher from Winter -> Candy -> Crystal', () => {
+    const createForMap = (mapId: 'winter_cabin' | 'candy_canyon' | 'crystal_cavern') =>
+      createSurvivalWorld({
+        matchId: `m-diff-${mapId}`,
+        mode: 'solo',
+        mapId,
+        seed: 77,
+        players: [
+          { id: 'p1', name: 'Hero', animal: 'cat', weaponId: 'candy_smg', gearId: 'plush_armor', isBot: false },
+        ],
+      });
+
+    // Regular mob scaling check across the 3 campaign maps
+    const wWinter = createForMap('winter_cabin');
+    const wCandy = createForMap('candy_canyon');
+    const wCrystal = createForMap('crystal_cavern');
+
+    for (const w of [wWinter, wCandy, wCrystal]) {
+      w.players[0].fireCooldown = 9999;
+      w.spawnTimer = 0;
+      stepSurvivalWorld(w, { p1: IDLE_INPUT }, 0.05);
+    }
+
+    const hpWinter = wWinter.enemies[0].maxHp;
+    const hpCandy = wCandy.enemies[0].maxHp;
+    const hpCrystal = wCrystal.enemies[0].maxHp;
+    assert.ok(hpWinter < hpCandy && hpCandy < hpCrystal, `expected progressive mob HP ${hpWinter} < ${hpCandy} < ${hpCrystal}`);
+
+    // Candy Canyon final boss (boss_sugar_pharaoh) triggers victory only on defeat
+    wCandy.elapsedSec = 330;
+    wCandy.bossScheduleIndex = 2;
+    wCandy.nextBossAtSec = 330;
+    wCandy.enemies = [];
+    wCandy.activeBossId = null;
+    stepSurvivalWorld(wCandy, { p1: IDLE_INPUT }, 0.05);
+    const pharaoh = wCandy.enemies.find((e) => e.kind === 'boss_sugar_pharaoh');
+    assert.ok(pharaoh, 'candy_canyon boss 3 must be boss_sugar_pharaoh');
+    assert.equal(buildHudSnapshot(wCandy, 'p1').activeBoss?.isFinalBoss, true);
+
+    pharaoh.hp = 1;
+    pharaoh.x = wCandy.players[0].x + 60;
+    pharaoh.y = wCandy.players[0].y;
+    wCandy.players[0].fireCooldown = 0;
+    for (let i = 0; i < 25 && wCandy.phase === 'playing'; i++) {
+      stepSurvivalWorld(wCandy, { p1: IDLE_INPUT }, 0.05);
+    }
+    assert.equal(wCandy.phase, 'victory');
+
+    // Crystal Cavern final boss (boss_void_dragon) has strictly higher HP than winter/candy final bosses
+    wCrystal.elapsedSec = 330;
+    wCrystal.bossScheduleIndex = 2;
+    wCrystal.nextBossAtSec = 330;
+    wCrystal.enemies = [];
+    wCrystal.activeBossId = null;
+    stepSurvivalWorld(wCrystal, { p1: IDLE_INPUT }, 0.05);
+    const voidDragon = wCrystal.enemies.find((e) => e.kind === 'boss_void_dragon');
+    assert.ok(voidDragon, 'crystal_cavern boss 3 must be boss_void_dragon');
+    assert.ok(voidDragon.maxHp > pharaoh.maxHp, 'crystal_cavern Final Boss must have higher HP than candy_canyon Final Boss');
+    assert.equal(buildHudSnapshot(wCrystal, 'p1').activeBoss?.isFinalBoss, true);
+
+    voidDragon.hp = 1;
+    voidDragon.x = wCrystal.players[0].x + 60;
+    voidDragon.y = wCrystal.players[0].y;
+    wCrystal.players[0].fireCooldown = 0;
+    for (let i = 0; i < 25 && wCrystal.phase === 'playing'; i++) {
+      stepSurvivalWorld(wCrystal, { p1: IDLE_INPUT }, 0.05);
+    }
+    assert.equal(wCrystal.phase, 'victory');
   });
 });

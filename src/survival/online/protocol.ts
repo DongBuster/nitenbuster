@@ -77,6 +77,12 @@ const BOSS_KINDS: readonly BossKind[] = [
   'boss_slime_king',
   'boss_frost_bear',
   'boss_snow_dragon',
+  'boss_jelly_king',
+  'boss_candy_scorpion',
+  'boss_sugar_pharaoh',
+  'boss_quartz_lord',
+  'boss_crystal_golem',
+  'boss_void_dragon',
 ];
 
 const ENEMY_KINDS: readonly EnemyKind[] = [
@@ -86,9 +92,7 @@ const ENEMY_KINDS: readonly EnemyKind[] = [
   'owl_mage',
   'golem',
   'bomber',
-  'boss_slime_king',
-  'boss_frost_bear',
-  'boss_snow_dragon',
+  ...BOSS_KINDS,
 ];
 
 const TELEGRAPH_KINDS: readonly EnemyEntity['telegraphKind'][] = [
@@ -122,22 +126,7 @@ const XP_GEM_TIERS: readonly XpGemEntity['tier'][] = [
 const PICKUP_KINDS: readonly PickupItemEntity['kind'][] = ['heal', 'magnet'];
 const HAZARD_SHAPES: readonly PackedHazard['shape'][] = ['circle', 'line'];
 
-const SKILL_IDS: readonly SkillId[] = [
-  'multishot',
-  'fire_rate',
-  'damage_up',
-  'pierce_up',
-  'ricochet',
-  'orbital_ice',
-  'warm_aura',
-  'candy_meteor',
-  'plush_drone',
-  'max_hp',
-  'vampirism',
-  'magnet_range',
-  'agility',
-  'team_aura',
-];
+const SKILL_IDS: readonly SkillId[] = SKILLS.map((s) => s.id);
 
 const SKILL_RARITIES: readonly SkillRarity[] = ['common', 'rare', 'epic'];
 
@@ -154,6 +143,10 @@ const KNOWN_COLORS: readonly string[] = [
   '#60a5fa',
   '#ef4444',
   '#f59e0b',
+  '#e879f9',
+  '#fbbf24',
+  '#a855f7',
+  '#ea580c',
 ];
 
 const FORBIDDEN_KEYS: ReadonlySet<string> = new Set([

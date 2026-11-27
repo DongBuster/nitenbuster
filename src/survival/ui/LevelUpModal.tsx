@@ -8,9 +8,10 @@ import {
   type SyntheticEvent,
 } from 'react';
 import { RefreshCw, Sparkles, Timer, Zap } from 'lucide-react';
-import { getSkillSpec } from '../sim/catalog.ts';
+import { SKILL_SCOPE_LABELS, getSkillSpec } from '../sim/catalog.ts';
 import type {
   SkillCategory,
+  SkillMapScope,
   SkillOffer,
   SkillRarity,
 } from '../sim/types.ts';
@@ -141,6 +142,13 @@ const CATEGORY_META: Record<
     label: 'Sinh tồn',
     badgeClass: 'border-emerald-400/45 bg-emerald-500/20 text-emerald-200',
   },
+};
+
+const SCOPE_BADGE_CLASSES: Record<SkillMapScope, string> = {
+  core: 'border-white/15 bg-white/8 text-slate-300',
+  winter_cabin: 'border-sky-400/45 bg-sky-500/20 text-sky-200',
+  candy_canyon: 'border-orange-400/45 bg-orange-500/20 text-orange-200',
+  crystal_cavern: 'border-fuchsia-400/45 bg-fuchsia-500/20 text-fuchsia-200',
 };
 
 const RARITY_STYLES: Record<
@@ -463,11 +471,18 @@ export function LevelUpModal({
                 <div className="flex flex-col gap-3">
                   {/* Top Badges */}
                   <div className="flex flex-wrap items-center justify-between gap-1.5">
-                    <span
-                      className={`rounded-lg border px-2 py-0.5 text-[10px] font-black uppercase tracking-wide ${cat.badgeClass}`}
-                    >
-                      {cat.label}
-                    </span>
+                    <div className="flex flex-wrap items-center gap-1">
+                      <span
+                        className={`rounded-lg border px-2 py-0.5 text-[10px] font-black uppercase tracking-wide ${cat.badgeClass}`}
+                      >
+                        {cat.label}
+                      </span>
+                      <span
+                        className={`rounded-lg border px-2 py-0.5 text-[10px] font-black tracking-wide ${SCOPE_BADGE_CLASSES[spec.mapScope]}`}
+                      >
+                        {SKILL_SCOPE_LABELS[spec.mapScope]}
+                      </span>
+                    </div>
 
                     <span
                       className={`inline-flex items-center gap-1 rounded-lg border px-2 py-0.5 text-[10px] font-black uppercase tracking-wide ${rarityStyle.badgeClass}`}

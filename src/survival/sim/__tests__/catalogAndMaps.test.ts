@@ -5,13 +5,16 @@ import {
   BASE_MOVE_SPEED,
   BASE_PICKUP_RADIUS,
   BASE_PLAYER_HP,
+  BIOME_ENEMY_NAMES,
   BOSS_NAMES,
   ENEMY_NAMES,
   GEARS,
   SKILLS,
   WEAPONS,
   computeDerivedStats,
+  getEnemyNameForMap,
   getGearSpec,
+  getSkillPoolForMap,
   getSkillSpec,
   getWeaponSpec,
   rollSkillOffers,
@@ -37,15 +40,16 @@ function mulberry32(seed: number): () => number {
 }
 
 describe('survival catalog & map registry', () => {
-  it('exposes exact counts for 6 weapons, 4 gears, 14 skills, and 4 maps', () => {
+  it('exposes exact counts for 6 weapons, 4 gears, 24 skills (6 core + 18 map-exclusive), 9 bosses, and 4 maps', () => {
     assert.equal(WEAPONS.length, 6);
     assert.equal(GEARS.length, 4);
-    assert.equal(SKILLS.length, 14);
+    assert.equal(SKILLS.length, 24);
     assert.equal(SURVIVAL_MAPS.length, 4);
+    assert.equal(Object.keys(BOSS_NAMES).length, 9);
 
     assert.equal(new Set(WEAPONS.map((w) => w.id)).size, 6);
     assert.equal(new Set(GEARS.map((g) => g.id)).size, 4);
-    assert.equal(new Set(SKILLS.map((s) => s.id)).size, 14);
+    assert.equal(new Set(SKILLS.map((s) => s.id)).size, 24);
     assert.equal(new Set(SURVIVAL_MAPS.map((m) => m.id)).size, 4);
 
     for (const skill of SKILLS) {
@@ -62,10 +66,12 @@ describe('survival catalog & map registry', () => {
     assert.equal(getGearSpec('crystal_magnet').pickupRadiusPct, 0.6);
     assert.equal(getSkillSpec('orbital_ice').category, 'secondary');
     assert.equal(BOSS_NAMES.boss_snow_dragon, 'Rồng Tuyết Cổ Đại');
+    assert.equal(BOSS_NAMES.boss_sugar_pharaoh, 'Pharaoh Kẹo Lửa');
+    assert.equal(BOSS_NAMES.boss_void_dragon, 'Rồng Pha Lê Hư Không');
     assert.ok(ENEMY_NAMES.slime.length > 0);
   });
 
-  it('defines 3 campaign 6-minute maps and 1 endless_abyss map', () => {
+  it('defines progressive difficulty across 3 campaign maps + 1 endless_abyss and distinct biome enemies', () => {
     assert.deepEqual(
       SURVIVAL_MAPS.map((m) => m.id),
       ['winter_cabin', 'candy_canyon', 'crystal_cavern', 'endless_abyss'],
@@ -73,17 +79,35 @@ describe('survival catalog & map registry', () => {
     assert.equal(isSurvivalMapId('winter_cabin'), true);
     assert.equal(isSurvivalMapId('invalid_map'), false);
 
-    for (const map of SURVIVAL_MAPS) {
-      const fetched = getSurvivalMapMeta(map.id);
-      assert.equal(fetched.id, map.id);
-      if (map.id === 'endless_abyss') {
-        assert.equal(map.isEndless, true);
-        assert.equal(map.targetDurationSec, 0);
-      } else {
-        assert.equal(map.isEndless, false);
-        assert.equal(map.targetDurationSec, 360);
-      }
-    }
+    const winter = getSurvivalMapMeta('winter_cabin');
+    const candy = getSurvivalMapMeta('candy_canyon');
+    const crystal = getSurvivalMapMeta('crystal_cavern');
+    const endless = getSurvivalMapMeta('endless_abyss');
+
+    assert.ok(winter.difficultyStars < candy.difficultyStars);
+    assert.ok(candy.difficultyStars < crystal.difficultyStars);
+    assert.ok(crystal.difficultyStars < endless.difficultyStars);
+    assert.ok(winter.difficulty.hpMult < candy.difficulty.hpMult);
+    assert.ok(candy.difficulty.hpMult < crystal.difficulty.hpMult);
+    assert.ok(winter.difficulty.damageMult < candy.difficulty.damageMult);
+    assert.ok(candy.difficulty.damageMult < crystal.difficulty.damageMult);
+    assert.ok(winter.cookieMultiplier < candy.cookieMultiplier);
+    assert.ok(candy.cookieMultiplier < crystal.cookieMultiplier);
+
+    assert.equal(winter.finalBossKind, 'boss_snow_dragon');
+    assert.equal(candy.finalBossKind, 'boss_sugar_pharaoh');
+    assert.equal(crystal.finalBossKind, 'boss_void_dragon');
+    assert.equal(endless.isEndless, true);
+    assert.equal(endless.bossRotation.length, 9);
+
+    assert.notEqual(
+      getEnemyNameForMap('slime', 'winter_cabin'),
+      getEnemyNameForMap('slime', 'candy_canyon'),
+    );
+    assert.notEqual(
+      BIOME_ENEMY_NAMES.candy_canyon.wolf,
+      BIOME_ENEMY_NAMES.crystal_cavern.wolf,
+    );
   });
 
   it('computes xpForNextLevel(1) === 101 and grows strictly', () => {
@@ -96,14 +120,60 @@ describe('survival catalog & map registry', () => {
     }
   });
 
-  it('rolls up to 3 unique eligible skill offers and respects guaranteeRare', () => {
+  it('enforces 50/50 map skill pools (6 core + 6 exclusive), fixed rarity (never downgrades), and guaranteeRare', () => {
     const rng = mulberry32(42);
-    const offers = rollSkillOffers({}, rng, false);
-    assert.equal(offers.length, 3);
-    assert.equal(new Set(offers.map((o) => o.skillId)).size, 3);
 
+    // 1. 50/50 split on every campaign map; all 24 on endless_abyss
+    for (const mapId of ['winter_cabin', 'candy_canyon', 'crystal_cavern'] as const) {
+      const mapPool = getSkillPoolForMap(mapId);
+      assert.equal(mapPool.length, 12, `${mapId} should have 12 total skills`);
+      const coreCount = mapPool.filter((s) => s.mapScope === 'core').length;
+      const exclCount = mapPool.filter((s) => s.mapScope === mapId).length;
+      assert.equal(coreCount, 6, `${mapId} should include all 6 core skills`);
+      assert.equal(exclCount, 6, `${mapId} should include 6 exclusive skills`);
+
+      const allowedIds = new Set(mapPool.map((s) => s.id));
+      for (let i = 0; i < 40; i++) {
+        const rolled = rollSkillOffers({}, rng, i % 2 === 0, mapId);
+        assert.equal(rolled.length, 3);
+        assert.equal(new Set(rolled.map((o) => o.skillId)).size, 3);
+        for (const offer of rolled) {
+          assert.equal(
+            allowedIds.has(offer.skillId),
+            true,
+            `skill ${offer.skillId} leaked into ${mapId}`,
+          );
+          assert.equal(
+            offer.rarity,
+            getSkillSpec(offer.skillId).rarity,
+            `rarity for ${offer.skillId} must match its fixed catalog rarity`,
+          );
+        }
+      }
+    }
+    assert.equal(getSkillPoolForMap('endless_abyss').length, 24);
+
+    // 2. Fixed rarity NEVER downgrades when a Rare/Epic skill re-appears at higher levels
+    for (let lv = 0; lv <= 4; lv++) {
+      const offers = rollSkillOffers(
+        { multishot: lv, orbital_ice: lv },
+        rng,
+        false,
+        'winter_cabin',
+      );
+      for (const o of offers) {
+        assert.equal(o.rarity, getSkillSpec(o.skillId).rarity);
+      }
+    }
+
+    // 3. guaranteeRare strictly offers Rare/Epic when eligible
     for (let i = 0; i < 30; i++) {
-      const rareOffers = rollSkillOffers({ multishot: 5, fire_rate: 5 }, rng, true);
+      const rareOffers = rollSkillOffers(
+        { multishot: 5, fire_rate: 5 },
+        rng,
+        true,
+        'winter_cabin',
+      );
       assert.equal(rareOffers.length, 3);
       for (const offer of rareOffers) {
         assert.notEqual(offer.skillId, 'multishot');
@@ -114,25 +184,25 @@ describe('survival catalog & map registry', () => {
       }
     }
 
+    // 4. Exhausted pool down to 1 skill on winter_cabin returns only that remaining skill
     const almostMaxed: Partial<Record<SkillId, number>> = {
-      multishot: 5,
-      fire_rate: 5,
       damage_up: 5,
+      fire_rate: 5,
+      max_hp: 5,
+      agility: 4,
+      magnet_range: 5,
+      multishot: 5,
       pierce_up: 5,
-      ricochet: 5,
       orbital_ice: 5,
       warm_aura: 5,
-      candy_meteor: 5,
-      plush_drone: 5,
-      max_hp: 5,
-      vampirism: 5,
-      magnet_range: 5,
-      agility: 4,
       team_aura: 5,
+      frost_nova: 5,
+      ice_shatter: 5,
     };
-    const lastOffer = rollSkillOffers(almostMaxed, rng, true);
+    const lastOffer = rollSkillOffers(almostMaxed, rng, true, 'winter_cabin');
     assert.equal(lastOffer.length, 1);
     assert.equal(lastOffer[0].skillId, 'agility');
+    assert.equal(lastOffer[0].rarity, 'common');
     assert.equal(lastOffer[0].nextLevel, 5);
   });
 

@@ -1274,13 +1274,109 @@ function drawObstacle(
   ctx.restore();
 }
 
+interface BiomeEnemyPalette {
+  slimeBody: string;
+  slimeRim: string;
+  batWing: string;
+  batBody: string;
+  batRim: string;
+  wolfEar: string;
+  wolfBody: string;
+  wolfSnout: string;
+  owlHood: string;
+  owlBody: string;
+  owlEye: string;
+  golemSpike: string;
+  golemBody: string;
+  golemCore: string;
+  bomberBody: string;
+  bomberRim: string;
+}
+
+const BIOME_ENEMY_PALETTES: Record<SurvivalMapId, BiomeEnemyPalette> = {
+  winter_cabin: {
+    slimeBody: '#34d399',
+    slimeRim: '#047857',
+    batWing: '#5b21b6',
+    batBody: '#7c3aed',
+    batRim: '#2e1065',
+    wolfEar: '#475569',
+    wolfBody: '#64748b',
+    wolfSnout: '#cbd5e1',
+    owlHood: '#4338ca',
+    owlBody: '#312e81',
+    owlEye: '#38bdf8',
+    golemSpike: '#7dd3fc',
+    golemBody: '#475569',
+    golemCore: '#38bdf8',
+    bomberBody: '#e11d48',
+    bomberRim: '#881337',
+  },
+  candy_canyon: {
+    slimeBody: '#fb923c',
+    slimeRim: '#9a3412',
+    batWing: '#ca8a04',
+    batBody: '#facc15',
+    batRim: '#713f12',
+    wolfEar: '#b45309',
+    wolfBody: '#d97706',
+    wolfSnout: '#fde68a',
+    owlHood: '#be185d',
+    owlBody: '#831843',
+    owlEye: '#fde047',
+    golemSpike: '#fbbf24',
+    golemBody: '#92400e',
+    golemCore: '#f97316',
+    bomberBody: '#dc2626',
+    bomberRim: '#7f1d1d',
+  },
+  crystal_cavern: {
+    slimeBody: '#c084fc',
+    slimeRim: '#581c87',
+    batWing: '#0e7490',
+    batBody: '#22d3ee',
+    batRim: '#164e63',
+    wolfEar: '#6d28d9',
+    wolfBody: '#7c3aed',
+    wolfSnout: '#ddd6fe',
+    owlHood: '#a21caf',
+    owlBody: '#4a044e',
+    owlEye: '#67e8f9',
+    golemSpike: '#e879f9',
+    golemBody: '#312e81',
+    golemCore: '#22d3ee',
+    bomberBody: '#a855f7',
+    bomberRim: '#3b0764',
+  },
+  endless_abyss: {
+    slimeBody: '#f43f5e',
+    slimeRim: '#881337',
+    batWing: '#9f1239',
+    batBody: '#be123c',
+    batRim: '#4c0519',
+    wolfEar: '#334155',
+    wolfBody: '#1e293b',
+    wolfSnout: '#fda4af',
+    owlHood: '#7e22ce',
+    owlBody: '#3b0764',
+    owlEye: '#fbbf24',
+    golemSpike: '#fbbf24',
+    golemBody: '#1e293b',
+    golemCore: '#f43f5e',
+    bomberBody: '#f97316',
+    bomberRim: '#7c2d12',
+  },
+};
+
 function drawEnemy(
   ctx: CanvasRenderingContext2D,
   enemy: RenderEnemy,
+  mapId: SurvivalMapId,
   nowMs: number,
   reducedMotion: boolean,
 ): void {
   const { x, y, radius: r, kind } = enemy;
+  const pal = BIOME_ENEMY_PALETTES[mapId];
   const isSlowed = enemy.slowTimer > 0;
   const hitFlash = enemy.hitFlashTimer > 0;
   const anim = reducedMotion ? 0 : Math.sin(nowMs * 0.008 + x * 0.04);
@@ -1304,12 +1400,27 @@ function drawEnemy(
   ctx.ellipse(x, y + r * 0.85, r * 0.86, r * 0.38, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  if (kind === 'slime' || kind === 'boss_slime_king') {
+  if (
+    kind === 'slime' ||
+    kind === 'boss_slime_king' ||
+    kind === 'boss_jelly_king'
+  ) {
     const squash = 1 + anim * 0.05;
     const rx = r * squash;
     const ry = r * (2 - squash) * 0.92;
-    const bodyColor = kind === 'boss_slime_king' ? '#2dd4bf' : '#34d399';
-    const rimColor = kind === 'boss_slime_king' ? '#0f766e' : '#047857';
+    const isSlimeBoss = kind === 'boss_slime_king' || kind === 'boss_jelly_king';
+    const bodyColor =
+      kind === 'boss_jelly_king'
+        ? '#fb923c'
+        : kind === 'boss_slime_king'
+          ? '#2dd4bf'
+          : pal.slimeBody;
+    const rimColor =
+      kind === 'boss_jelly_king'
+        ? '#9a3412'
+        : kind === 'boss_slime_king'
+          ? '#0f766e'
+          : pal.slimeRim;
 
     ctx.fillStyle = bodyColor;
     ctx.strokeStyle = isSlowed ? '#38bdf8' : rimColor;
@@ -1339,9 +1450,12 @@ function drawEnemy(
     ctx.arc(x + eyeSpread - eyeR * 0.25, y - eyeR * 0.25, eyeR * 0.36, 0, Math.PI * 2);
     ctx.fill();
 
-    if (kind === 'boss_slime_king') {
-      // Suspended ice crystals & angry brow
-      ctx.fillStyle = 'rgba(224, 242, 254, 0.55)';
+    if (isSlimeBoss) {
+      // Suspended crystals / candy pearls & angry brow
+      ctx.fillStyle =
+        kind === 'boss_jelly_king'
+          ? 'rgba(254, 240, 138, 0.7)'
+          : 'rgba(224, 242, 254, 0.55)';
       ctx.beginPath();
       ctx.arc(x - r * 0.42, y + r * 0.28, 4.5, 0, Math.PI * 2);
       ctx.arc(x + r * 0.46, y + r * 0.22, 3.8, 0, Math.PI * 2);
@@ -1379,9 +1493,9 @@ function drawEnemy(
     }
   } else if (kind === 'bat') {
     const flap = reducedMotion ? 0 : Math.sin(nowMs * 0.02 + y * 0.05) * 6;
-    // Bat wings
-    ctx.fillStyle = '#5b21b6';
-    ctx.strokeStyle = isSlowed ? '#38bdf8' : '#2e1065';
+    // Bat / Sugar Bee / Crystal Bat wings
+    ctx.fillStyle = pal.batWing;
+    ctx.strokeStyle = isSlowed ? '#38bdf8' : pal.batRim;
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.moveTo(x - r * 0.3, y);
@@ -1395,8 +1509,8 @@ function drawEnemy(
     ctx.fill();
     ctx.stroke();
 
-    // Fuzzy round bat body + ears
-    ctx.fillStyle = '#7c3aed';
+    // Fuzzy round body + ears
+    ctx.fillStyle = pal.batBody;
     ctx.beginPath();
     ctx.moveTo(x - r * 0.65, y - r * 0.4);
     ctx.lineTo(x - r * 0.5, y - r * 1.15);
@@ -1447,8 +1561,8 @@ function drawEnemy(
       ctx.stroke();
     }
 
-    // Pointed wolf ears
-    ctx.fillStyle = '#475569';
+    // Pointed ears / pincers
+    ctx.fillStyle = pal.wolfEar;
     ctx.strokeStyle = isSlowed ? '#38bdf8' : lunging ? '#fca5a5' : '#1e293b';
     ctx.lineWidth = isSlowed ? 3 : 2.2;
     ctx.beginPath();
@@ -1463,14 +1577,14 @@ function drawEnemy(
     ctx.fill();
     ctx.stroke();
 
-    // Wolf head & snout
-    ctx.fillStyle = '#64748b';
+    // Head & snout
+    ctx.fillStyle = pal.wolfBody;
     ctx.beginPath();
     ctx.arc(x, y, r * 0.92, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
 
-    ctx.fillStyle = '#cbd5e1';
+    ctx.fillStyle = pal.wolfSnout;
     ctx.beginPath();
     ctx.ellipse(x, y + r * 0.34, r * 0.45, r * 0.32, 0, 0, Math.PI * 2);
     ctx.fill();
@@ -1481,8 +1595,8 @@ function drawEnemy(
     ctx.arc(x + r * 0.32, y - 2, 2.6, 0, Math.PI * 2);
     ctx.fill();
   } else if (kind === 'owl_mage') {
-    // Hooded mage owl
-    ctx.fillStyle = '#312e81';
+    // Hooded biome mage
+    ctx.fillStyle = pal.owlBody;
     ctx.strokeStyle = isSlowed ? '#38bdf8' : '#1e1b4b';
     ctx.lineWidth = isSlowed ? 3 : 2.2;
     ctx.beginPath();
@@ -1491,7 +1605,7 @@ function drawEnemy(
     ctx.stroke();
 
     // Hooded point & feather horns
-    ctx.fillStyle = '#4338ca';
+    ctx.fillStyle = pal.owlHood;
     ctx.beginPath();
     ctx.moveTo(x - r * 0.8, y - r * 0.35);
     ctx.lineTo(x, y - r * 1.25);
@@ -1501,7 +1615,7 @@ function drawEnemy(
     ctx.stroke();
 
     // Glowing eyes + beak
-    ctx.fillStyle = '#38bdf8';
+    ctx.fillStyle = pal.owlEye;
     ctx.beginPath();
     ctx.arc(x - 5, y - 1, 3, 0, Math.PI * 2);
     ctx.arc(x + 5, y - 1, 3, 0, Math.PI * 2);
@@ -1526,13 +1640,12 @@ function drawEnemy(
     ctx.arc(x + r * 1.05, y - r * 0.78, 4.2, 0, Math.PI * 2);
     ctx.fill();
   } else if (kind === 'golem') {
-    // Chunky faceted ice-stone shoulders & torso
-    ctx.fillStyle = '#334155';
+    // Chunky faceted shoulders & torso
     ctx.strokeStyle = isSlowed ? '#38bdf8' : '#0f172a';
     ctx.lineWidth = isSlowed ? 3.5 : 2.6;
 
-    // Ice shoulder crystals
-    ctx.fillStyle = '#7dd3fc';
+    // Shoulder spikes
+    ctx.fillStyle = pal.golemSpike;
     ctx.beginPath();
     ctx.moveTo(x - r * 1.15, y - r * 0.1);
     ctx.lineTo(x - r * 0.9, y - r * 0.85);
@@ -1546,7 +1659,7 @@ function drawEnemy(
     ctx.stroke();
 
     // Hexagonal stone body
-    ctx.fillStyle = '#475569';
+    ctx.fillStyle = pal.golemBody;
     ctx.beginPath();
     for (let i = 0; i < 6; i += 1) {
       const ang = (i * Math.PI * 2) / 6;
@@ -1559,8 +1672,8 @@ function drawEnemy(
     ctx.fill();
     ctx.stroke();
 
-    // Glowing ice chest core & eyes
-    ctx.fillStyle = '#38bdf8';
+    // Glowing core & eyes
+    ctx.fillStyle = pal.golemCore;
     ctx.beginPath();
     ctx.arc(x, y + 5, 5, 0, Math.PI * 2);
     ctx.fill();
@@ -1569,15 +1682,15 @@ function drawEnemy(
   } else if (kind === 'bomber') {
     const exploding = enemy.telegraphKind === 'explode';
     const blink = exploding && !reducedMotion && Math.sin(nowMs * 0.04) > 0;
-    ctx.fillStyle = blink ? '#fb923c' : '#e11d48';
-    ctx.strokeStyle = isSlowed ? '#38bdf8' : '#881337';
+    ctx.fillStyle = blink ? '#fb923c' : pal.bomberBody;
+    ctx.strokeStyle = isSlowed ? '#38bdf8' : pal.bomberRim;
     ctx.lineWidth = isSlowed ? 3 : 2.3;
     ctx.beginPath();
     ctx.arc(x, y, r * 0.95, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
 
-    // Candy stripe band
+    // Stripe band
     ctx.strokeStyle = '#fecdd3';
     ctx.lineWidth = 3;
     ctx.beginPath();
@@ -1602,6 +1715,227 @@ function drawEnemy(
     ctx.beginPath();
     ctx.arc(x - 5, y - 2, 2.5, 0, Math.PI * 2);
     ctx.arc(x + 5, y - 2, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (kind === 'boss_candy_scorpion') {
+    // Twin golden-caramel pincers & arched stinger tail
+    ctx.fillStyle = '#d97706';
+    ctx.strokeStyle = '#451a03';
+    ctx.lineWidth = 2.4;
+    ctx.beginPath();
+    ctx.arc(x - r * 0.95, y - r * 0.3, r * 0.34, 0.3, Math.PI * 1.7);
+    ctx.fill();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(x + r * 0.95, y - r * 0.3, r * 0.34, Math.PI + 0.3, Math.PI * 2.7);
+    ctx.fill();
+    ctx.stroke();
+
+    // Curved scorpion stinger above head
+    ctx.strokeStyle = '#f59e0b';
+    ctx.lineWidth = 6;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(x, y - r * 0.5);
+    ctx.quadraticCurveTo(x + r * 0.7, y - r * 1.45, x, y - r * 1.28);
+    ctx.stroke();
+    ctx.fillStyle = '#ef4444';
+    ctx.beginPath();
+    ctx.arc(x, y - r * 1.28, 6, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Armored carapace body
+    ctx.fillStyle = '#ea580c';
+    ctx.strokeStyle = isSlowed ? '#38bdf8' : '#451a03';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.ellipse(x, y, r * 0.96, r * 0.84, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Glowing venom eyes
+    ctx.fillStyle = '#fef08a';
+    ctx.beginPath();
+    ctx.arc(x - r * 0.28, y - r * 0.08, 4.5, 0, Math.PI * 2);
+    ctx.arc(x + r * 0.28, y - r * 0.08, 4.5, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (kind === 'boss_sugar_pharaoh') {
+    const isVolley = enemy.telegraphKind === 'volley';
+    const wingBeat = reducedMotion ? 0 : Math.sin(nowMs * 0.008) * 8;
+    // Fiery golden solar wings
+    ctx.fillStyle = '#f97316';
+    ctx.strokeStyle = '#fef08a';
+    ctx.lineWidth = 2.4;
+    ctx.beginPath();
+    ctx.moveTo(x - r * 0.45, y);
+    ctx.lineTo(x - r * 1.72, y - r * 0.55 + wingBeat);
+    ctx.lineTo(x - r * 1.38, y + r * 0.45);
+    ctx.closePath();
+    ctx.moveTo(x + r * 0.45, y);
+    ctx.lineTo(x + r * 1.72, y - r * 0.55 + wingBeat);
+    ctx.lineTo(x + r * 1.38, y + r * 0.45);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Pharaoh striped golden nemes headdress
+    ctx.fillStyle = '#eab308';
+    ctx.strokeStyle = '#78350f';
+    ctx.lineWidth = 2.6;
+    ctx.beginPath();
+    ctx.moveTo(x - r * 0.96, y + r * 0.45);
+    ctx.lineTo(x - r * 0.72, y - r * 0.95);
+    ctx.lineTo(x, y - r * 1.25);
+    ctx.lineTo(x + r * 0.72, y - r * 0.95);
+    ctx.lineTo(x + r * 0.96, y + r * 0.45);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Inner obsidian mask & blazing ruby eyes
+    ctx.fillStyle = isVolley ? '#dc2626' : '#7c2d12';
+    ctx.beginPath();
+    ctx.arc(x, y, r * 0.78, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = '#fef08a';
+    ctx.beginPath();
+    ctx.arc(x - r * 0.28, y - r * 0.12, 4.8, 0, Math.PI * 2);
+    ctx.arc(x + r * 0.28, y - r * 0.12, 4.8, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#fb923c';
+    ctx.beginPath();
+    ctx.arc(x, y - r * 0.78, 6.5, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (kind === 'boss_quartz_lord') {
+    // Floating crystal spikes & diamond silhouette
+    ctx.fillStyle = '#a855f7';
+    ctx.strokeStyle = '#1e1b4b';
+    ctx.lineWidth = 2.6;
+    ctx.beginPath();
+    ctx.moveTo(x, y - r * 1.25);
+    ctx.lineTo(x + r * 0.95, y - r * 0.2);
+    ctx.lineTo(x + r * 0.65, y + r * 0.9);
+    ctx.lineTo(x - r * 0.65, y + r * 0.9);
+    ctx.lineTo(x - r * 0.95, y - r * 0.2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Inner bright amethyst facet
+    ctx.fillStyle = '#e879f9';
+    ctx.beginPath();
+    ctx.moveTo(x, y - r * 0.92);
+    ctx.lineTo(x + r * 0.5, y);
+    ctx.lineTo(x, y + r * 0.55);
+    ctx.lineTo(x - r * 0.5, y);
+    ctx.closePath();
+    ctx.fill();
+
+    // Cyan glowing eyes
+    ctx.fillStyle = '#22d3ee';
+    ctx.beginPath();
+    ctx.arc(x - r * 0.26, y - r * 0.08, 4.5, 0, Math.PI * 2);
+    ctx.arc(x + r * 0.26, y - r * 0.08, 4.5, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (kind === 'boss_crystal_golem') {
+    // Massive crystal-armored bear/golem with glowing neon core
+    ctx.fillStyle = '#c084fc';
+    ctx.strokeStyle = '#3b0764';
+    ctx.lineWidth = 2.6;
+    ctx.beginPath();
+    ctx.moveTo(x - r * 1.15, y + r * 0.1);
+    ctx.lineTo(x - r * 1.22, y - r * 0.82);
+    ctx.lineTo(x - r * 0.45, y - r * 0.65);
+    ctx.closePath();
+    ctx.moveTo(x + r * 1.15, y + r * 0.1);
+    ctx.lineTo(x + r * 1.22, y - r * 0.82);
+    ctx.lineTo(x + r * 0.45, y - r * 0.65);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = '#4c1d95';
+    ctx.strokeStyle = isSlowed ? '#38bdf8' : '#e879f9';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    for (let i = 0; i < 6; i += 1) {
+      const ang = (i * Math.PI * 2) / 6;
+      const px = x + Math.cos(ang) * r;
+      const py = y + Math.sin(ang) * r * 0.94;
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = '#22d3ee';
+    ctx.beginPath();
+    ctx.arc(x, y + r * 0.22, r * 0.24, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#fde047';
+    ctx.fillRect(x - r * 0.42, y - r * 0.22, r * 0.3, 5);
+    ctx.fillRect(x + r * 0.12, y - r * 0.22, r * 0.3, 5);
+  } else if (kind === 'boss_void_dragon') {
+    const isVolley = enemy.telegraphKind === 'volley';
+    const wingBeat = reducedMotion ? 0 : Math.sin(nowMs * 0.01) * 11;
+    if (isVolley) {
+      ctx.strokeStyle = '#e879f9';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.arc(x, y, r + 15, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    // Jagged void-crystal wings
+    ctx.fillStyle = '#581c87';
+    ctx.strokeStyle = '#e879f9';
+    ctx.lineWidth = 2.6;
+    ctx.beginPath();
+    ctx.moveTo(x - r * 0.4, y);
+    ctx.lineTo(x - r * 1.85, y - r * 0.78 + wingBeat);
+    ctx.lineTo(x - r * 1.5, y + r * 0.38 + wingBeat * 0.4);
+    ctx.lineTo(x - r * 0.65, y + r * 0.35);
+    ctx.closePath();
+    ctx.moveTo(x + r * 0.4, y);
+    ctx.lineTo(x + r * 1.85, y - r * 0.78 + wingBeat);
+    ctx.lineTo(x + r * 1.5, y + r * 0.38 + wingBeat * 0.4);
+    ctx.lineTo(x + r * 0.65, y + r * 0.35);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Twin amethyst horns
+    ctx.fillStyle = '#f0abfc';
+    ctx.beginPath();
+    ctx.moveTo(x - r * 0.48, y - r * 0.55);
+    ctx.lineTo(x - r * 0.92, y - r * 1.38);
+    ctx.lineTo(x - r * 0.16, y - r * 0.82);
+    ctx.closePath();
+    ctx.moveTo(x + r * 0.48, y - r * 0.55);
+    ctx.lineTo(x + r * 0.92, y - r * 1.38);
+    ctx.lineTo(x + r * 0.16, y - r * 0.82);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Obsidian void body & prism core
+    ctx.fillStyle = '#1e1b4b';
+    ctx.strokeStyle = '#c084fc';
+    ctx.lineWidth = 3.2;
+    ctx.beginPath();
+    ctx.arc(x, y, r * 0.95, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = '#e879f9';
+    ctx.beginPath();
+    ctx.arc(x, y + r * 0.28, r * 0.28, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#fde047';
+    ctx.beginPath();
+    ctx.arc(x - r * 0.32, y - r * 0.14, 5, 0, Math.PI * 2);
+    ctx.arc(x + r * 0.32, y - r * 0.14, 5, 0, Math.PI * 2);
     ctx.fill();
   } else if (kind === 'boss_frost_bear') {
     // Spiked frost armor shoulders
@@ -2803,7 +3137,7 @@ export function renderSurvivalFrame(
       e.hp > 0 &&
       isInView(e.x, e.y, e.radius + 32, viewMinX, viewMaxX, viewMinY, viewMaxY)
     ) {
-      drawEnemy(ctx, e, nowMs, reducedMotion);
+      drawEnemy(ctx, e, view.mapId, nowMs, reducedMotion);
     }
   }
   for (let i = 0; i < view.enemies.length; i += 1) {
@@ -2813,7 +3147,7 @@ export function renderSurvivalFrame(
       e.hp > 0 &&
       isInView(e.x, e.y, e.radius + 64, viewMinX, viewMaxX, viewMinY, viewMaxY)
     ) {
-      drawEnemy(ctx, e, nowMs, reducedMotion);
+      drawEnemy(ctx, e, view.mapId, nowMs, reducedMotion);
     }
   }
 

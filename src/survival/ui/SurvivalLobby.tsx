@@ -24,10 +24,11 @@ import {
 import { playSfx } from '../../audio/soundEngine.ts';
 import { AnimalAvatar } from '../../components/AnimalAvatar.tsx';
 import { ANIMALS, type AnimalId } from '../../engine/types.ts';
-import { copyTextSafe, shareRoomInvite } from '../../online/inviteLink.ts';
+import { buildRoomInviteUrl, copyTextSafe } from '../../online/inviteLink.ts';
 import { normalizeRoomCode } from '../../online/sanitize.ts';
 import type { SurvivalRoomController } from '../online/useSurvivalRoom.ts';
 import {
+  BOSS_NAMES,
   GEARS,
   WEAPONS,
   getGearSpec,
@@ -318,25 +319,15 @@ export function SurvivalLobby({
     });
   };
 
-  const handleShareInvite = async () => {
+  const handleCopyInvite = async () => {
     if (!room.roomCode) return;
     playSfx('click');
-    const outcome = await shareRoomInvite({
-      kind: 'survival',
-      roomCode: room.roomCode,
-      title: 'PAWS Survival — Sinh Tồn 2D',
-      text: `Vào phòng PAWS Survival mã ${room.roomCode} chiến đấu cùng mình nhé!`,
-    });
+    const url = buildRoomInviteUrl('survival', room.roomCode);
+    const copied = url ? await copyTextSafe(url) : false;
 
-    if (!isMountedRef.current || outcome === 'cancelled') return;
+    if (!isMountedRef.current) return;
 
-    setInviteFeedback(
-      outcome === 'shared'
-        ? 'Đã chia sẻ!'
-        : outcome === 'copied'
-          ? 'Đã sao chép!'
-          : 'Không thể sao chép',
-    );
+    setInviteFeedback(copied ? 'Đã sao chép!' : 'Không thể sao chép');
     if (feedbackTimerRef.current !== null) {
       window.clearTimeout(feedbackTimerRef.current);
     }
@@ -713,11 +704,10 @@ export function SurvivalLobby({
 
                           <button
                             type="button"
-                            onClick={() => void handleShareInvite()}
+                            onClick={() => void handleCopyInvite()}
                             className={`btn-tactile-sky inline-flex cursor-pointer items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-black ${FOCUS_RING_CLASS}`}
                           >
-                            {inviteFeedback === 'Đã sao chép!' ||
-                            inviteFeedback === 'Đã chia sẻ!' ? (
+                            {inviteFeedback === 'Đã sao chép!' ? (
                               <Check aria-hidden="true" className="h-3.5 w-3.5" />
                             ) : (
                               <Link2 aria-hidden="true" className="h-3.5 w-3.5" />
@@ -988,6 +978,8 @@ export function SurvivalLobby({
             {SURVIVAL_MAPS.map((map) => {
               const isSelected = activeMapId === map.id;
               const isEndless = map.isEndless;
+              const stars = `${'★'.repeat(map.difficultyStars)}${'☆'.repeat(4 - map.difficultyStars)}`;
+              const finalBossName = BOSS_NAMES[map.finalBossKind];
 
               const cardContent = (
                 <>
@@ -1005,18 +997,18 @@ export function SurvivalLobby({
                       {isEndless ? (
                         <span className="inline-flex items-center gap-1 rounded-lg border border-amber-300/75 bg-[#190c22]/85 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-amber-200 backdrop-blur-sm">
                           <InfinityIcon aria-hidden="true" className="h-3 w-3" />
-                          <span>VÔ TẬN</span>
+                          <span>{map.difficultyLabel} · {stars}</span>
                         </span>
                       ) : (
                         <span
                           className="rounded-lg border px-2 py-0.5 text-[10px] font-black uppercase tracking-wide backdrop-blur-sm"
                           style={{
                             borderColor: `${map.theme.accent}88`,
-                            backgroundColor: 'rgba(11, 16, 28, 0.82)',
+                            backgroundColor: 'rgba(11, 16, 28, 0.85)',
                             color: map.theme.accent,
                           }}
                         >
-                          Chiến dịch · 3 Boss
+                          {map.difficultyLabel} · {stars}
                         </span>
                       )}
                     </span>
@@ -1033,8 +1025,16 @@ export function SurvivalLobby({
                   {/* Card Body */}
                   <span className="flex flex-1 flex-col justify-between p-3.5">
                     <span className="block">
-                      <span className="block font-display text-base font-black text-white">
-                        {map.name}
+                      <span className="flex items-center justify-between gap-1.5">
+                        <span className="block font-display text-base font-black text-white">
+                          {map.name}
+                        </span>
+                        {map.cookieMultiplier > 1 && (
+                          <span className="inline-flex shrink-0 items-center gap-0.5 rounded-md border border-amber-400/45 bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-black text-amber-200 tabular-nums">
+                            <Cookie aria-hidden="true" className="h-2.5 w-2.5" />
+                            <span>×{map.cookieMultiplier}</span>
+                          </span>
+                        )}
                       </span>
                       <span className="mt-1 block text-xs leading-snug text-slate-300">
                         {map.description}
@@ -1044,6 +1044,14 @@ export function SurvivalLobby({
                     <span className="mt-3 block space-y-2 border-t border-white/10 pt-2.5">
                       <span className="block text-[11px] font-bold text-cyan-200/90">
                         {map.mechanicSummary}
+                      </span>
+
+                      <span className="flex flex-wrap items-center justify-between gap-1 text-[10px] font-black">
+                        <span className="rounded-md border border-white/10 bg-white/5 px-1.5 py-0.5 text-slate-300">
+                          {isEndless
+                            ? '24 Kỹ năng · 9 Boss'
+                            : '6 Mặc định + 6 Riêng Map'}
+                        </span>
                       </span>
 
                       <span className="flex items-center justify-between text-[11px] font-black">
@@ -1061,9 +1069,9 @@ export function SurvivalLobby({
                           <span className="inline-flex items-center gap-1 text-rose-200/90">
                             <Skull
                               aria-hidden="true"
-                              className="h-3.5 w-3.5 text-rose-300"
+                              className="h-3.5 w-3.5 shrink-0 text-rose-300"
                             />
-                            <span>Hạ 3 Boss · Diệt Rồng Tuyết</span>
+                            <span>Boss Cuối: {finalBossName}</span>
                           </span>
                         )}
                       </span>

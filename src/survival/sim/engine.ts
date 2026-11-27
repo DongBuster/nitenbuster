@@ -68,11 +68,22 @@ const MAX_PARTICLES = 120;
 const MAX_LIGHTNING_ARCS = 20;
 
 const CAMPAIGN_BOSS_TIMINGS = [90, 210, 330] as const;
-const BOSS_ROTATION: readonly BossKind[] = [
+
+const BOSS_KIND_SET: ReadonlySet<EnemyKind> = new Set<BossKind>([
   'boss_slime_king',
   'boss_frost_bear',
   'boss_snow_dragon',
-];
+  'boss_jelly_king',
+  'boss_candy_scorpion',
+  'boss_sugar_pharaoh',
+  'boss_quartz_lord',
+  'boss_crystal_golem',
+  'boss_void_dragon',
+]);
+
+function isBossKind(kind: EnemyKind): kind is BossKind {
+  return BOSS_KIND_SET.has(kind);
+}
 
 const ZERO_INPUT: SurvivalInput = {
   moveX: 0,
@@ -100,9 +111,18 @@ const ENEMY_TEMPLATES: Record<EnemyKind, EnemyTemplate> = {
   owl_mage: { radius: 18, baseHp: 50, speed: 82, damage: 14, xpValue: 30, scoreValue: 35, flying: true },
   golem: { radius: 28, baseHp: 165, speed: 62, damage: 24, xpValue: 80, scoreValue: 60, flying: false },
   bomber: { radius: 18, baseHp: 48, speed: 118, damage: 28, xpValue: 30, scoreValue: 45, flying: false },
+  // Map 1 Bosses (Winter Cabin)
   boss_slime_king: { radius: 44, baseHp: 1400, speed: 76, damage: 26, xpValue: 250, scoreValue: 1500, flying: false },
   boss_frost_bear: { radius: 46, baseHp: 1800, speed: 88, damage: 30, xpValue: 250, scoreValue: 1500, flying: false },
   boss_snow_dragon: { radius: 50, baseHp: 2100, speed: 96, damage: 34, xpValue: 250, scoreValue: 1500, flying: true },
+  // Map 2 Bosses (Candy Canyon)
+  boss_jelly_king: { radius: 45, baseHp: 1480, speed: 82, damage: 27, xpValue: 250, scoreValue: 1600, flying: false },
+  boss_candy_scorpion: { radius: 46, baseHp: 1880, speed: 96, damage: 31, xpValue: 250, scoreValue: 1700, flying: false },
+  boss_sugar_pharaoh: { radius: 50, baseHp: 2200, speed: 98, damage: 35, xpValue: 250, scoreValue: 1900, flying: true },
+  // Map 3 Bosses (Crystal Cavern)
+  boss_quartz_lord: { radius: 45, baseHp: 1560, speed: 84, damage: 28, xpValue: 250, scoreValue: 1700, flying: false },
+  boss_crystal_golem: { radius: 48, baseHp: 1980, speed: 92, damage: 32, xpValue: 250, scoreValue: 1850, flying: false },
+  boss_void_dragon: { radius: 52, baseHp: 2350, speed: 102, damage: 36, xpValue: 250, scoreValue: 2100, flying: true },
 };
 
 const MAX_ENEMY_RADIUS = Math.max(
@@ -255,6 +275,11 @@ export function createSurvivalWorld(config: CreateWorldConfig): SurvivalWorldSta
       meteorTimer: 0,
       droneTimer: 0,
       droneAngle: 0,
+      frostNovaTimer: 0,
+      caramelNovaTimer: 0,
+      prismChainTimer: 0,
+      voidPulseTimer: 0,
+      crystalShieldCooldown: 0,
       teamAuraHealTimer: 0,
       teamAuraBuffTimer: 0,
       pylonBuffTimer: 0,
@@ -569,6 +594,7 @@ function updatePlayers(
     p.fireCooldown = Math.max(0, p.fireCooldown - dt);
     p.pylonBuffTimer = Math.max(0, p.pylonBuffTimer - dt);
     p.teamAuraBuffTimer = Math.max(0, p.teamAuraBuffTimer - dt);
+    p.crystalShieldCooldown = Math.max(0, p.crystalShieldCooldown - dt);
     p.comboTimer = Math.max(0, p.comboTimer - dt);
     if (p.comboTimer === 0) {
       p.comboCount = 0;
@@ -644,12 +670,17 @@ function updatePlayers(
         zoneSpeedMult *= 1.1;
       }
 
+      const sugarRushSpeedMult =
+        p.stats.sugarRushLevel > 0 && p.comboCount > 0
+          ? 1 + Math.min(0.45, p.comboCount * 0.025 * p.stats.sugarRushLevel)
+          : 1;
+
       const len = Math.hypot(input.moveX, input.moveY);
       if (len > 1e-4) {
         const scale = Math.max(1, len);
         const nx = input.moveX / scale;
         const ny = input.moveY / scale;
-        const speed = p.stats.moveSpeed * zoneSpeedMult;
+        const speed = p.stats.moveSpeed * zoneSpeedMult * sugarRushSpeedMult;
         p.vx = nx * speed;
         p.vy = ny * speed;
         p.x += p.vx * remDt;
@@ -693,6 +724,7 @@ function handleEnemyDeath(
   enemy: EnemyEntity,
   killerId: string,
   events: SurvivalSimEvent[],
+  allowPepperChain = true,
 ): void {
   const killer = world.players.find((p) => p.id === killerId) ?? null;
 
@@ -737,7 +769,8 @@ function handleEnemyDeath(
     spawnParticles(world, enemy.x, enemy.y, '#fbbf24', 18, 220);
     events.push({ type: 'boss_kill', bossKind: enemy.kind as BossKind });
 
-    if (!world.isEndlessActive && enemy.kind === 'boss_snow_dragon') {
+    const finalBossKind = getSurvivalMapMeta(world.mapId).finalBossKind;
+    if (!world.isEndlessActive && enemy.kind === finalBossKind) {
       world.bossScheduleIndex = Math.max(world.bossScheduleIndex + 1, 3);
       world.nextBossAtSec = Math.max(world.elapsedSec + 90, 420);
       world.phase = 'victory';
@@ -795,6 +828,46 @@ function handleEnemyDeath(
     });
   }
 
+  if (allowPepperChain && killer && killer.stats.pepperBombLevel > 0) {
+    const lv = killer.stats.pepperBombLevel;
+    const blastRadius = 78 + lv * 14;
+    const blastDmg =
+      (22 + lv * 11) * getPlayerDamageMultiplier(world, killer);
+    const nearby = enemyGrid.queryRadius(
+      enemy.x,
+      enemy.y,
+      blastRadius + MAX_ENEMY_RADIUS,
+      aoeGridScratch,
+    );
+    for (let i = 0; i < nearby.length; i++) {
+      const other = nearby[i];
+      if (other.id === enemy.id || other.hp <= 0) continue;
+      const dx = other.x - enemy.x;
+      const dy = other.y - enemy.y;
+      const d = Math.hypot(dx, dy);
+      if (d <= blastRadius + other.radius) {
+        const nx = d > 1e-4 ? dx / d : 1;
+        const ny = d > 1e-4 ? dy / d : 0;
+        damageEnemy(
+          world,
+          other,
+          blastDmg,
+          killer.id,
+          false,
+          36,
+          nx,
+          ny,
+          0,
+          0,
+          events,
+          true,
+          false,
+        );
+      }
+    }
+    spawnParticles(world, enemy.x, enemy.y, '#fb7185', 10, 175);
+  }
+
   spawnParticles(world, enemy.x, enemy.y, '#f87171', 6, 110);
   events.push({ type: 'enemy_kill' });
 }
@@ -812,14 +885,19 @@ function damageEnemy(
   slowDurationSec: number,
   events: SurvivalSimEvent[],
   showFloatingText = true,
+  allowPepperChain = true,
 ): void {
   if (enemy.hp <= 0) return;
 
-  const actualDamage = Math.max(1, Math.round(amount));
+  const owner = world.players.find((p) => p.id === ownerId);
+  const shatterMult =
+    owner && owner.stats.iceShatterLevel > 0 && enemy.slowTimer > 0
+      ? 1 + owner.stats.iceShatterLevel * 0.18
+      : 1;
+  const actualDamage = Math.max(1, Math.round(amount * shatterMult));
   enemy.hp -= actualDamage;
   enemy.hitFlashTimer = 0.12;
 
-  const owner = world.players.find((p) => p.id === ownerId);
   if (owner) {
     owner.damageDealt += actualDamage;
   }
@@ -842,8 +920,8 @@ function damageEnemy(
       enemy.x,
       enemy.y - enemy.radius,
       `${actualDamage}`,
-      isCrit ? '#facc15' : '#ffffff',
-      isCrit,
+      isCrit || shatterMult > 1 ? '#facc15' : '#ffffff',
+      isCrit || shatterMult > 1,
     );
   }
 
@@ -851,7 +929,7 @@ function damageEnemy(
 
   if (enemy.hp <= 0) {
     enemy.hp = 0;
-    handleEnemyDeath(world, enemy, ownerId, events);
+    handleEnemyDeath(world, enemy, ownerId, events, allowPepperChain);
   }
 }
 
@@ -1210,7 +1288,12 @@ function updatePrimaryWeapons(
     if (p.fireCooldown > 0) continue;
     if (!input.manualAim && !autoTarget) continue;
 
-    const effectiveFireRate = p.stats.fireRate * (p.pylonBuffTimer > 0 ? 1.2 : 1);
+    const sugarRushFireMult =
+      p.stats.sugarRushLevel > 0 && p.comboCount > 0
+        ? 1 + Math.min(0.5, p.comboCount * 0.03 * p.stats.sugarRushLevel)
+        : 1;
+    const effectiveFireRate =
+      p.stats.fireRate * (p.pylonBuffTimer > 0 ? 1.2 : 1) * sugarRushFireMult;
     p.fireCooldown = 1 / Math.max(0.1, effectiveFireRate);
 
     const baseDamageMult = getPlayerDamageMultiplier(world, p);
@@ -1244,7 +1327,16 @@ function updateSecondaryWeapons(
     const p = world.players[i];
     if (p.downed) continue;
 
-    const { orbitalLevel, warmAuraLevel, meteorLevel, droneLevel } = p.stats;
+    const {
+      orbitalLevel,
+      warmAuraLevel,
+      meteorLevel,
+      droneLevel,
+      frostNovaLevel,
+      caramelNovaLevel,
+      prismChainLevel,
+      voidPulseLevel,
+    } = p.stats;
     const damageMultiplier = getPlayerDamageMultiplier(world, p);
 
     if (orbitalLevel > 0) {
@@ -1403,6 +1495,175 @@ function updateSecondaryWeapons(
         }
       }
     }
+
+    if (frostNovaLevel > 0) {
+      p.frostNovaTimer -= dt;
+      if (p.frostNovaTimer <= 0) {
+        const radius = 145 + frostNovaLevel * 22;
+        const hits = enemyGrid.queryRadius(
+          p.x,
+          p.y,
+          radius + MAX_ENEMY_RADIUS,
+          gridScratch,
+        );
+        if (hits.some((e) => e.hp > 0 && Math.hypot(e.x - p.x, e.y - p.y) <= radius + e.radius)) {
+          p.frostNovaTimer = Math.max(2.0, 4.6 - frostNovaLevel * 0.45);
+          const dmg = (26 + frostNovaLevel * 14) * damageMultiplier;
+          for (let h = 0; h < hits.length; h++) {
+            const e = hits[h];
+            if (e.hp <= 0) continue;
+            const dx = e.x - p.x;
+            const dy = e.y - p.y;
+            const d = Math.hypot(dx, dy);
+            if (d <= radius + e.radius) {
+              const nx = d > 1e-4 ? dx / d : 1;
+              const ny = d > 1e-4 ? dy / d : 0;
+              damageEnemy(
+                world,
+                e,
+                dmg,
+                p.id,
+                false,
+                55,
+                nx,
+                ny,
+                0.45,
+                2.6,
+                events,
+              );
+            }
+          }
+          spawnParticles(world, p.x, p.y, '#7dd3fc', 14, 210);
+        }
+      }
+    }
+
+    if (caramelNovaLevel > 0) {
+      p.caramelNovaTimer -= dt;
+      if (p.caramelNovaTimer <= 0) {
+        const target = enemyGrid.findNearest(
+          p.x,
+          p.y,
+          560,
+          (e) => e.hp > 0,
+        );
+        if (target) {
+          p.caramelNovaTimer = Math.max(2.2, 5.0 - caramelNovaLevel * 0.5);
+          const radius = 130 + caramelNovaLevel * 16;
+          const dmg = (38 + caramelNovaLevel * 18) * damageMultiplier;
+          const cx = target.x;
+          const cy = target.y;
+          const hits = enemyGrid.queryRadius(
+            cx,
+            cy,
+            radius + MAX_ENEMY_RADIUS,
+            aoeGridScratch,
+          );
+          for (let h = 0; h < hits.length; h++) {
+            const e = hits[h];
+            if (e.hp <= 0) continue;
+            const dx = cx - e.x;
+            const dy = cy - e.y;
+            const d = Math.hypot(dx, dy);
+            if (d <= radius + e.radius) {
+              if (!e.isBoss && d > 8) {
+                const pull = Math.min(d * 0.55, 42 + caramelNovaLevel * 6);
+                e.x = clampCoord(e.x + (dx / d) * pull, e.radius);
+                e.y = clampCoord(e.y + (dy / d) * pull, e.radius);
+              }
+              damageEnemy(world, e, dmg, p.id, false, 0, 0, 0, 0.25, 1.4, events);
+            }
+          }
+          spawnParticles(world, cx, cy, '#ea580c', 14, 180);
+        }
+      }
+    }
+
+    if (prismChainLevel > 0) {
+      p.prismChainTimer -= dt;
+      if (p.prismChainTimer <= 0) {
+        const first = enemyGrid.findNearest(
+          p.x,
+          p.y,
+          420,
+          (e) => e.hp > 0,
+        );
+        if (first) {
+          p.prismChainTimer = Math.max(1.1, 3.0 - prismChainLevel * 0.35);
+          const hops = 2 + prismChainLevel;
+          let hopDmg = (28 + prismChainLevel * 14) * damageMultiplier;
+          const visited = new Set<string>([first.id]);
+          const points: Array<{ x: number; y: number }> = [
+            { x: p.x, y: p.y },
+            { x: first.x, y: first.y },
+          ];
+          damageEnemy(world, first, hopDmg, p.id, false, 0, 0, 0, 0, 0, events);
+          let current = first;
+          for (let h = 1; h < hops; h++) {
+            hopDmg *= 0.88;
+            const next = enemyGrid.findNearest(
+              current.x,
+              current.y,
+              240,
+              (cand) => cand.hp > 0 && !visited.has(cand.id),
+            );
+            if (!next) break;
+            visited.add(next.id);
+            points.push({ x: next.x, y: next.y });
+            damageEnemy(world, next, hopDmg, p.id, false, 0, 0, 0, 0, 0, events);
+            current = next;
+          }
+          world.lightningArcs.push({
+            points,
+            color: '#e879f9',
+            ttl: 0.2,
+            maxTtl: 0.2,
+          });
+        }
+      }
+    }
+
+    if (voidPulseLevel > 0) {
+      p.voidPulseTimer -= dt;
+      if (p.voidPulseTimer <= 0) {
+        const radius = 185 + voidPulseLevel * 26;
+        const hits = enemyGrid.queryRadius(
+          p.x,
+          p.y,
+          radius + MAX_ENEMY_RADIUS,
+          gridScratch,
+        );
+        if (hits.some((e) => e.hp > 0 && Math.hypot(e.x - p.x, e.y - p.y) <= radius + e.radius)) {
+          p.voidPulseTimer = Math.max(2.4, 5.2 - voidPulseLevel * 0.5);
+          const dmg = (46 + voidPulseLevel * 24) * damageMultiplier;
+          for (let h = 0; h < hits.length; h++) {
+            const e = hits[h];
+            if (e.hp <= 0) continue;
+            const dx = e.x - p.x;
+            const dy = e.y - p.y;
+            const d = Math.hypot(dx, dy);
+            if (d <= radius + e.radius) {
+              const nx = d > 1e-4 ? dx / d : 1;
+              const ny = d > 1e-4 ? dy / d : 0;
+              damageEnemy(
+                world,
+                e,
+                dmg,
+                p.id,
+                false,
+                150,
+                nx,
+                ny,
+                0,
+                0,
+                events,
+              );
+            }
+          }
+          spawnParticles(world, p.x, p.y, '#9333ea', 16, 240);
+        }
+      }
+    }
   }
 }
 
@@ -1456,6 +1717,36 @@ function damagePlayer(
   player.comboCount = 0;
   player.comboTimer = 0;
   addFloatingText(world, player.x, player.y - player.radius, `-${dmg}`, '#f87171', false);
+
+  if (
+    player.hp > 0 &&
+    player.stats.crystalShieldLevel > 0 &&
+    player.crystalShieldCooldown <= 0
+  ) {
+    const lv = player.stats.crystalShieldLevel;
+    player.crystalShieldCooldown = Math.max(2.5, 6.0 - lv * 0.65);
+    const shockRadius = 130 + lv * 18;
+    const shockDmg = (28 + lv * 14) * getPlayerDamageMultiplier(world, player);
+    const nearby = enemyGrid.queryRadius(
+      player.x,
+      player.y,
+      shockRadius + MAX_ENEMY_RADIUS,
+      aoeGridScratch,
+    );
+    for (let i = 0; i < nearby.length; i++) {
+      const e = nearby[i];
+      if (e.hp <= 0) continue;
+      const dx = e.x - player.x;
+      const dy = e.y - player.y;
+      const d = Math.hypot(dx, dy);
+      if (d <= shockRadius + e.radius) {
+        const nx = d > 1e-4 ? dx / d : 1;
+        const ny = d > 1e-4 ? dy / d : 0;
+        damageEnemy(world, e, shockDmg, player.id, false, 95, nx, ny, 0, 0, events);
+      }
+    }
+    spawnParticles(world, player.x, player.y, '#818cf8', 12, 190);
+  }
 
   if (player.hp <= 0) {
     player.downed = true;
@@ -1869,10 +2160,8 @@ function createEnemy(
   bossTier = 0,
 ): EnemyEntity {
   const tpl = ENEMY_TEMPLATES[kind];
-  const isBoss =
-    kind === 'boss_slime_king' ||
-    kind === 'boss_frost_bear' ||
-    kind === 'boss_snow_dragon';
+  const isBoss = isBossKind(kind);
+  const mapMeta = getSurvivalMapMeta(world.mapId);
   const teamSize = Math.max(1, world.players.length);
   const teamHpMult = 1 + (teamSize - 1) * 0.45;
 
@@ -1880,15 +2169,28 @@ function createEnemy(
   let damage: number;
   if (isBoss) {
     const tier = Math.max(1, bossTier);
-    hp = Math.round(tpl.baseHp * teamHpMult * (1 + (tier - 1) * 0.65));
-    damage = Math.round(tpl.damage * (1 + (tier - 1) * 0.25));
+    hp = Math.round(
+      tpl.baseHp *
+        mapMeta.difficulty.bossHpMult *
+        teamHpMult *
+        (1 + (tier - 1) * 0.65),
+    );
+    damage = Math.round(
+      tpl.damage * mapMeta.difficulty.damageMult * (1 + (tier - 1) * 0.25),
+    );
   } else {
     const timeMult =
       1 +
       (world.elapsedSec / 60) * 0.18 +
       (world.elapsedSec > 360 ? ((world.elapsedSec - 360) / 60) * 0.35 : 0);
-    hp = Math.round(tpl.baseHp * teamHpMult * timeMult);
-    damage = Math.round(tpl.damage * (1 + (world.elapsedSec / 180) * 0.15));
+    hp = Math.round(
+      tpl.baseHp * mapMeta.difficulty.hpMult * teamHpMult * timeMult,
+    );
+    damage = Math.round(
+      tpl.damage *
+        mapMeta.difficulty.damageMult *
+        (1 + (world.elapsedSec / 180) * 0.15),
+    );
   }
 
   return {
@@ -2221,6 +2523,440 @@ function stepSnowDragonAi(
   }
 }
 
+function fireBossRadialVolley(
+  world: SurvivalWorldState,
+  boss: EnemyEntity,
+  bullets: number,
+  speed: number,
+  color: string,
+  baseAngle: number,
+): void {
+  for (let b = 0; b < bullets; b++) {
+    const ang = baseAngle + (b * Math.PI * 2) / bullets;
+    world.projectiles.push({
+      id: allocId(world, 'eproj'),
+      ownerId: boss.id,
+      fromEnemy: true,
+      weaponId: 'enemy_dragon',
+      x: boss.x,
+      y: boss.y,
+      vx: Math.cos(ang) * speed,
+      vy: Math.sin(ang) * speed,
+      startX: boss.x,
+      startY: boss.y,
+      radius: 9,
+      damage: boss.damage,
+      isCrit: false,
+      pierceLeft: 1,
+      ricochetLeft: 0,
+      maxRange: 740,
+      traveled: 0,
+      ttl: 2.9,
+      knockback: 0,
+      aoeRadius: 0,
+      slowPct: 0,
+      slowDurationSec: 0,
+      boomerang: false,
+      returning: false,
+      hitIds: [],
+      color,
+    });
+  }
+}
+
+function stepJellyKingAi(
+  world: SurvivalWorldState,
+  boss: EnemyEntity,
+  target: PlayerEntity,
+  nx: number,
+  ny: number,
+  effSpeed: number,
+  dt: number,
+): void {
+  boss.vx = nx * effSpeed;
+  boss.vy = ny * effSpeed;
+  boss.x += boss.vx * dt;
+  boss.y += boss.vy * dt;
+
+  if (boss.telegraphTimer > 0) {
+    boss.telegraphTimer = Math.max(0, boss.telegraphTimer - dt);
+    if (boss.telegraphTimer === 0) boss.telegraphKind = 'none';
+  }
+  if (boss.attackCooldown > 0) return;
+
+  boss.attackCooldown = 4.0;
+  boss.telegraphKind = 'slam';
+  boss.telegraphX = target.x;
+  boss.telegraphY = target.y;
+  boss.telegraphRadius = 135;
+  boss.telegraphTimer = 0.85;
+
+  // Twin caramel slam rings (on target + around boss)
+  for (let i = 0; i < 2; i++) {
+    const hx = i === 0 ? target.x : boss.x;
+    const hy = i === 0 ? target.y : boss.y;
+    world.hazards.push({
+      id: allocId(world, 'haz'),
+      x: hx,
+      y: hy,
+      radius: i === 0 ? 125 : 115,
+      shape: 'circle',
+      elapsed: 0,
+      duration: 0.85,
+      damage: Math.round(boss.damage * 1.35),
+      fromEnemy: true,
+      ownerId: boss.id,
+      color: '#fb923c',
+      resolved: false,
+    });
+  }
+
+  const maxEnemies = getMaxEnemiesForTeam(world);
+  const count = 3 + Math.floor(nextRng(world) * 2);
+  for (let m = 0; m < count && world.enemies.length < maxEnemies; m++) {
+    const ang = (m * Math.PI * 2) / count + nextRng(world) * 0.4;
+    const kind: EnemyKind = m === 0 ? 'bomber' : 'slime';
+    world.enemies.push(
+      createEnemy(world, kind, boss.x + Math.cos(ang) * 88, boss.y + Math.sin(ang) * 88),
+    );
+  }
+}
+
+function stepCandyScorpionAi(
+  world: SurvivalWorldState,
+  boss: EnemyEntity,
+  target: PlayerEntity,
+  nx: number,
+  ny: number,
+  effSpeed: number,
+  dt: number,
+): void {
+  if (boss.stateTimer > 0) {
+    boss.vx = boss.dashVx;
+    boss.vy = boss.dashVy;
+    boss.x += boss.vx * dt;
+    boss.y += boss.vy * dt;
+    boss.stateTimer = Math.max(0, boss.stateTimer - dt);
+    if (boss.stateTimer === 0 && boss.chargeRemaining > 0) {
+      startBossLineCharge(world, boss, target, 390, 40, 0.65, 1.35, 0.36, '#f59e0b');
+    }
+    return;
+  }
+
+  if (boss.telegraphKind === 'charge' && boss.telegraphTimer > 0) {
+    boss.vx = 0;
+    boss.vy = 0;
+    boss.telegraphTimer = Math.max(0, boss.telegraphTimer - dt);
+    if (boss.telegraphTimer === 0) {
+      boss.telegraphKind = 'none';
+      boss.stateTimer = 0.36;
+      boss.chargeRemaining = Math.max(0, boss.chargeRemaining - 1);
+    }
+    return;
+  }
+
+  boss.vx = nx * effSpeed;
+  boss.vy = ny * effSpeed;
+  boss.x += boss.vx * dt;
+  boss.y += boss.vy * dt;
+
+  if (boss.attackCooldown > 0) return;
+
+  boss.attackCooldown = 3.5;
+  boss.chargeRemaining = 2;
+  startBossLineCharge(world, boss, target, 390, 40, 0.65, 1.35, 0.36, '#f59e0b');
+
+  // Fan of 5 amber venom orbs toward target
+  const aim = Math.atan2(target.y - boss.y, target.x - boss.x);
+  for (let i = -2; i <= 2; i++) {
+    const ang = aim + i * 0.22;
+    const speed = 290;
+    world.projectiles.push({
+      id: allocId(world, 'eproj'),
+      ownerId: boss.id,
+      fromEnemy: true,
+      weaponId: 'enemy_orb',
+      x: boss.x,
+      y: boss.y,
+      vx: Math.cos(ang) * speed,
+      vy: Math.sin(ang) * speed,
+      startX: boss.x,
+      startY: boss.y,
+      radius: 8,
+      damage: Math.round(boss.damage * 0.9),
+      isCrit: false,
+      pierceLeft: 1,
+      ricochetLeft: 0,
+      maxRange: 640,
+      traveled: 0,
+      ttl: 2.3,
+      knockback: 0,
+      aoeRadius: 0,
+      slowPct: 0,
+      slowDurationSec: 0,
+      boomerang: false,
+      returning: false,
+      hitIds: [],
+      color: '#fbbf24',
+    });
+  }
+}
+
+function stepSugarPharaohAi(
+  world: SurvivalWorldState,
+  boss: EnemyEntity,
+  target: PlayerEntity,
+  nx: number,
+  ny: number,
+  effSpeed: number,
+  dt: number,
+): void {
+  if (boss.stateTimer > 0) {
+    boss.vx = boss.dashVx;
+    boss.vy = boss.dashVy;
+    boss.x += boss.vx * dt;
+    boss.y += boss.vy * dt;
+    boss.stateTimer = Math.max(0, boss.stateTimer - dt);
+    return;
+  }
+  if (boss.telegraphKind === 'charge' && boss.telegraphTimer > 0) {
+    boss.vx = 0;
+    boss.vy = 0;
+    boss.telegraphTimer = Math.max(0, boss.telegraphTimer - dt);
+    if (boss.telegraphTimer === 0) {
+      boss.telegraphKind = 'none';
+      boss.stateTimer = 0.38;
+    }
+    return;
+  }
+  if (boss.telegraphTimer > 0) {
+    boss.telegraphTimer = Math.max(0, boss.telegraphTimer - dt);
+    if (boss.telegraphTimer === 0) boss.telegraphKind = 'none';
+  }
+
+  boss.vx = nx * effSpeed;
+  boss.vy = ny * effSpeed;
+  boss.x += boss.vx * dt;
+  boss.y += boss.vy * dt;
+  if (boss.attackCooldown > 0) return;
+
+  const pattern = boss.chargeRemaining % 3;
+  boss.chargeRemaining += 1;
+
+  if (pattern === 0) {
+    boss.attackCooldown = 2.9;
+    boss.telegraphKind = 'volley';
+    boss.telegraphTimer = 0.45;
+    fireBossRadialVolley(world, boss, 14, 275, '#fb923c', world.elapsedSec * 0.9);
+  } else if (pattern === 1) {
+    boss.attackCooldown = 3.1;
+    const count = 4 + Math.floor(nextRng(world) * 2);
+    for (let c = 0; c < count; c++) {
+      const tx = clampCoord(target.x + (nextRng(world) - 0.5) * 280, 88);
+      const ty = clampCoord(target.y + (nextRng(world) - 0.5) * 280, 88);
+      world.hazards.push({
+        id: allocId(world, 'haz'),
+        x: tx,
+        y: ty,
+        radius: 88,
+        shape: 'circle',
+        elapsed: 0,
+        duration: 0.92,
+        damage: Math.round(boss.damage * 1.35),
+        fromEnemy: true,
+        color: '#f97316',
+        resolved: false,
+      });
+    }
+  } else {
+    boss.attackCooldown = 3.2;
+    startBossLineCharge(world, boss, target, 450, 48, 0.7, 1.45, 0.38, '#fbbf24');
+  }
+}
+
+function stepQuartzLordAi(
+  world: SurvivalWorldState,
+  boss: EnemyEntity,
+  target: PlayerEntity,
+  nx: number,
+  ny: number,
+  effSpeed: number,
+  dt: number,
+): void {
+  boss.vx = nx * effSpeed;
+  boss.vy = ny * effSpeed;
+  boss.x += boss.vx * dt;
+  boss.y += boss.vy * dt;
+
+  if (boss.telegraphTimer > 0) {
+    boss.telegraphTimer = Math.max(0, boss.telegraphTimer - dt);
+    if (boss.telegraphTimer === 0) boss.telegraphKind = 'none';
+  }
+  if (boss.attackCooldown > 0) return;
+
+  boss.attackCooldown = 3.6;
+  boss.telegraphKind = 'volley';
+  boss.telegraphTimer = 0.5;
+  fireBossRadialVolley(world, boss, 10, 285, '#c084fc', world.elapsedSec);
+
+  world.hazards.push({
+    id: allocId(world, 'haz'),
+    x: target.x,
+    y: target.y,
+    radius: 118,
+    shape: 'circle',
+    elapsed: 0,
+    duration: 0.85,
+    damage: Math.round(boss.damage * 1.35),
+    fromEnemy: true,
+    ownerId: boss.id,
+    color: '#c084fc',
+    resolved: false,
+  });
+
+  const maxEnemies = getMaxEnemiesForTeam(world);
+  if (world.enemies.length + 2 < maxEnemies) {
+    world.enemies.push(createEnemy(world, 'owl_mage', boss.x + 85, boss.y));
+    world.enemies.push(createEnemy(world, 'bat', boss.x - 85, boss.y));
+  }
+}
+
+function stepCrystalGolemAi(
+  world: SurvivalWorldState,
+  boss: EnemyEntity,
+  target: PlayerEntity,
+  nx: number,
+  ny: number,
+  effSpeed: number,
+  dt: number,
+): void {
+  if (boss.stateTimer > 0) {
+    boss.vx = boss.dashVx;
+    boss.vy = boss.dashVy;
+    boss.x += boss.vx * dt;
+    boss.y += boss.vy * dt;
+    boss.stateTimer = Math.max(0, boss.stateTimer - dt);
+    if (boss.stateTimer === 0) {
+      if (boss.chargeRemaining > 0) {
+        startBossLineCharge(world, boss, target, 400, 48, 0.68, 1.45, 0.38, '#a855f7');
+      } else {
+        for (let i = 0; i < 2; i++) {
+          world.hazards.push({
+            id: allocId(world, 'haz'),
+            x: i === 0 ? boss.x : target.x,
+            y: i === 0 ? boss.y : target.y,
+            radius: 122,
+            shape: 'circle',
+            elapsed: 0,
+            duration: 0.65,
+            damage: Math.round(boss.damage * 1.3),
+            fromEnemy: true,
+            ownerId: boss.id,
+            color: '#e879f9',
+            resolved: false,
+          });
+        }
+      }
+    }
+    return;
+  }
+
+  if (boss.telegraphKind === 'charge' && boss.telegraphTimer > 0) {
+    boss.vx = 0;
+    boss.vy = 0;
+    boss.telegraphTimer = Math.max(0, boss.telegraphTimer - dt);
+    if (boss.telegraphTimer === 0) {
+      boss.telegraphKind = 'none';
+      boss.stateTimer = 0.38;
+      boss.chargeRemaining = Math.max(0, boss.chargeRemaining - 1);
+    }
+    return;
+  }
+
+  boss.vx = nx * effSpeed;
+  boss.vy = ny * effSpeed;
+  boss.x += boss.vx * dt;
+  boss.y += boss.vy * dt;
+
+  if (boss.attackCooldown <= 0) {
+    boss.attackCooldown = 3.5;
+    boss.chargeRemaining = 3;
+    startBossLineCharge(world, boss, target, 400, 48, 0.68, 1.45, 0.38, '#a855f7');
+  }
+}
+
+function stepVoidDragonAi(
+  world: SurvivalWorldState,
+  boss: EnemyEntity,
+  target: PlayerEntity,
+  nx: number,
+  ny: number,
+  effSpeed: number,
+  dt: number,
+): void {
+  if (boss.stateTimer > 0) {
+    boss.vx = boss.dashVx;
+    boss.vy = boss.dashVy;
+    boss.x += boss.vx * dt;
+    boss.y += boss.vy * dt;
+    boss.stateTimer = Math.max(0, boss.stateTimer - dt);
+    return;
+  }
+  if (boss.telegraphKind === 'charge' && boss.telegraphTimer > 0) {
+    boss.vx = 0;
+    boss.vy = 0;
+    boss.telegraphTimer = Math.max(0, boss.telegraphTimer - dt);
+    if (boss.telegraphTimer === 0) {
+      boss.telegraphKind = 'none';
+      boss.stateTimer = 0.36;
+    }
+    return;
+  }
+  if (boss.telegraphTimer > 0) {
+    boss.telegraphTimer = Math.max(0, boss.telegraphTimer - dt);
+    if (boss.telegraphTimer === 0) boss.telegraphKind = 'none';
+  }
+
+  boss.vx = nx * effSpeed;
+  boss.vy = ny * effSpeed;
+  boss.x += boss.vx * dt;
+  boss.y += boss.vy * dt;
+  if (boss.attackCooldown > 0) return;
+
+  const pattern = boss.chargeRemaining % 3;
+  boss.chargeRemaining += 1;
+
+  if (pattern === 0) {
+    boss.attackCooldown = 2.6;
+    boss.telegraphKind = 'volley';
+    boss.telegraphTimer = 0.45;
+    fireBossRadialVolley(world, boss, 16, 295, '#e879f9', world.elapsedSec * 1.1);
+  } else if (pattern === 1) {
+    boss.attackCooldown = 2.8;
+    const count = 5 + Math.floor(nextRng(world) * 2);
+    for (let c = 0; c < count; c++) {
+      const tx = clampCoord(target.x + (nextRng(world) - 0.5) * 300, 90);
+      const ty = clampCoord(target.y + (nextRng(world) - 0.5) * 300, 90);
+      world.hazards.push({
+        id: allocId(world, 'haz'),
+        x: tx,
+        y: ty,
+        radius: 90,
+        shape: 'circle',
+        elapsed: 0,
+        duration: 0.88,
+        damage: Math.round(boss.damage * 1.4),
+        fromEnemy: true,
+        color: '#c084fc',
+        resolved: false,
+      });
+    }
+  } else {
+    boss.attackCooldown = 2.9;
+    startBossLineCharge(world, boss, target, 480, 52, 0.65, 1.5, 0.36, '#e879f9');
+  }
+}
+
 function stepBossAi(
   world: SurvivalWorldState,
   boss: EnemyEntity,
@@ -2232,12 +2968,34 @@ function stepBossAi(
   const nx = dist > 1e-4 ? (target.x - boss.x) / dist : 1;
   const ny = dist > 1e-4 ? (target.y - boss.y) / dist : 0;
 
-  if (boss.kind === 'boss_slime_king') {
-    stepSlimeKingAi(world, boss, target, nx, ny, effSpeed, dt);
-  } else if (boss.kind === 'boss_frost_bear') {
-    stepFrostBearAi(world, boss, target, nx, ny, effSpeed, dt);
-  } else {
-    stepSnowDragonAi(world, boss, target, nx, ny, effSpeed, dt);
+  switch (boss.kind) {
+    case 'boss_slime_king':
+      stepSlimeKingAi(world, boss, target, nx, ny, effSpeed, dt);
+      break;
+    case 'boss_frost_bear':
+      stepFrostBearAi(world, boss, target, nx, ny, effSpeed, dt);
+      break;
+    case 'boss_snow_dragon':
+      stepSnowDragonAi(world, boss, target, nx, ny, effSpeed, dt);
+      break;
+    case 'boss_jelly_king':
+      stepJellyKingAi(world, boss, target, nx, ny, effSpeed, dt);
+      break;
+    case 'boss_candy_scorpion':
+      stepCandyScorpionAi(world, boss, target, nx, ny, effSpeed, dt);
+      break;
+    case 'boss_sugar_pharaoh':
+      stepSugarPharaohAi(world, boss, target, nx, ny, effSpeed, dt);
+      break;
+    case 'boss_quartz_lord':
+      stepQuartzLordAi(world, boss, target, nx, ny, effSpeed, dt);
+      break;
+    case 'boss_crystal_golem':
+      stepCrystalGolemAi(world, boss, target, nx, ny, effSpeed, dt);
+      break;
+    default:
+      stepVoidDragonAi(world, boss, target, nx, ny, effSpeed, dt);
+      break;
   }
 }
 
@@ -2446,8 +3204,10 @@ function updateSpawnersAndBosses(
   dt: number,
   events: SurvivalSimEvent[],
 ): void {
+  const mapMeta = getSurvivalMapMeta(world.mapId);
   const teamSize = Math.max(1, world.players.length);
-  const spawnRateMult = 1 + (teamSize - 1) * 0.35;
+  const spawnRateMult =
+    (1 + (teamSize - 1) * 0.35) * mapMeta.difficulty.spawnRateMult;
   const maxEnemies = getMaxEnemiesForTeam(world);
   const endlessRamp =
     world.elapsedSec > 360 ? 1 + (world.elapsedSec - 360) / 180 : 1;
@@ -2459,7 +3219,9 @@ function updateSpawnersAndBosses(
       Math.max(0.22, 1.15 - (world.elapsedSec / 360) * 0.65) * bossCalmFactor;
     world.spawnTimer = baseInterval / (spawnRateMult * endlessRamp);
 
-    const pool = getUnlockedEnemyPool(world.elapsedSec);
+    const unlockProgressSec =
+      world.elapsedSec * (1 + (mapMeta.difficultyStars - 1) * 0.14);
+    const pool = getUnlockedEnemyPool(unlockProgressSec);
     const batch = 1 + Math.floor(Math.min(4, world.elapsedSec / 75));
 
     for (let b = 0; b < batch && world.enemies.length < maxEnemies; b++) {
@@ -2490,7 +3252,8 @@ function updateSpawnersAndBosses(
   }
 
   if (world.activeBossId === null) {
-    const upcomingKind = BOSS_ROTATION[world.bossScheduleIndex % BOSS_ROTATION.length];
+    const rotation = mapMeta.bossRotation;
+    const upcomingKind = rotation[world.bossScheduleIndex % rotation.length];
     const timeUntilBoss = world.nextBossAtSec - world.elapsedSec;
 
     if (timeUntilBoss <= 5 && timeUntilBoss > 0) {
@@ -2663,7 +3426,7 @@ function triggerLevelUpIfReady(
 
   for (let i = 0; i < world.players.length; i++) {
     const p = world.players[i];
-    const offers = rollSkillOffers(p.skills, rng, guaranteeRare);
+    const offers = rollSkillOffers(p.skills, rng, guaranteeRare, world.mapId);
     world.pendingOffersByPlayer[p.id] = offers;
 
     if (p.isBot || p.botTakeover) {
@@ -2747,6 +3510,14 @@ function updateXpAndPickups(
       const step = XP_MAGNET_SPEED * dt;
       if (dist <= collector.radius + 12 + step) {
         world.teamXp += Math.round(gem.value * collector.stats.xpMultiplier);
+        if (
+          collector.stats.gemGreedLevel > 0 &&
+          gem.tier !== 'green' &&
+          !collector.downed
+        ) {
+          const heal = 1 + collector.stats.gemGreedLevel;
+          collector.hp = Math.min(collector.maxHp, collector.hp + heal);
+        }
         events.push({ type: 'xp_pickup' });
         collected = true;
       } else {
@@ -2957,6 +3728,7 @@ export function rerollSkillOffers(
     player.skills,
     () => nextRng(world),
     world.activeLevelUpGuaranteeRare,
+    world.mapId,
   );
   return true;
 }
@@ -3064,7 +3836,8 @@ export function buildHudSnapshot(
           maxHp: bossEntity.maxHp,
           tier: bossEntity.bossTier,
           isFinalBoss:
-            !world.isEndlessActive && bossEntity.kind === 'boss_snow_dragon',
+            !world.isEndlessActive &&
+            bossEntity.kind === getSurvivalMapMeta(world.mapId).finalBossKind,
         }
       : null,
     sandstormActive:

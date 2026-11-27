@@ -779,6 +779,153 @@ export function SkillArt({
           <circle cx="19" cy="41" r="6" fill="#38bdf8" stroke="#0c4a6e" strokeWidth="2" />
         </svg>
       );
+
+    case 'frost_nova':
+      return (
+        <svg viewBox="0 0 64 64" aria-hidden="true" className={className}>
+          <circle cx="32" cy="32" r="28" fill="#7dd3fc" opacity="0.16" />
+          <circle cx="32" cy="32" r="22" fill="none" stroke="#7dd3fc" strokeWidth="2.8" strokeDasharray="6 4" />
+          <path
+            d="M32 10 V54 M10 32 H54 M17 17 L47 47 M47 17 L17 47"
+            stroke="#e0f2fe"
+            strokeWidth="2.8"
+            strokeLinecap="round"
+          />
+          <polygon points="32,20 40,32 32,44 24,32" fill="#38bdf8" stroke="#f0f9ff" strokeWidth="2" />
+        </svg>
+      );
+
+    case 'ice_shatter':
+      return (
+        <svg viewBox="0 0 64 64" aria-hidden="true" className={className}>
+          <circle cx="32" cy="32" r="28" fill="#0ea5e9" opacity="0.18" />
+          <polygon points="32,8 46,24 38,54 18,46 16,22" fill="#38bdf8" stroke="#e0f2fe" strokeWidth="2.2" strokeLinejoin="round" />
+          <path d="M22 18 L34 32 L46 22 M34 32 L26 50 M34 32 L42 46" stroke="#0c4a6e" strokeWidth="2.4" strokeLinecap="round" />
+          <polygon points="48,10 52,18 59,16 52,22 54,30 47,23 40,25 46,19" fill="#fde047" />
+        </svg>
+      );
+
+    case 'sugar_rush':
+      return (
+        <svg viewBox="0 0 64 64" aria-hidden="true" className={className}>
+          <circle cx="32" cy="32" r="28" fill="#f59e0b" opacity="0.18" />
+          <path d="M12 44 C18 22 30 14 52 14" fill="none" stroke="#fde047" strokeWidth="3" strokeDasharray="4 4" strokeLinecap="round" />
+          <polygon points="36,10 20,34 32,34 26,54 46,28 34,28" fill="#f59e0b" stroke="#fef08a" strokeWidth="2.2" strokeLinejoin="round" />
+          <circle cx="16" cy="20" r="4" fill="#f472b6" />
+          <circle cx="49" cy="46" r="4.5" fill="#fb923c" />
+        </svg>
+      );
+
+    case 'pepper_bomb':
+      return (
+        <svg viewBox="0 0 64 64" aria-hidden="true" className={className}>
+          <circle cx="32" cy="32" r="28" fill="#fb7185" opacity="0.18" />
+          <polygon
+            points="32,8 38,20 52,16 44,28 56,36 42,40 44,54 32,45 20,54 22,40 8,36 20,28 12,16 26,20"
+            fill="#f97316"
+            stroke="#fef08a"
+            strokeWidth="2"
+            strokeLinejoin="round"
+          />
+          <circle cx="32" cy="33" r="10" fill="#e11d48" stroke="#fecdd3" strokeWidth="2" />
+          <circle cx="29" cy="30" r="3" fill="#fef08a" />
+        </svg>
+      );
+
+    case 'caramel_nova':
+      return (
+        <svg viewBox="0 0 64 64" aria-hidden="true" className={className}>
+          <circle cx="32" cy="32" r="28" fill="#ea580c" opacity="0.18" />
+          <path
+            d="M32 10 C48 10 54 24 48 36 C42 48 24 52 16 42 C10 34 14 20 26 18 C36 16 42 26 36 34 C32 39 24 38 24 32"
+            fill="none"
+            stroke="#fb923c"
+            strokeWidth="4.5"
+            strokeLinecap="round"
+          />
+          <path
+            d="M32 16 C42 16 47 26 42 34 C38 42 26 44 22 36"
+            fill="none"
+            stroke="#fef08a"
+            strokeWidth="2.4"
+            strokeLinecap="round"
+          />
+          <circle cx="30" cy="31" r="5" fill="#fde047" />
+        </svg>
+      );
+
+    case 'overcharge':
+      return (
+        <svg viewBox="0 0 64 64" aria-hidden="true" className={className}>
+          <circle cx="32" cy="32" r="28" fill="#2dd4bf" opacity="0.18" />
+          <circle cx="32" cy="32" r="19" fill="#0f172a" stroke="#2dd4bf" strokeWidth="3.2" />
+          <path d="M18 38 A15 15 0 1 1 46 38" fill="none" stroke="#99f6e4" strokeWidth="3.4" strokeLinecap="round" />
+          <polygon points="34,19 25,34 32,34 29,46 40,30 33,30" fill="#fde047" />
+        </svg>
+      );
+
+    case 'crystal_shield':
+      return (
+        <svg viewBox="0 0 64 64" aria-hidden="true" className={className}>
+          <circle cx="32" cy="32" r="28" fill="#818cf8" opacity="0.18" />
+          <polygon
+            points="32,8 52,18 48,40 32,56 16,40 12,18"
+            fill="#6366f1"
+            stroke="#e0e7ff"
+            strokeWidth="2.4"
+            strokeLinejoin="round"
+          />
+          <polygon points="32,14 44,22 32,48 20,22" fill="#a5b4fc" opacity="0.55" />
+          <polygon points="32,22 38,31 32,40 26,31" fill="#38bdf8" stroke="#ffffff" strokeWidth="1.6" />
+        </svg>
+      );
+
+    case 'prism_chain':
+      return (
+        <svg viewBox="0 0 64 64" aria-hidden="true" className={className}>
+          <circle cx="32" cy="32" r="28" fill="#e879f9" opacity="0.18" />
+          <polyline
+            points="12,46 25,22 39,40 52,16"
+            fill="none"
+            stroke="#f0abfc"
+            strokeWidth="4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <polyline
+            points="12,46 25,22 39,40 52,16"
+            fill="none"
+            stroke="#ffffff"
+            strokeWidth="1.6"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <polygon points="25,15 30,22 25,29 20,22" fill="#38bdf8" stroke="#ffffff" strokeWidth="1.4" />
+          <polygon points="39,33 44,40 39,47 34,40" fill="#e879f9" stroke="#ffffff" strokeWidth="1.4" />
+        </svg>
+      );
+
+    case 'gem_greed':
+      return (
+        <svg viewBox="0 0 64 64" aria-hidden="true" className={className}>
+          <circle cx="32" cy="32" r="28" fill="#a3e635" opacity="0.16" />
+          <polygon points="32,10 50,26 32,54 14,26" fill="#84cc16" stroke="#ecfccb" strokeWidth="2.4" strokeLinejoin="round" />
+          <polygon points="32,10 42,26 32,48 22,26" fill="#bef264" opacity="0.5" />
+          <path d="M14 26 H50" stroke="#3f6212" strokeWidth="2" />
+          <path d="M47 11 L49 16 L54 18 L49 20 L47 25 L45 20 L40 18 L45 16 Z" fill="#fef08a" />
+        </svg>
+      );
+
+    case 'void_pulse':
+      return (
+        <svg viewBox="0 0 64 64" aria-hidden="true" className={className}>
+          <circle cx="32" cy="32" r="28" fill="#9333ea" opacity="0.2" />
+          <circle cx="32" cy="32" r="23" fill="none" stroke="#c084fc" strokeWidth="2.6" strokeDasharray="8 4" />
+          <circle cx="32" cy="32" r="15" fill="none" stroke="#e879f9" strokeWidth="3" />
+          <circle cx="32" cy="32" r="8" fill="#581c87" stroke="#f5d0fe" strokeWidth="2.2" />
+          <circle cx="32" cy="32" r="3.2" fill="#fef08a" />
+        </svg>
+      );
   }
 }
 

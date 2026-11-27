@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { playSfx } from '../../audio/soundEngine.ts';
 import { AnimalAvatar } from '../../components/AnimalAvatar.tsx';
-import { getWeaponSpec } from '../sim/catalog.ts';
+import { BOSS_NAMES, getWeaponSpec } from '../sim/catalog.ts';
 import { getSurvivalMapMeta } from '../sim/maps.ts';
 import type { SurvivalMatchSummary, SurvivalMode } from '../sim/types.ts';
 import {
@@ -147,8 +147,8 @@ export function SurvivalResultModal({
             <p id={descId} className="mt-1 text-xs font-bold text-slate-300">
               {isCampaignVictory
                 ? summary.mode === 'solo'
-                  ? `Bạn đã hạ gục Rồng Tuyết Cổ Đại và chinh phục ${mapMeta.name}!`
-                  : `Cả đội đã hạ gục Rồng Tuyết Cổ Đại và chinh phục ${mapMeta.name}!`
+                  ? `Bạn đã hạ gục ${BOSS_NAMES[mapMeta.finalBossKind]} và chinh phục ${mapMeta.name}!`
+                  : `Cả đội đã hạ gục ${BOSS_NAMES[mapMeta.finalBossKind]} và chinh phục ${mapMeta.name}!`
                 : summary.victory && summary.isEndless
                   ? `Hoàn thành chiến dịch và chinh phục chế độ Vô Tận tại ${mapMeta.name}.`
                   : `Tổng kết hành trình sinh tồn tại ${mapMeta.name}.`}

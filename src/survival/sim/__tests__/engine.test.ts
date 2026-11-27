@@ -1343,4 +1343,111 @@ describe('survival simulation engine', () => {
     assert.equal(world.phase, 'playing', 'botTakeover mid-levelup should auto-pick and resume playing');
     assert.equal(Object.keys(h2.skills).length > 0, true, 'botTakeover player should receive auto-picked skill');
   });
+
+  it('activates all 10 new map-exclusive skills and enforces active map skill pools on levelup', () => {
+    // Map 1: frost_nova slows & damages; ice_shatter amplifies damage against slowed enemies
+    const wWinter = createSurvivalWorld({
+      matchId: 'm-new-winter',
+      mode: 'solo',
+      mapId: 'winter_cabin',
+      seed: 10,
+      players: [
+        { id: 'p1', name: 'Frost', animal: 'cat', weaponId: 'frost_bow', gearId: 'ice_skates', isBot: false },
+      ],
+    });
+    wWinter.obstacles = [];
+    wWinter.crates = [];
+    wWinter.spawnTimer = 9999;
+    const pWin = wWinter.players[0];
+    pWin.fireCooldown = 9999;
+    pWin.skills = { frost_nova: 2, ice_shatter: 2 };
+    pWin.stats = computeDerivedStats('frost_bow', 'ice_skates', pWin.skills);
+    const frostTarget = makeEnemy(wWinter, { x: pWin.x + 110, y: pWin.y, hp: 500, maxHp: 500 });
+    wWinter.enemies.push(frostTarget);
+    stepSurvivalWorld(wWinter, { p1: IDLE_INPUT }, 0.05);
+    assert.ok(frostTarget.hp < 500, 'frost_nova deals AoE damage');
+    assert.ok(frostTarget.slowTimer > 0 && frostTarget.slowFactor >= 0.45, 'frost_nova applies slow');
+
+    // Verify map-exclusive pool on levelup in candy_canyon never rolls winter_cabin-only skills
+    const wCandy = createSurvivalWorld({
+      matchId: 'm-new-candy',
+      mode: 'solo',
+      mapId: 'candy_canyon',
+      seed: 20,
+      players: [
+        { id: 'p1', name: 'Candy', animal: 'dog', weaponId: 'candy_smg', gearId: 'plush_armor', isBot: false },
+      ],
+    });
+    wCandy.obstacles = [];
+    wCandy.crates = [];
+    wCandy.spawnTimer = 9999;
+    const pCan = wCandy.players[0];
+    pCan.fireCooldown = 9999;
+
+    // Trigger pepper_bomb + caramel_nova + sugar_rush
+    pCan.skills = { pepper_bomb: 2, caramel_nova: 2, sugar_rush: 2 };
+    pCan.stats = computeDerivedStats('candy_smg', 'plush_armor', pCan.skills);
+    pCan.comboCount = 10;
+    const oneHit = makeEnemy(wCandy, { x: pCan.x + 80, y: pCan.y, hp: 20, maxHp: 200 });
+    const neighbor = makeEnemy(wCandy, { x: pCan.x + 125, y: pCan.y, hp: 300, maxHp: 300 });
+    wCandy.enemies.push(oneHit, neighbor);
+    pCan.fireCooldown = 0;
+    stepSurvivalWorld(wCandy, { p1: IDLE_INPUT }, 0.05);
+    assert.ok(oneHit.hp <= 0, 'primary hit kills target');
+    assert.ok(neighbor.hp < 300, 'pepper_bomb & caramel_nova damage clustered enemy');
+
+    // Trigger crystal_cavern exclusives: crystal_shield, prism_chain, void_pulse, gem_greed, overcharge
+    const wCrystal = createSurvivalWorld({
+      matchId: 'm-new-crystal',
+      mode: 'solo',
+      mapId: 'crystal_cavern',
+      seed: 30,
+      players: [
+        { id: 'p1', name: 'Prism', animal: 'panda', weaponId: 'candy_smg', gearId: 'crystal_magnet', isBot: false },
+      ],
+    });
+    wCrystal.obstacles = [];
+    wCrystal.crates = [];
+    wCrystal.spawnTimer = 9999;
+    const pCry = wCrystal.players[0];
+    pCry.fireCooldown = 9999;
+    pCry.skills = { overcharge: 2, crystal_shield: 2, prism_chain: 2, gem_greed: 2, void_pulse: 2 };
+    pCry.stats = computeDerivedStats('candy_smg', 'crystal_magnet', pCry.skills);
+    pCry.hp = 60;
+    pCry.invulnTimer = 0;
+
+    // Nearby attacker triggers crystal_shield counter-shock + prism_chain + void_pulse
+    const attacker = makeEnemy(wCrystal, { x: pCry.x, y: pCry.y, hp: 600, maxHp: 600, damage: 20, radius: 22 });
+    const secondTarget = makeEnemy(wCrystal, { x: pCry.x + 120, y: pCry.y, hp: 600, maxHp: 600 });
+    wCrystal.enemies.push(attacker, secondTarget);
+    wCrystal.xpGems.push({
+      id: 'cry_purple_gem',
+      x: pCry.x,
+      y: pCry.y,
+      value: 60,
+      tier: 'purple',
+      magnetizedBy: 'p1',
+    });
+
+    stepSurvivalWorld(wCrystal, { p1: IDLE_INPUT }, 0.05);
+    assert.ok(attacker.hp < 600, 'crystal_shield counter-shock + void_pulse + prism_chain damage attacker');
+    assert.ok(secondTarget.hp < 600, 'prism_chain / void_pulse hits secondary enemy');
+    assert.ok(wCrystal.lightningArcs.length >= 1, 'prism_chain emits prism lightning arc');
+    assert.ok(pCry.crystalShieldCooldown > 0, 'crystal_shield enters cooldown after retaliating');
+    assert.equal(wCrystal.xpGems.length, 0, 'purple XP gem collected');
+
+    // Trigger XP levelup on crystal_cavern -> offers must come exclusively from crystal pool (never winter/candy skills)
+    wCrystal.teamXp = wCrystal.xpToNext + 10;
+    stepSurvivalWorld(wCrystal, { p1: IDLE_INPUT }, 0.05);
+    assert.equal(wCrystal.phase, 'levelup');
+    const forbiddenScopes = new Set(['winter_cabin', 'candy_canyon']);
+    for (const offer of wCrystal.pendingOffersByPlayer.p1) {
+      const spec = SKILLS.find((s) => s.id === offer.skillId)!;
+      assert.equal(
+        forbiddenScopes.has(spec.mapScope),
+        false,
+        `crystal_cavern levelup leaked out-of-map skill ${spec.id}`,
+      );
+    }
+  });
 });

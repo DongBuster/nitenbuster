@@ -41,6 +41,18 @@ function formatClock(sec: number): string {
   return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
 }
 
+const SKILL_RARITY_PILL_CLASS: Record<'common' | 'rare' | 'epic', string> = {
+  common: 'border-white/15 bg-[#0a101d] text-slate-200',
+  rare: 'border-cyan-400/55 bg-cyan-950/75 text-cyan-100',
+  epic: 'border-amber-400/75 bg-gradient-to-r from-amber-950/75 to-fuchsia-950/75 text-amber-100',
+};
+
+const SKILL_RARITY_LABEL: Record<'common' | 'rare' | 'epic', string> = {
+  common: 'Thường',
+  rare: 'Hiếm',
+  epic: 'Sử Thi',
+};
+
 /**
  * Non-blocking 2D gameplay HUD overlay for PAWS Survival.
  * Leaves the top-right quadrant below 72px clear for the 136x136 Canvas Minimap
@@ -537,8 +549,8 @@ export function SurvivalHud({
                 return (
                   <span
                     key={spec.id}
-                    title={`${spec.name} (Lv.${lv})`}
-                    className="inline-flex items-center gap-1 rounded-lg border border-white/15 bg-[#0a101d] px-1.5 py-0.5 text-[10px] font-bold text-slate-200"
+                    title={`${spec.name} · ${SKILL_RARITY_LABEL[spec.rarity]} (Lv.${lv})`}
+                    className={`inline-flex items-center gap-1 rounded-lg border px-1.5 py-0.5 text-[10px] font-bold ${SKILL_RARITY_PILL_CLASS[spec.rarity]}`}
                   >
                     <SkillArt skillId={spec.id} className="h-4 w-4 shrink-0" />
                     <span>{spec.name}</span>
