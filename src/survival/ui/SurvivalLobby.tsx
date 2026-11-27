@@ -9,7 +9,6 @@ import {
   Copy,
   Crown,
   Flame,
-  Globe,
   Infinity as InfinityIcon,
   Keyboard,
   Link2,
@@ -20,7 +19,6 @@ import {
   Swords,
   Timer,
   Trophy,
-  User,
   Users,
 } from 'lucide-react';
 import { playSfx } from '../../audio/soundEngine.ts';
@@ -42,7 +40,13 @@ import type {
   SurvivalMode,
   WeaponId,
 } from '../sim/types.ts';
-import { GearArt, HeroLoadoutPreview, WeaponArt } from './SurvivalIcons.tsx';
+import {
+  GearArt,
+  HeroLoadoutPreview,
+  MapArt,
+  ModeArt,
+  WeaponArt,
+} from './SurvivalIcons.tsx';
 
 export interface SurvivalLobbyProps {
   mode: SurvivalMode;
@@ -444,28 +448,22 @@ export function SurvivalLobby({
                   }`}
                 >
                   <span
-                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border ${
+                    className={`flex h-13 w-13 shrink-0 items-center justify-center rounded-2xl border shadow-inner ${
                       active
-                        ? 'border-amber-300/60 bg-amber-400/20 text-amber-200'
-                        : 'border-white/10 bg-white/5 text-slate-400'
+                        ? 'border-amber-300/60 bg-amber-400/15'
+                        : 'border-white/10 bg-[#080d18]'
                     }`}
                   >
-                    {tab.id === 'solo' ? (
-                      <User aria-hidden="true" className="h-5 w-5" />
-                    ) : tab.id === 'bot_team' ? (
-                      <Bot aria-hidden="true" className="h-5 w-5" />
-                    ) : (
-                      <Globe aria-hidden="true" className="h-5 w-5" />
-                    )}
+                    <ModeArt mode={tab.id} className="h-11 w-11" />
                   </span>
-                  <div className="min-w-0">
-                    <div className="font-display text-sm font-black text-white">
+                  <span className="min-w-0 flex-1">
+                    <span className="block font-display text-sm font-black text-white">
                       {tab.label}
-                    </div>
-                    <div className="text-[11px] font-bold text-slate-300/85">
+                    </span>
+                    <span className="mt-0.5 block text-[11px] font-bold text-slate-300/85">
                       {tab.subtitle}
-                    </div>
-                  </div>
+                    </span>
+                  </span>
                 </button>
               );
             })}
@@ -969,7 +967,7 @@ export function SurvivalLobby({
             <div className="flex items-center gap-2">
               <Compass aria-hidden="true" className="h-4 w-4 text-amber-300" />
               <h2 className="text-xs font-black uppercase tracking-wider text-amber-300">
-                Chọn Bản Đồ (3 Chiến Dịch 6 Phút &amp; 1 Đấu Trường Vô Cực)
+                Chọn Bản Đồ (3 Chiến Dịch Hạ Boss &amp; 1 Đấu Trường Vô Cực)
               </h2>
             </div>
 
@@ -993,81 +991,88 @@ export function SurvivalLobby({
 
               const cardContent = (
                 <>
-                  <div>
-                    <div className="flex flex-wrap items-center justify-between gap-1.5">
+                  {/* Top Biome Illustration Header */}
+                  <span className="relative block w-full overflow-hidden border-b border-white/10 bg-[#080d18]">
+                    <MapArt
+                      mapId={map.id}
+                      className="block aspect-[2/1] w-full transition-transform duration-300 group-hover:scale-[1.03] motion-reduce:transition-none"
+                    />
+                    <span
+                      aria-hidden="true"
+                      className="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-[#0d1320] via-[#0d1320]/45 to-transparent"
+                    />
+                    <span className="absolute left-2.5 top-2.5 flex items-center gap-1.5">
                       {isEndless ? (
-                        <span className="inline-flex items-center gap-1 rounded-lg border border-amber-300/70 bg-gradient-to-r from-amber-500/30 to-violet-500/35 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-amber-200">
+                        <span className="inline-flex items-center gap-1 rounded-lg border border-amber-300/75 bg-[#190c22]/85 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-amber-200 backdrop-blur-sm">
                           <InfinityIcon aria-hidden="true" className="h-3 w-3" />
-                          <span>VÔ TẬN · SO KÈ ĐIỂM</span>
+                          <span>VÔ TẬN</span>
                         </span>
                       ) : (
                         <span
-                          className="rounded-lg border px-2 py-0.5 text-[10px] font-black uppercase tracking-wide"
+                          className="rounded-lg border px-2 py-0.5 text-[10px] font-black uppercase tracking-wide backdrop-blur-sm"
                           style={{
-                            borderColor: `${map.theme.accent}66`,
-                            backgroundColor: `${map.theme.accent}22`,
+                            borderColor: `${map.theme.accent}88`,
+                            backgroundColor: 'rgba(11, 16, 28, 0.82)',
                             color: map.theme.accent,
                           }}
                         >
-                          Chiến dịch 6 phút
+                          Chiến dịch · 3 Boss
                         </span>
                       )}
+                    </span>
+                    {isSelected && (
+                      <span className="absolute right-2.5 top-2.5 inline-flex items-center gap-1 rounded-lg border border-amber-300/80 bg-amber-400 px-2 py-0.5 text-[10px] font-black text-[#24130a] shadow">
+                        <Check aria-hidden="true" className="h-3 w-3" />
+                        <span>
+                          {isOnlineGuest ? 'Chủ phòng' : 'Đang chọn'}
+                        </span>
+                      </span>
+                    )}
+                  </span>
 
-                      <span
-                        aria-hidden="true"
-                        className="h-3 w-3 rounded-full ring-2 ring-white/25"
-                        style={{ backgroundColor: map.theme.accent }}
-                      />
-                    </div>
+                  {/* Card Body */}
+                  <span className="flex flex-1 flex-col justify-between p-3.5">
+                    <span className="block">
+                      <span className="block font-display text-base font-black text-white">
+                        {map.name}
+                      </span>
+                      <span className="mt-1 block text-xs leading-snug text-slate-300">
+                        {map.description}
+                      </span>
+                    </span>
 
-                    <h3 className="mt-2.5 font-display text-base font-black text-white">
-                      {map.name}
-                    </h3>
-                    <p className="mt-0.5 text-[11px] font-bold text-amber-200/80">
-                      {map.subtitle}
-                    </p>
-                    <p className="mt-1.5 text-xs leading-relaxed text-slate-300">
-                      {map.description}
-                    </p>
-                  </div>
+                    <span className="mt-3 block space-y-2 border-t border-white/10 pt-2.5">
+                      <span className="block text-[11px] font-bold text-cyan-200/90">
+                        {map.mechanicSummary}
+                      </span>
 
-                  <div className="mt-3 space-y-2 border-t border-white/10 pt-2.5">
-                    <div className="text-[11px] font-bold text-cyan-200/90">
-                      {map.mechanicSummary}
-                    </div>
-
-                    <div className="flex items-center justify-between text-[11px] font-black">
-                      {isEndless ? (
-                        <span className="inline-flex items-center gap-1 text-amber-200 tabular-nums">
-                          <Trophy
-                            aria-hidden="true"
-                            className="h-3.5 w-3.5 text-amber-300"
-                          />
-                          <span>
-                            Kỷ lục: {bestScore.toLocaleString('vi-VN')}đ
+                      <span className="flex items-center justify-between text-[11px] font-black">
+                        {isEndless ? (
+                          <span className="inline-flex items-center gap-1 text-amber-200 tabular-nums">
+                            <Trophy
+                              aria-hidden="true"
+                              className="h-3.5 w-3.5 text-amber-300"
+                            />
+                            <span>
+                              Kỷ lục: {bestScore.toLocaleString('vi-VN')}đ
+                            </span>
                           </span>
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-rose-200/90">
-                          <Skull
-                            aria-hidden="true"
-                            className="h-3.5 w-3.5 text-rose-300"
-                          />
-                          <span>Hạ 3 Boss · Diệt Rồng Tuyết</span>
-                        </span>
-                      )}
-
-                      {isSelected && (
-                        <span className="rounded-md bg-amber-400/25 px-2 py-0.5 text-[10px] font-black text-amber-200">
-                          {isOnlineGuest ? 'Chủ phòng chọn' : 'Đang chọn'}
-                        </span>
-                      )}
-                    </div>
-                  </div>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-rose-200/90">
+                            <Skull
+                              aria-hidden="true"
+                              className="h-3.5 w-3.5 text-rose-300"
+                            />
+                            <span>Hạ 3 Boss · Diệt Rồng Tuyết</span>
+                          </span>
+                        )}
+                      </span>
+                    </span>
+                  </span>
                 </>
               );
 
-              const baseClass = `flex h-full flex-col justify-between rounded-2xl border-2 p-3.5 text-left transition-all motion-reduce:transition-none ${
+              const baseClass = `group flex h-full flex-col overflow-hidden rounded-2xl border-2 text-left transition-all motion-reduce:transition-none ${
                 isSelected
                   ? isEndless
                     ? 'border-amber-300 bg-gradient-to-b from-violet-950/60 via-[#1c1220] to-[#121826] shadow-[0_0_24px_rgba(251,191,36,0.24)]'

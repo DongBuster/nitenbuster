@@ -12,10 +12,10 @@ export const SURVIVAL_MAPS: readonly SurvivalMapMeta[] = [
     id: 'winter_cabin',
     order: 1,
     name: 'Rừng Tuyết Cabin',
-    subtitle: 'Chiến dịch 6 phút · Cân bằng',
+    subtitle: 'Chiến dịch 3 Boss · Cân bằng',
     description:
-      'Khu rừng thông phủ tuyết quanh căn cabin ấm áp với những mảng băng trượt tăng tốc.',
-    mechanicSummary: 'Sàn băng trượt tăng +18% tốc độ di chuyển',
+      'Rừng thông phủ tuyết quanh căn cabin ấm áp với nhiều mảng băng trượt tăng tốc.',
+    mechanicSummary: 'Sàn băng trượt giúp chạy nhanh hơn',
     isEndless: false,
     targetDurationSec: 360,
     theme: {
@@ -31,10 +31,10 @@ export const SURVIVAL_MAPS: readonly SurvivalMapMeta[] = [
     id: 'candy_canyon',
     order: 2,
     name: 'Hoang Mạc Kẹo Đá',
-    subtitle: 'Chiến dịch 6 phút · Thoáng rộng',
+    subtitle: 'Chiến dịch 3 Boss · Thoáng rộng',
     description:
       'Hẻm núi kẹo đường rộng mở, nơi bão cát ngọt định kỳ thổi qua kèm hòm tiếp tế.',
-    mechanicSummary: 'Bão cát 75s/lần đẩy gió nhẹ & tăng hòm tiếp tế',
+    mechanicSummary: 'Bão cát ngọt thổi qua & nhân đôi hòm tiếp tế',
     isEndless: false,
     targetDurationSec: 360,
     theme: {
@@ -50,10 +50,10 @@ export const SURVIVAL_MAPS: readonly SurvivalMapMeta[] = [
     id: 'crystal_cavern',
     order: 3,
     name: 'Hầm Mỏ Pha Lê',
-    subtitle: 'Chiến dịch 6 phút · Chiến thuật',
+    subtitle: 'Chiến dịch 3 Boss · Chiến thuật',
     description:
-      'Hang động pha lê phát sáng chứa các trụ năng lượng kích hoạt hào quang cường hóa.',
-    mechanicSummary: 'Trụ Pha Lê kích hoạt +20% tốc bắn trong 10s (hồi 30s)',
+      'Hang động pha lê phát sáng với các trụ năng lượng kích hoạt hào quang bắn siêu nhanh.',
+    mechanicSummary: 'Chạm Trụ Pha Lê để kích hoạt tăng tốc bắn',
     isEndless: false,
     targetDurationSec: 360,
     theme: {
@@ -71,8 +71,8 @@ export const SURVIVAL_MAPS: readonly SurvivalMapMeta[] = [
     name: 'Đấu Trường Vô Cực',
     subtitle: 'Vô tận · So kè điểm cao',
     description:
-      'Đấu trường không giới hạn thời gian với Boss xoay vòng mỗi 90 giây và bậc sức mạnh tăng dần.',
-    mechanicSummary: 'Boss xoay vòng 90s/lần · Bệ ấn tăng điểm & tốc chạy',
+      'Đấu trường không giới hạn với Boss xoay vòng liên tục và độ khó leo thang.',
+    mechanicSummary: 'Boss xoay vòng liên tục · Bệ ấn nhân điểm',
     isEndless: true,
     targetDurationSec: 0,
     theme: {

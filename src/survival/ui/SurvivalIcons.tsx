@@ -2,7 +2,13 @@ import { useId } from 'react';
 import { getAnimalAvatarTheme } from '../../components/animalAvatarMeta.ts';
 import type { AnimalId } from '../../engine/types.ts';
 import { getGearSpec, getWeaponSpec } from '../sim/catalog.ts';
-import type { GearId, SkillId, WeaponId } from '../sim/types.ts';
+import type {
+  GearId,
+  SkillId,
+  SurvivalMapId,
+  SurvivalMode,
+  WeaponId,
+} from '../sim/types.ts';
 
 interface IconProps {
   className?: string;
@@ -959,4 +965,523 @@ export function HeroLoadoutPreview({
       </div>
     </div>
   );
+}
+
+/**
+ * Expressive vector emblems for the 3 PAWS Survival play modes
+ * (Solo, Team + Bot AI, Online Co-op 2-4p).
+ */
+export function ModeArt({
+  mode,
+  className = 'h-12 w-12',
+}: IconProps & { mode: SurvivalMode }) {
+  const uid = useId().replace(/:/g, '');
+
+  switch (mode) {
+    case 'solo':
+      return (
+        <svg viewBox="0 0 64 64" aria-hidden="true" className={className}>
+          <defs>
+            <radialGradient id={`msolo-${uid}`} cx="38%" cy="32%" r="68%">
+              <stop offset="0%" stopColor="#fde68a" />
+              <stop offset="100%" stopColor="#f59e0b" />
+            </radialGradient>
+          </defs>
+          <circle cx="32" cy="34" r="24" fill="#f59e0b" opacity="0.16" />
+          {/* Hero aura ring */}
+          <ellipse cx="32" cy="52" rx="18" ry="5" fill="#fbbf24" opacity="0.28" />
+          {/* Plush ears */}
+          <polygon points="18,28 19,12 30,22" fill="#d97706" stroke="#1e1b18" strokeWidth="2" strokeLinejoin="round" />
+          <polygon points="46,28 45,12 34,22" fill="#d97706" stroke="#1e1b18" strokeWidth="2" strokeLinejoin="round" />
+          {/* Hero plush head */}
+          <circle cx="32" cy="34" r="16" fill={`url(#msolo-${uid})`} stroke="#1e1b18" strokeWidth="2.4" />
+          {/* Determined headband */}
+          <path d="M17 28 Q32 23 47 28" fill="none" stroke="#ef4444" strokeWidth="4" strokeLinecap="round" />
+          <path d="M46 27 L55 24 L53 31 Z" fill="#ef4444" stroke="#991b1b" strokeWidth="1.2" />
+          {/* Eyes & cheeks */}
+          <circle cx="26" cy="35" r="2.4" fill="#1e1b18" />
+          <circle cx="38" cy="35" r="2.4" fill="#1e1b18" />
+          <circle cx="26.8" cy="34.2" r="0.8" fill="#ffffff" />
+          <circle cx="38.8" cy="34.2" r="0.8" fill="#ffffff" />
+          <path d="M29 40 Q32 43 35 40" fill="none" stroke="#1e1b18" strokeWidth="1.8" strokeLinecap="round" />
+          {/* Sparkle */}
+          <path d="M12 16 L14 11 L16 16 L21 18 L16 20 L14 25 L12 20 L7 18 Z" fill="#fef08a" />
+        </svg>
+      );
+
+    case 'bot_team':
+      return (
+        <svg viewBox="0 0 64 64" aria-hidden="true" className={className}>
+          <defs>
+            <linearGradient id={`mbot-${uid}`} x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stopColor="#6ee7b7" />
+              <stop offset="100%" stopColor="#059669" />
+            </linearGradient>
+          </defs>
+          <circle cx="32" cy="34" r="24" fill="#10b981" opacity="0.16" />
+          {/* Back-left Bot buddy */}
+          <rect x="8" y="25" width="20" height="18" rx="6" fill="#38bdf8" stroke="#0c4a6e" strokeWidth="2" />
+          <line x1="18" y1="18" x2="18" y2="25" stroke="#bae6fd" strokeWidth="2" strokeLinecap="round" />
+          <circle cx="18" cy="17" r="2.5" fill="#fde047" />
+          <rect x="12" y="30" width="12" height="6" rx="3" fill="#0f172a" />
+          <circle cx="15.5" cy="33" r="1.5" fill="#38bdf8" />
+          <circle cx="20.5" cy="33" r="1.5" fill="#38bdf8" />
+          {/* Back-right Bot buddy */}
+          <rect x="36" y="25" width="20" height="18" rx="6" fill="#a78bfa" stroke="#3b0764" strokeWidth="2" />
+          <line x1="46" y1="18" x2="46" y2="25" stroke="#ddd6fe" strokeWidth="2" strokeLinecap="round" />
+          <circle cx="46" cy="17" r="2.5" fill="#fde047" />
+          <rect x="40" y="30" width="12" height="6" rx="3" fill="#0f172a" />
+          <circle cx="43.5" cy="33" r="1.5" fill="#c084fc" />
+          <circle cx="48.5" cy="33" r="1.5" fill="#c084fc" />
+          {/* Front Center Leader Plush */}
+          <circle cx="24" cy="24" r="5" fill="#10b981" stroke="#064e3b" strokeWidth="2" />
+          <circle cx="40" cy="24" r="5" fill="#10b981" stroke="#064e3b" strokeWidth="2" />
+          <circle cx="32" cy="38" r="14" fill={`url(#mbot-${uid})`} stroke="#064e3b" strokeWidth="2.4" />
+          <circle cx="27" cy="37" r="2.2" fill="#064e3b" />
+          <circle cx="37" cy="37" r="2.2" fill="#064e3b" />
+          <path d="M29 42 Q32 45 35 42" fill="none" stroke="#064e3b" strokeWidth="1.8" strokeLinecap="round" />
+        </svg>
+      );
+
+    case 'online_coop':
+      return (
+        <svg viewBox="0 0 64 64" aria-hidden="true" className={className}>
+          <defs>
+            <radialGradient id={`monl-${uid}`} cx="50%" cy="50%" r="55%">
+              <stop offset="0%" stopColor="#7dd3fc" />
+              <stop offset="65%" stopColor="#0284c7" />
+              <stop offset="100%" stopColor="#1e3a8a" />
+            </radialGradient>
+          </defs>
+          {/* Glowing co-op globe / portal */}
+          <circle cx="32" cy="32" r="22" fill={`url(#monl-${uid})`} stroke="#bae6fd" strokeWidth="2.2" />
+          <ellipse cx="32" cy="32" rx="10" ry="21" fill="none" stroke="#bae6fd" strokeWidth="1.4" opacity="0.55" />
+          <line x1="11" y1="32" x2="53" y2="32" stroke="#bae6fd" strokeWidth="1.4" opacity="0.55" />
+          {/* Connected co-op player badges */}
+          <circle cx="17" cy="20" r="7.5" fill="#fbbf24" stroke="#1e1b18" strokeWidth="2" />
+          <circle cx="15" cy="19.5" r="1.2" fill="#1e1b18" />
+          <circle cx="19" cy="19.5" r="1.2" fill="#1e1b18" />
+          <circle cx="47" cy="20" r="7.5" fill="#f472b6" stroke="#1e1b18" strokeWidth="2" />
+          <circle cx="45" cy="19.5" r="1.2" fill="#1e1b18" />
+          <circle cx="49" cy="19.5" r="1.2" fill="#1e1b18" />
+          <circle cx="32" cy="46" r="8" fill="#4ade80" stroke="#1e1b18" strokeWidth="2" />
+          <circle cx="29.5" cy="45.5" r="1.3" fill="#1e1b18" />
+          <circle cx="34.5" cy="45.5" r="1.3" fill="#1e1b18" />
+          {/* Connection pulses */}
+          <path d="M24 22 L40 22 M21 26 L28 39 M43 26 L36 39" stroke="#fef08a" strokeWidth="2" strokeDasharray="3 3" strokeLinecap="round" />
+        </svg>
+      );
+  }
+}
+
+/**
+ * Rich 16:8 stylized biome landscape illustrations for the 4 PAWS Survival maps.
+ * Designed to sit at the top of each map choice card with crisp silhouettes and
+ * clear visual cues of each map's signature terrain mechanic.
+ */
+export function MapArt({
+  mapId,
+  className = 'aspect-[2/1] w-full',
+}: IconProps & { mapId: SurvivalMapId }) {
+  const uid = useId().replace(/:/g, '');
+
+  switch (mapId) {
+    case 'winter_cabin':
+      return (
+        <svg
+          viewBox="0 0 320 160"
+          preserveAspectRatio="xMidYMid slice"
+          aria-hidden="true"
+          className={className}
+        >
+          <defs>
+            <linearGradient id={`wc-sky-${uid}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#071326" />
+              <stop offset="58%" stopColor="#143254" />
+              <stop offset="100%" stopColor="#38bdf8" stopOpacity="0.45" />
+            </linearGradient>
+            <linearGradient id={`wc-aur-${uid}`} x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stopColor="#22d3ee" stopOpacity="0" />
+              <stop offset="35%" stopColor="#34d399" stopOpacity="0.55" />
+              <stop offset="70%" stopColor="#38bdf8" stopOpacity="0.5" />
+              <stop offset="100%" stopColor="#a78bfa" stopOpacity="0" />
+            </linearGradient>
+            <linearGradient id={`wc-snow-${uid}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#e0f2fe" />
+              <stop offset="100%" stopColor="#93c5fd" />
+            </linearGradient>
+            <linearGradient id={`wc-ice-${uid}`} x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stopColor="#67e8f9" />
+              <stop offset="100%" stopColor="#0284c7" />
+            </linearGradient>
+          </defs>
+
+          {/* Night sky & Aurora */}
+          <rect width="320" height="160" fill={`url(#wc-sky-${uid})`} />
+          <path
+            d="M0 36 Q75 10 155 34 T320 24 L320 56 Q240 68 155 48 T0 60 Z"
+            fill={`url(#wc-aur-${uid})`}
+          />
+          {/* Stars & snowflakes */}
+          <g fill="#e0f2fe" opacity="0.85">
+            <circle cx="34" cy="18" r="1.4" />
+            <circle cx="88" cy="12" r="1.8" />
+            <circle cx="142" cy="22" r="1.2" />
+            <circle cx="235" cy="16" r="1.7" />
+            <circle cx="288" cy="26" r="1.3" />
+            <circle cx="52" cy="54" r="1.5" />
+            <circle cx="268" cy="52" r="1.5" />
+          </g>
+
+          {/* Distant snow hills */}
+          <path
+            d="M0 98 Q80 68 170 92 T320 86 L320 160 L0 160 Z"
+            fill="#60a5fa"
+            opacity="0.35"
+          />
+          {/* Foreground snowy ground */}
+          <path
+            d="M0 108 Q95 92 185 106 T320 100 L320 160 L0 160 Z"
+            fill={`url(#wc-snow-${uid})`}
+          />
+
+          {/* Shimmering Ice Skating Patches */}
+          <ellipse
+            cx="74"
+            cy="134"
+            rx="46"
+            ry="13"
+            fill={`url(#wc-ice-${uid})`}
+            stroke="#bae6fd"
+            strokeWidth="2"
+          />
+          <path d="M46 132 L68 128 M76 138 L104 134" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" opacity="0.7" />
+          <ellipse
+            cx="248"
+            cy="138"
+            rx="40"
+            ry="11"
+            fill={`url(#wc-ice-${uid})`}
+            stroke="#bae6fd"
+            strokeWidth="1.8"
+          />
+          <path d="M226 137 L254 133" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" opacity="0.65" />
+
+          {/* Frosted Pine Trees (left & right) */}
+          {[
+            { x: 34, y: 108, s: 1.05 },
+            { x: 76, y: 100, s: 0.85 },
+            { x: 242, y: 102, s: 0.9 },
+            { x: 286, y: 112, s: 1.1 },
+          ].map((t, i) => (
+            <g key={i} transform={`translate(${t.x}, ${t.y}) scale(${t.s})`}>
+              <rect x="-4" y="0" width="8" height="12" rx="2" fill="#78350f" stroke="#1e293b" strokeWidth="1.6" />
+              <polygon points="0,-46 -22,-8 22,-8" fill="#0f766e" stroke="#0f172a" strokeWidth="2" strokeLinejoin="round" />
+              <polygon points="0,-46 -15,-22 15,-22" fill="#e0f2fe" />
+              <polygon points="0,-32 -19,0 19,0" fill="#115e59" stroke="#0f172a" strokeWidth="2" strokeLinejoin="round" />
+              <polygon points="0,-32 -12,-14 12,-14" fill="#f0f9ff" />
+            </g>
+          ))}
+
+          {/* Cozy Wooden Cabin */}
+          <g transform="translate(160, 102)">
+            {/* Chimney & smoke */}
+            <path d="M18 -54 Q26 -68 20 -80 Q32 -72 28 -58" fill="#e2e8f0" opacity="0.55" />
+            <rect x="13" y="-50" width="12" height="18" rx="2" fill="#64748b" stroke="#0f172a" strokeWidth="2" />
+            {/* Cabin warm ground glow */}
+            <ellipse cx="0" cy="14" rx="44" ry="10" fill="#fbbf24" opacity="0.3" />
+            {/* Walls */}
+            <rect x="-32" y="-20" width="64" height="32" rx="3" fill="#92400e" stroke="#1e1b18" strokeWidth="2.2" />
+            <line x1="-32" y1="-10" x2="32" y2="-10" stroke="#451a03" strokeWidth="1.6" />
+            <line x1="-32" y1="1" x2="32" y2="1" stroke="#451a03" strokeWidth="1.6" />
+            {/* Glowing windows & door */}
+            <rect x="-24" y="-12" width="14" height="13" rx="2" fill="#fde047" stroke="#451a03" strokeWidth="1.8" />
+            <line x1="-17" y1="-12" x2="-17" y2="1" stroke="#92400e" strokeWidth="1.4" />
+            <rect x="10" y="-12" width="14" height="13" rx="2" fill="#fde047" stroke="#451a03" strokeWidth="1.8" />
+            <line x1="17" y1="-12" x2="17" y2="1" stroke="#92400e" strokeWidth="1.4" />
+            <rect x="-6" y="-8" width="12" height="20" rx="2" fill="#78350f" stroke="#1e1b18" strokeWidth="1.8" />
+            {/* Snowy Roof */}
+            <polygon points="-40,-18 0,-48 40,-18" fill="#f8fafc" stroke="#1e293b" strokeWidth="2.4" strokeLinejoin="round" />
+            <path d="M-36 -18 Q-18 -11 0 -18 Q18 -11 36 -18" fill="none" stroke="#bae6fd" strokeWidth="3" strokeLinecap="round" />
+          </g>
+
+          {/* Warm Campfire */}
+          <g transform="translate(198, 126)">
+            <circle cx="0" cy="-4" r="16" fill="#fb923c" opacity="0.3" />
+            <path d="M-8 3 L8 -1 M-8 -1 L8 3" stroke="#78350f" strokeWidth="3" strokeLinecap="round" />
+            <path d="M0 -15 Q7 -6 5 1 Q0 4 -5 1 Q-7 -6 0 -15 Z" fill="#f97316" />
+            <path d="M0 -10 Q4 -4 2 0 Q0 2 -2 0 Q-4 -4 0 -10 Z" fill="#fef08a" />
+          </g>
+        </svg>
+      );
+
+    case 'candy_canyon':
+      return (
+        <svg
+          viewBox="0 0 320 160"
+          preserveAspectRatio="xMidYMid slice"
+          aria-hidden="true"
+          className={className}
+        >
+          <defs>
+            <linearGradient id={`cc-sky-${uid}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#701a45" />
+              <stop offset="48%" stopColor="#ea580c" />
+              <stop offset="100%" stopColor="#fde047" />
+            </linearGradient>
+            <linearGradient id={`cc-sand-${uid}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#fb923c" />
+              <stop offset="100%" stopColor="#c2410c" />
+            </linearGradient>
+            <linearGradient id={`cc-storm-${uid}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#fef08a" stopOpacity="0.92" />
+              <stop offset="65%" stopColor="#f59e0b" stopOpacity="0.72" />
+              <stop offset="100%" stopColor="#ea580c" stopOpacity="0.2" />
+            </linearGradient>
+          </defs>
+
+          {/* Sunset Sky & Sun */}
+          <rect width="320" height="160" fill={`url(#cc-sky-${uid})`} />
+          <circle cx="164" cy="96" r="28" fill="#fef08a" opacity="0.88" />
+
+          {/* Canyon Cliffs (left & right) */}
+          <polygon points="0,12 58,28 76,72 108,82 114,120 0,120" fill="#9a3412" stroke="#431407" strokeWidth="2.2" />
+          <polygon points="0,12 34,26 44,96 0,104" fill="#c2410c" opacity="0.65" />
+          <polygon points="320,16 256,34 236,78 206,86 202,120 320,120" fill="#9a3412" stroke="#431407" strokeWidth="2.2" />
+          <polygon points="320,16 284,32 274,98 320,106" fill="#c2410c" opacity="0.65" />
+
+          {/* Amber Rock Candy Crystals on Cliffs */}
+          <polygon points="22,66 32,38 42,66" fill="#fbbf24" stroke="#78350f" strokeWidth="1.8" />
+          <polygon points="34,68 42,48 49,68" fill="#fde047" stroke="#78350f" strokeWidth="1.6" />
+          <polygon points="274,64 286,36 298,64" fill="#fbbf24" stroke="#78350f" strokeWidth="1.8" />
+
+          {/* Swirling Sugar Sandstorm Vortex */}
+          <path
+            d="M150 18 Q188 12 214 26 Q198 46 184 62 Q178 82 170 108 Q160 82 152 60 Q138 42 150 18 Z"
+            fill={`url(#cc-storm-${uid})`}
+          />
+          <path
+            d="M144 30 Q176 24 206 34 M150 48 Q174 44 194 52 M156 68 Q172 64 184 70"
+            fill="none"
+            stroke="#fffbeb"
+            strokeWidth="2.4"
+            strokeLinecap="round"
+            opacity="0.7"
+          />
+
+          {/* Rolling Caramel Sand Dunes */}
+          <path d="M0 112 Q85 92 165 112 T320 106 L320 160 L0 160 Z" fill={`url(#cc-sand-${uid})`} />
+          <path d="M0 132 Q110 114 215 134 T320 126 L320 160 L0 160 Z" fill="#9a3412" opacity="0.45" />
+
+          {/* Giant Striped Lollipops */}
+          <g transform="translate(44, 110)">
+            <line x1="0" y1="0" x2="0" y2="28" stroke="#fff7ed" strokeWidth="4" strokeLinecap="round" />
+            <circle cx="0" cy="-14" r="18" fill="#ec4899" stroke="#500724" strokeWidth="2.2" />
+            <path d="M-11 -14 A11 11 0 1 1 10 -10 A6 6 0 1 1 -4 -14" fill="none" stroke="#fef08a" strokeWidth="3.2" strokeLinecap="round" />
+          </g>
+          <g transform="translate(274, 108)">
+            <line x1="0" y1="0" x2="0" y2="30" stroke="#fff7ed" strokeWidth="4" strokeLinecap="round" />
+            <circle cx="0" cy="-14" r="16" fill="#22c55e" stroke="#14532d" strokeWidth="2.2" />
+            <path d="M-9 -14 A9 9 0 1 1 8 -10 A5 5 0 1 1 -3 -14" fill="none" stroke="#fde047" strokeWidth="3" strokeLinecap="round" />
+          </g>
+
+          {/* Cute Desert Cacti */}
+          <g transform="translate(96, 134)">
+            <rect x="-7" y="-26" width="14" height="30" rx="7" fill="#16a34a" stroke="#14532d" strokeWidth="2" />
+            <path d="M-7 -12 H-14 V-20" fill="none" stroke="#16a34a" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M7 -16 H14 V-23" fill="none" stroke="#16a34a" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
+            <circle cx="0" cy="-27" r="3" fill="#f472b6" />
+          </g>
+
+          {/* Glowing Supply Chest */}
+          <g transform="translate(188, 126)">
+            <ellipse cx="0" cy="8" rx="28" ry="8" fill="#fef08a" opacity="0.4" />
+            <rect x="-18" y="-12" width="36" height="22" rx="4" fill="#b45309" stroke="#451a03" strokeWidth="2.2" />
+            <rect x="-18" y="-12" width="36" height="8" rx="3" fill="#fbbf24" stroke="#451a03" strokeWidth="2" />
+            <rect x="-4" y="-6" width="8" height="9" rx="2" fill="#fef08a" stroke="#451a03" strokeWidth="1.6" />
+          </g>
+        </svg>
+      );
+
+    case 'crystal_cavern':
+      return (
+        <svg
+          viewBox="0 0 320 160"
+          preserveAspectRatio="xMidYMid slice"
+          aria-hidden="true"
+          className={className}
+        >
+          <defs>
+            <radialGradient id={`cv-bg-${uid}`} cx="50%" cy="55%" r="65%">
+              <stop offset="0%" stopColor="#4c1d95" />
+              <stop offset="55%" stopColor="#1e1b4b" />
+              <stop offset="100%" stopColor="#09071a" />
+            </radialGradient>
+            <linearGradient id={`cv-pylon-${uid}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#f5d0fe" />
+              <stop offset="50%" stopColor="#c084fc" />
+              <stop offset="100%" stopColor="#6b21a8" />
+            </linearGradient>
+            <linearGradient id={`cv-cyan-${uid}`} x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stopColor="#a5f3fc" />
+              <stop offset="100%" stopColor="#0284c7" />
+            </linearGradient>
+          </defs>
+
+          {/* Deep Indigo Cavern */}
+          <rect width="320" height="160" fill={`url(#cv-bg-${uid})`} />
+
+          {/* Cavern Ceiling Stalactites */}
+          <polygon points="0,0 320,0 320,34 282,16 254,40 218,18 188,30 156,12 122,32 82,14 48,38 0,24" fill="#0f0b29" />
+
+          {/* Glowing Arcane Aura Rings around Central Pylon */}
+          <ellipse cx="160" cy="120" rx="84" ry="22" fill="#a855f7" opacity="0.22" />
+          <ellipse cx="160" cy="120" rx="64" ry="16" fill="none" stroke="#e879f9" strokeWidth="2" strokeDasharray="8 6" opacity="0.85" />
+          <ellipse cx="160" cy="120" rx="40" ry="10" fill="none" stroke="#38bdf8" strokeWidth="1.8" opacity="0.85" />
+
+          {/* Cavern Stone Floor */}
+          <path d="M0 124 Q160 108 320 124 L320 160 L0 160 Z" fill="#171336" opacity="0.85" />
+          {/* Mine Track Hint */}
+          <path d="M18 158 L98 130 M56 158 L122 132" stroke="#64748b" strokeWidth="2.5" opacity="0.55" />
+
+          {/* Left Luminous Cyan & Violet Crystal Clusters */}
+          <g transform="translate(46, 124)">
+            <polygon points="-24,6 -12,-58 4,6" fill={`url(#cv-cyan-${uid})`} stroke="#0f172a" strokeWidth="2" strokeLinejoin="round" />
+            <polygon points="-4,10 14,-44 26,10" fill="#a855f7" stroke="#0f172a" strokeWidth="2" strokeLinejoin="round" />
+            <polygon points="-32,12 -24,-24 -12,12" fill="#e879f9" stroke="#0f172a" strokeWidth="1.8" />
+          </g>
+
+          {/* Right Luminous Crystal Clusters */}
+          <g transform="translate(274, 126)">
+            <polygon points="-6,6 10,-60 26,6" fill="#c084fc" stroke="#0f172a" strokeWidth="2" strokeLinejoin="round" />
+            <polygon points="-26,10 -12,-40 4,10" fill={`url(#cv-cyan-${uid})`} stroke="#0f172a" strokeWidth="2" strokeLinejoin="round" />
+            <polygon points="12,12 24,-24 34,12" fill="#f0abfc" stroke="#0f172a" strokeWidth="1.8" />
+          </g>
+
+          {/* Central Floating Amethyst Energy Pylon */}
+          <g transform="translate(160, 74)">
+            {/* Pedestal */}
+            <polygon points="-24,46 -16,32 16,32 24,46" fill="#312e81" stroke="#0f172a" strokeWidth="2.2" />
+            {/* Crystal Obelisk */}
+            <polygon
+              points="0,-44 22,-4 12,28 -12,28 -22,-4"
+              fill={`url(#cv-pylon-${uid})`}
+              stroke="#1e1b4b"
+              strokeWidth="2.4"
+              strokeLinejoin="round"
+            />
+            {/* Facet highlight */}
+            <polygon points="0,-44 10,-4 0,24 -6,-4" fill="#ffffff" opacity="0.32" />
+            {/* Core energy diamond */}
+            <polygon points="0,-16 8,-4 0,8 -8,-4" fill="#38bdf8" stroke="#f0f9ff" strokeWidth="1.6" />
+          </g>
+
+          {/* Floating Mana Sparkles */}
+          <g fill="#f5d0fe">
+            <circle cx="114" cy="54" r="2.2" />
+            <circle cx="206" cy="48" r="2.5" />
+            <circle cx="132" cy="88" r="1.6" />
+            <circle cx="192" cy="84" r="1.8" />
+            <circle cx="88" cy="76" r="1.8" fill="#67e8f9" />
+            <circle cx="234" cy="74" r="2" fill="#67e8f9" />
+          </g>
+        </svg>
+      );
+
+    case 'endless_abyss':
+      return (
+        <svg
+          viewBox="0 0 320 160"
+          preserveAspectRatio="xMidYMid slice"
+          aria-hidden="true"
+          className={className}
+        >
+          <defs>
+            <radialGradient id={`ea-bg-${uid}`} cx="50%" cy="38%" r="70%">
+              <stop offset="0%" stopColor="#881337" />
+              <stop offset="48%" stopColor="#2e1065" />
+              <stop offset="100%" stopColor="#070a14" />
+            </radialGradient>
+            <radialGradient id={`ea-portal-${uid}`} cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stopColor="#fef08a" />
+              <stop offset="45%" stopColor="#f43f5e" />
+              <stop offset="100%" stopColor="#7e22ce" stopOpacity="0" />
+            </radialGradient>
+          </defs>
+
+          {/* Cosmic Nebula Void */}
+          <rect width="320" height="160" fill={`url(#ea-bg-${uid})`} />
+
+          {/* Starfield */}
+          <g fill="#fde68a" opacity="0.8">
+            <circle cx="28" cy="24" r="1.5" />
+            <circle cx="72" cy="16" r="1.2" />
+            <circle cx="246" cy="20" r="1.6" />
+            <circle cx="294" cy="34" r="1.3" />
+            <circle cx="46" cy="70" r="1.2" />
+            <circle cx="278" cy="78" r="1.5" />
+          </g>
+
+          {/* Swirling Infinity Portal Glow */}
+          <circle cx="160" cy="64" r="56" fill={`url(#ea-portal-${uid})`} opacity="0.72" />
+          <path
+            d="M120 62 C120 42 146 42 160 62 C174 82 200 82 200 62 C200 42 174 42 160 62 C146 82 120 82 120 62 Z"
+            fill="none"
+            stroke="#fef08a"
+            strokeWidth="4"
+            opacity="0.75"
+          />
+
+          {/* Fierce Boss Dragon Silhouette */}
+          <g transform="translate(160, 56)">
+            {/* Outstretched dragon wings */}
+            <path
+              d="M-8 6 L-64 -26 L-50 4 L-68 12 L-36 18 L-14 14 Z"
+              fill="#1e1b2e"
+              stroke="#fb7185"
+              strokeWidth="1.8"
+              strokeLinejoin="round"
+            />
+            <path
+              d="M8 6 L64 -26 L50 4 L68 12 L36 18 L14 14 Z"
+              fill="#1e1b2e"
+              stroke="#fb7185"
+              strokeWidth="1.8"
+              strokeLinejoin="round"
+            />
+            {/* Horned head */}
+            <path
+              d="M-12 -18 L-20 -34 L-4 -22 L4 -22 L20 -34 L12 -18 L14 6 L0 16 L-14 6 Z"
+              fill="#0f172a"
+              stroke="#f43f5e"
+              strokeWidth="2"
+              strokeLinejoin="round"
+            />
+            {/* Glowing Boss Eyes */}
+            <polygon points="-8,-8 -2,-5 -6,-2" fill="#fef08a" />
+            <polygon points="8,-8 2,-5 6,-2" fill="#fef08a" />
+          </g>
+
+          {/* Floating Cracked Arena Obelisks */}
+          <polygon points="36,118 46,66 60,72 56,120" fill="#1e293b" stroke="#f43f5e" strokeWidth="1.6" />
+          <polygon points="284,118 274,66 260,72 264,120" fill="#1e293b" stroke="#f43f5e" strokeWidth="1.6" />
+
+          {/* Floating Obsidian Arena Platform */}
+          <ellipse cx="160" cy="134" rx="124" ry="26" fill="#0f172a" stroke="#475569" strokeWidth="2.4" />
+          {/* Golden Score-Pad Rune Ring */}
+          <ellipse cx="160" cy="132" rx="76" ry="15" fill="#fbbf24" opacity="0.2" />
+          <ellipse
+            cx="160"
+            cy="132"
+            rx="76"
+            ry="15"
+            fill="none"
+            stroke="#fbbf24"
+            strokeWidth="2.4"
+            strokeDasharray="10 6"
+          />
+          <ellipse cx="160" cy="132" rx="34" ry="7" fill="none" stroke="#fb7185" strokeWidth="2" />
+        </svg>
+      );
+  }
 }
