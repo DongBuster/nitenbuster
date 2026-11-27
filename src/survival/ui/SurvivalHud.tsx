@@ -4,7 +4,6 @@ import {
   Crosshair,
   Infinity as InfinityIcon,
   Pause,
-  Shield,
   Skull,
   Sparkles,
   Swords,
@@ -20,6 +19,7 @@ import {
   getWeaponSpec,
 } from '../sim/catalog.ts';
 import type { SurvivalHudSnapshot } from '../sim/types.ts';
+import { GearArt, SkillArt, WeaponArt } from './SurvivalIcons.tsx';
 
 export interface SurvivalHudProps {
   hud: SurvivalHudSnapshot;
@@ -221,19 +221,33 @@ export function SurvivalHud({
               <span>{hud.totalKills.toLocaleString('vi-VN')}</span>
             </span>
 
-            {hasNextBossCountdown && (
+            {hud.activeBoss ? (
               <>
                 <span className="text-white/20" aria-hidden="true">
                   |
                 </span>
-                <span className="inline-flex items-center gap-1 rounded-lg border border-rose-400/40 bg-rose-500/15 px-2 py-0.5 font-mono text-[11px] font-black text-rose-200 tabular-nums">
-                  <Skull
-                    aria-hidden="true"
-                    className="h-3 w-3 text-rose-300"
-                  />
-                  <span>Boss sau {formatClock(Math.ceil(hud.nextBossInSec))}</span>
+                <span className="inline-flex items-center gap-1 rounded-lg border border-rose-400/70 bg-rose-500/25 px-2 py-0.5 text-[11px] font-black text-rose-100">
+                  <Skull aria-hidden="true" className="h-3 w-3 text-rose-300" />
+                  <span>
+                    {hud.activeBoss.isFinalBoss ? 'HẠ BOSS CUỐI' : 'ĐANG ĐẤU BOSS'}
+                  </span>
                 </span>
               </>
+            ) : (
+              hasNextBossCountdown && (
+                <>
+                  <span className="text-white/20" aria-hidden="true">
+                    |
+                  </span>
+                  <span className="inline-flex items-center gap-1 rounded-lg border border-rose-400/40 bg-rose-500/15 px-2 py-0.5 font-mono text-[11px] font-black text-rose-200 tabular-nums">
+                    <Skull
+                      aria-hidden="true"
+                      className="h-3 w-3 text-rose-300"
+                    />
+                    <span>Boss sau {formatClock(Math.ceil(hud.nextBossInSec))}</span>
+                  </span>
+                </>
+              )
             )}
           </div>
 
@@ -290,6 +304,11 @@ export function SurvivalHud({
                   className="h-full rounded-full bg-gradient-to-r from-rose-600 via-red-500 to-amber-400 transition-[width] duration-100 motion-reduce:transition-none"
                   style={{ width: `${bossHpPct}%` }}
                 />
+              </div>
+              <div className="mt-1 flex items-center justify-center text-[10px] font-black tracking-wide text-amber-200">
+                {hud.activeBoss.isFinalBoss
+                  ? 'Hạ Boss Cuối để chiến thắng màn chơi!'
+                  : 'Hạ Boss để nhận rương kỹ năng Hiếm!'}
               </div>
             </div>
           )}
@@ -419,24 +438,25 @@ export function SurvivalHud({
 
                 <div className="mt-0.5 flex flex-wrap items-center gap-1 text-[10px] font-black">
                   <span
-                    className="rounded-md border px-1.5 py-0.5"
+                    className="inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5"
                     style={{
                       borderColor: `${localWeapon.color}66`,
                       backgroundColor: `${localWeapon.color}1f`,
                       color: localWeapon.color,
                     }}
                   >
-                    {localWeapon.shortName}
+                    <WeaponArt weaponId={local.weaponId} className="h-3.5 w-3.5 shrink-0" />
+                    <span>{localWeapon.shortName}</span>
                   </span>
                   <span
-                    className="inline-flex items-center gap-0.5 rounded-md border px-1.5 py-0.5"
+                    className="inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5"
                     style={{
                       borderColor: `${localGear.color}66`,
                       backgroundColor: `${localGear.color}1f`,
                       color: localGear.color,
                     }}
                   >
-                    <Shield aria-hidden="true" className="h-2.5 w-2.5" />
+                    <GearArt gearId={local.gearId} className="h-3.5 w-3.5 shrink-0" />
                     <span>{localGear.name}</span>
                   </span>
                 </div>
@@ -517,13 +537,10 @@ export function SurvivalHud({
                 return (
                   <span
                     key={spec.id}
+                    title={`${spec.name} (Lv.${lv})`}
                     className="inline-flex items-center gap-1 rounded-lg border border-white/15 bg-[#0a101d] px-1.5 py-0.5 text-[10px] font-bold text-slate-200"
                   >
-                    <span
-                      aria-hidden="true"
-                      className="h-1.5 w-1.5 rounded-full"
-                      style={{ backgroundColor: spec.color }}
-                    />
+                    <SkillArt skillId={spec.id} className="h-4 w-4 shrink-0" />
                     <span>{spec.name}</span>
                     <span className="font-mono font-black text-amber-300">
                       Lv.{lv}

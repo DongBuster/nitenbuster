@@ -242,4 +242,39 @@ describe('survival catalog & map registry', () => {
       );
     }
   });
+
+  it('keeps weapon, gear, and skill copy player-friendly with zero FE/math jargon (px, AOE, degree formulas)', () => {
+    const forbidden = /\bpx\b|\bAOE\b|±|°|cấp×|HP\/s|\bMax HP\b/i;
+    for (const w of WEAPONS) {
+      assert.equal(
+        forbidden.test(w.description),
+        false,
+        `Weapon ${w.id} description contains technical jargon: "${w.description}"`,
+      );
+    }
+    for (const g of GEARS) {
+      assert.equal(
+        forbidden.test(g.description),
+        false,
+        `Gear ${g.id} description contains technical jargon: "${g.description}"`,
+      );
+      assert.equal(
+        forbidden.test(g.badge),
+        false,
+        `Gear ${g.id} badge contains technical jargon: "${g.badge}"`,
+      );
+    }
+    for (const s of SKILLS) {
+      assert.equal(
+        forbidden.test(s.description),
+        false,
+        `Skill ${s.id} description contains technical jargon: "${s.description}"`,
+      );
+      assert.equal(
+        forbidden.test(s.perLevelSummary),
+        false,
+        `Skill ${s.id} summary contains technical jargon: "${s.perLevelSummary}"`,
+      );
+    }
+  });
 });

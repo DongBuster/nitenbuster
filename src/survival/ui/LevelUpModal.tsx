@@ -14,6 +14,7 @@ import type {
   SkillOffer,
   SkillRarity,
 } from '../sim/types.ts';
+import { SkillArt } from './SurvivalIcons.tsx';
 
 const PROGRAMMATIC_CLOSE = '__programmatic__';
 const LEVEL_UP_MAX_TIMER_SEC = 15;
@@ -478,28 +479,31 @@ export function LevelUpModal({
                     </span>
                   </div>
 
-                  {/* Title & Accent Bar */}
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span
-                        aria-hidden="true"
-                        className="h-3 w-3 shrink-0 rounded-full ring-2 ring-white/25"
-                        style={{ backgroundColor: spec.color }}
-                      />
-                      <h2 className="font-display text-lg font-black leading-snug text-white">
-                        {spec.name}
-                      </h2>
+                  {/* Abstract Skill Emblem + Title */}
+                  <div className="flex items-center gap-3.5">
+                    <div
+                      className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border bg-[#0b101c]/90 p-1.5 shadow-inner"
+                      style={{
+                        borderColor: `${spec.color}70`,
+                        boxShadow: `0 0 18px ${spec.color}26`,
+                      }}
+                    >
+                      <SkillArt skillId={offer.skillId} className="h-13 w-13" />
                     </div>
-
-                    <div className="mt-1.5 inline-flex items-center rounded-lg border border-white/15 bg-black/35 px-2.5 py-0.5 font-mono text-xs font-black text-amber-200 tabular-nums">
-                      {levelText}
+                    <div className="min-w-0">
+                      <span className="block font-display text-lg font-black leading-snug text-white">
+                        {spec.name}
+                      </span>
+                      <span className="mt-1 inline-flex items-center rounded-lg border border-white/15 bg-black/35 px-2.5 py-0.5 font-mono text-xs font-black text-amber-200 tabular-nums">
+                        {levelText}
+                      </span>
                     </div>
                   </div>
 
-                  {/* Description */}
-                  <p className="text-xs font-semibold leading-relaxed text-slate-200/95">
+                  {/* Short Visual-First Description */}
+                  <span className="block text-xs font-semibold leading-relaxed text-slate-200/95">
                     {spec.description}
-                  </p>
+                  </span>
                 </div>
 
                 {/* Footer: Per-level summary & Key Hint */}

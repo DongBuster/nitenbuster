@@ -501,4 +501,59 @@ describe('survival bosses, waves & endless mode', () => {
     assert.equal(p1.hp, p1.maxHp, 'dead bomber must not deal explosion damage');
     assert.equal(world.hazards.some((h) => h.ownerId === bomber2.id), false);
   });
+
+  it('never ends a campaign match on time while Final Boss is alive — must defeat Boss to win', () => {
+    const world = createSurvivalWorld({
+      matchId: 'm-boss-gate',
+      mode: 'solo',
+      mapId: 'winter_cabin',
+      seed: 333,
+      players: [
+        { id: 'p1', name: 'Hero', animal: 'dog', weaponId: 'candy_smg', gearId: 'plush_armor', isBot: false },
+      ],
+    });
+    const p1 = world.players[0];
+
+    // Spawn Final Boss (Snow Dragon) at 330s
+    world.elapsedSec = 330;
+    world.bossScheduleIndex = 2;
+    world.nextBossAtSec = 330;
+    stepSurvivalWorld(world, { p1: IDLE_INPUT }, 0.05);
+
+    const dragon = world.enemies.find((e) => e.kind === 'boss_snow_dragon');
+    assert.ok(dragon, 'Final Boss must be active');
+
+    // Step well past the 6:00 (360s) mark to ~405s with Boss still alive
+    for (let i = 0; i < 1500; i++) {
+      p1.hp = p1.maxHp;
+      p1.downed = false;
+      p1.invulnTimer = 1;
+      p1.fireCooldown = 9999;
+      world.spawnTimer = 9999;
+      stepSurvivalWorld(world, { p1: IDLE_INPUT }, 0.05);
+      if (world.phase === 'levelup') {
+        applySkillPick(world, 'p1', 0);
+      }
+    }
+    assert.ok(world.elapsedSec >= 400, `expected elapsedSec >= 400, got ${world.elapsedSec}`);
+    assert.equal(world.phase, 'playing', 'match must stay in playing while Final Boss is alive past 6:00');
+    const hud = buildHudSnapshot(world, 'p1');
+    assert.equal(hud.activeBoss?.isFinalBoss, true, 'HUD must mark active Final Boss clearly');
+
+    // Now defeat the Final Boss -> match ends in victory
+    dragon.hp = 1;
+    dragon.x = p1.x + 80;
+    dragon.y = p1.y;
+    p1.fireCooldown = 0;
+    let won = false;
+    for (let i = 0; i < 40; i++) {
+      const evts = stepSurvivalWorld(world, { p1: IDLE_INPUT }, 0.05);
+      if (evts.some((e) => e.type === 'victory')) {
+        won = true;
+        break;
+      }
+    }
+    assert.equal(won, true, 'defeating Final Boss must complete the stage with victory');
+    assert.equal(world.phase, 'victory');
+  });
 });

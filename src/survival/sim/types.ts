@@ -472,6 +472,7 @@ export interface SurvivalHudSnapshot {
     hp: number;
     maxHp: number;
     tier: number;
+    isFinalBoss?: boolean;
   } | null;
   sandstormActive: boolean;
   localPlayer: SurvivalPlayerSummary;

@@ -15,6 +15,7 @@ import {
   Link2,
   Play,
   Shield,
+  Skull,
   Sparkles,
   Swords,
   Timer,
@@ -41,6 +42,7 @@ import type {
   SurvivalMode,
   WeaponId,
 } from '../sim/types.ts';
+import { GearArt, HeroLoadoutPreview, WeaponArt } from './SurvivalIcons.tsx';
 
 export interface SurvivalLobbyProps {
   mode: SurvivalMode;
@@ -817,24 +819,32 @@ export function SurvivalLobby({
 
                             <div className="mt-2.5 flex flex-wrap gap-1 text-[10px] font-black">
                               <span
-                                className="rounded-md border px-1.5 py-0.5"
+                                className="inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5"
                                 style={{
                                   borderColor: `${mWeapon.color}66`,
                                   backgroundColor: `${mWeapon.color}1f`,
                                   color: mWeapon.color,
                                 }}
                               >
-                                {mWeapon.shortName}
+                                <WeaponArt
+                                  weaponId={member.weaponId}
+                                  className="h-3.5 w-3.5 shrink-0"
+                                />
+                                <span>{mWeapon.shortName}</span>
                               </span>
                               <span
-                                className="rounded-md border px-1.5 py-0.5"
+                                className="inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5"
                                 style={{
                                   borderColor: `${mGear.color}66`,
                                   backgroundColor: `${mGear.color}1f`,
                                   color: mGear.color,
                                 }}
                               >
-                                {mGear.name}
+                                <GearArt
+                                  gearId={member.gearId}
+                                  className="h-3.5 w-3.5 shrink-0"
+                                />
+                                <span>{mGear.name}</span>
                               </span>
                             </div>
 
@@ -1038,8 +1048,12 @@ export function SurvivalLobby({
                           </span>
                         </span>
                       ) : (
-                        <span className="text-slate-400">
-                          Mục tiêu: {formatClock(map.targetDurationSec)}
+                        <span className="inline-flex items-center gap-1 text-rose-200/90">
+                          <Skull
+                            aria-hidden="true"
+                            className="h-3.5 w-3.5 text-rose-300"
+                          />
+                          <span>Hạ 3 Boss · Diệt Rồng Tuyết</span>
                         </span>
                       )}
 
@@ -1111,28 +1125,38 @@ export function SurvivalLobby({
               </span>
             </div>
 
-            <div className="mt-3 grid grid-cols-2 gap-2.5 sm:grid-cols-4 lg:grid-cols-8">
-              {ANIMALS.map((animal) => {
-                const active = selectedAnimal === animal.id;
-                return (
-                  <button
-                    key={animal.id}
-                    type="button"
-                    aria-pressed={active}
-                    onClick={() => handleAnimalSelect(animal.id)}
-                    className={`flex cursor-pointer flex-col items-center gap-1.5 rounded-2xl border-2 px-2.5 py-3 text-center transition-all motion-reduce:transition-none ${FOCUS_RING_CLASS} ${
-                      active
-                        ? 'border-amber-300 bg-amber-500/20 text-white shadow-[0_0_16px_rgba(251,191,36,0.2)]'
-                        : 'border-white/10 bg-[#0d1320] text-slate-300 hover:border-amber-400/45'
-                    }`}
-                  >
-                    <AnimalAvatar animal={animal.id} size="md" />
-                    <span className="max-w-full truncate text-xs font-black">
-                      {animal.name}
-                    </span>
-                  </button>
-                );
-              })}
+            <div className="mt-3 grid grid-cols-1 gap-3.5 lg:grid-cols-12">
+              <div className="lg:col-span-4">
+                <HeroLoadoutPreview
+                  animal={selectedAnimal}
+                  weaponId={selectedWeapon}
+                  gearId={selectedGear}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 lg:col-span-8">
+                {ANIMALS.map((animal) => {
+                  const active = selectedAnimal === animal.id;
+                  return (
+                    <button
+                      key={animal.id}
+                      type="button"
+                      aria-pressed={active}
+                      onClick={() => handleAnimalSelect(animal.id)}
+                      className={`flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-2xl border-2 px-2.5 py-3 text-center transition-all motion-reduce:transition-none ${FOCUS_RING_CLASS} ${
+                        active
+                          ? 'border-amber-300 bg-amber-500/20 text-white shadow-[0_0_16px_rgba(251,191,36,0.2)]'
+                          : 'border-white/10 bg-[#0d1320] text-slate-300 hover:border-amber-400/45'
+                      }`}
+                    >
+                      <AnimalAvatar animal={animal.id} size="md" />
+                      <span className="max-w-full truncate text-xs font-black">
+                        {animal.name}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </section>
 
@@ -1169,28 +1193,36 @@ export function SurvivalLobby({
                         : 'border-white/10 bg-[#0d1320]/90 hover:border-white/30'
                     }`}
                   >
-                    <div>
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          <span
-                            aria-hidden="true"
-                            className="h-3.5 w-3.5 shrink-0 rounded-full ring-2 ring-white/25"
-                            style={{ backgroundColor: weapon.color }}
-                          />
-                          <h3 className="font-display text-sm font-black text-white">
-                            {weapon.name}
-                          </h3>
-                        </div>
-                        {active && (
-                          <span className="rounded-md bg-amber-400/25 px-1.5 py-0.5 text-[10px] font-black text-amber-200">
-                            Đang dùng
-                          </span>
-                        )}
-                      </div>
+                    <div className="flex items-start gap-3">
+                      <span
+                        className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border shadow-inner"
+                        style={{
+                          borderColor: `${weapon.color}66`,
+                          background: `radial-gradient(circle at 50% 40%, ${weapon.color}2b 0%, rgba(11,16,28,0.95) 75%)`,
+                        }}
+                      >
+                        <WeaponArt
+                          weaponId={weapon.id}
+                          className="h-14 w-14"
+                        />
+                      </span>
 
-                      <p className="mt-1.5 text-xs leading-relaxed text-slate-300">
-                        {weapon.description}
-                      </p>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start justify-between gap-1.5">
+                          <span className="block font-display text-sm font-black leading-snug text-white">
+                            {weapon.name}
+                          </span>
+                          {active && (
+                            <span className="shrink-0 rounded-md bg-amber-400/25 px-1.5 py-0.5 text-[10px] font-black text-amber-200">
+                              Đang dùng
+                            </span>
+                          )}
+                        </div>
+
+                        <span className="mt-1 block text-xs leading-snug text-slate-300">
+                          {weapon.description}
+                        </span>
+                      </div>
                     </div>
 
                     <div className="mt-3 space-y-1.5 border-t border-white/10 pt-2.5">
@@ -1249,33 +1281,45 @@ export function SurvivalLobby({
                         : 'border-white/10 bg-[#0d1320]/90 hover:border-white/30'
                     }`}
                   >
-                    <div>
-                      <div className="flex items-center justify-between gap-2">
-                        <h3 className="font-display text-sm font-black text-white">
-                          {gear.name}
-                        </h3>
-                        {active && (
-                          <span className="rounded-md bg-cyan-400/25 px-1.5 py-0.5 text-[10px] font-black text-cyan-200">
-                            Đang đeo
-                          </span>
-                        )}
-                      </div>
-
+                    <div className="flex items-start gap-2.5">
                       <span
-                        className="mt-1.5 inline-block rounded-lg border px-2 py-0.5 text-[10px] font-black"
+                        className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border shadow-inner"
                         style={{
                           borderColor: `${gear.color}66`,
-                          backgroundColor: `${gear.color}1f`,
-                          color: gear.color,
+                          background: `radial-gradient(circle at 50% 40%, ${gear.color}2b 0%, rgba(11,16,28,0.95) 75%)`,
                         }}
                       >
-                        {gear.badge}
+                        <GearArt gearId={gear.id} className="h-12 w-12" />
                       </span>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start justify-between gap-1">
+                          <span className="block font-display text-sm font-black leading-snug text-white">
+                            {gear.name}
+                          </span>
+                          {active && (
+                            <span className="shrink-0 rounded-md bg-cyan-400/25 px-1.5 py-0.5 text-[10px] font-black text-cyan-200">
+                              Đang đeo
+                            </span>
+                          )}
+                        </div>
+
+                        <span
+                          className="mt-1 inline-block rounded-lg border px-2 py-0.5 text-[10px] font-black"
+                          style={{
+                            borderColor: `${gear.color}66`,
+                            backgroundColor: `${gear.color}1f`,
+                            color: gear.color,
+                          }}
+                        >
+                          {gear.badge}
+                        </span>
+                      </div>
                     </div>
 
-                    <p className="mt-2.5 text-xs leading-relaxed text-slate-300">
+                    <span className="mt-2.5 block text-xs leading-snug text-slate-300">
                       {gear.description}
-                    </p>
+                    </span>
                   </button>
                 );
               })}
@@ -1285,28 +1329,45 @@ export function SurvivalLobby({
 
         {/* Bottom Primary CTA & Loadout Summary */}
         <section className="flex flex-col justify-between gap-4 rounded-3xl border-2 border-amber-400/40 bg-gradient-to-r from-[#1c120c] via-[#171d2c] to-[#121826] p-4 shadow-2xl sm:flex-row sm:items-center sm:p-5">
-          <div className="space-y-1">
-            <div className="text-[11px] font-black uppercase tracking-wider text-amber-300">
-              Đội Hình Xuất Phát
-            </div>
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-black text-white">
-              <span>{activeMapMeta.name}</span>
-              <span aria-hidden="true" className="text-slate-500">
-                ·
-              </span>
-              <span className="text-amber-200">{activeAnimalMeta.name}</span>
-              <span aria-hidden="true" className="text-slate-500">
-                ·
-              </span>
-              <span style={{ color: activeWeaponSpec.color }}>
-                {activeWeaponSpec.shortName}
-              </span>
-              <span aria-hidden="true" className="text-slate-500">
-                ·
-              </span>
-              <span style={{ color: activeGearSpec.color }}>
-                {activeGearSpec.name}
-              </span>
+          <div className="flex items-center gap-3">
+            <AnimalAvatar animal={selectedAnimal} size="md" />
+            <div className="space-y-1">
+              <div className="text-[11px] font-black uppercase tracking-wider text-amber-300">
+                Đội Hình Xuất Phát
+              </div>
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-black text-white">
+                <span>{activeMapMeta.name}</span>
+                <span aria-hidden="true" className="text-slate-500">
+                  ·
+                </span>
+                <span className="text-amber-200">{activeAnimalMeta.name}</span>
+                <span aria-hidden="true" className="text-slate-500">
+                  ·
+                </span>
+                <span
+                  className="inline-flex items-center gap-1"
+                  style={{ color: activeWeaponSpec.color }}
+                >
+                  <WeaponArt
+                    weaponId={selectedWeapon}
+                    className="h-4 w-4 shrink-0"
+                  />
+                  <span>{activeWeaponSpec.shortName}</span>
+                </span>
+                <span aria-hidden="true" className="text-slate-500">
+                  ·
+                </span>
+                <span
+                  className="inline-flex items-center gap-1"
+                  style={{ color: activeGearSpec.color }}
+                >
+                  <GearArt
+                    gearId={selectedGear}
+                    className="h-4 w-4 shrink-0"
+                  />
+                  <span>{activeGearSpec.name}</span>
+                </span>
+              </div>
             </div>
           </div>
 

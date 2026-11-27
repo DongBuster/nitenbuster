@@ -24,6 +24,7 @@ import {
   SurvivalDialogShell,
   setNativeAutofocus,
 } from './LevelUpModal.tsx';
+import { WeaponArt } from './SurvivalIcons.tsx';
 
 export interface SurvivalResultModalProps {
   open: boolean;
@@ -284,10 +285,14 @@ export function SurvivalResultModal({
                           )}
                         </div>
                         <div
-                          className="text-[11px] font-bold"
+                          className="mt-0.5 inline-flex items-center gap-1 text-[11px] font-bold"
                           style={{ color: weapon.color }}
                         >
-                          {weapon.name}
+                          <WeaponArt
+                            weaponId={player.weaponId}
+                            className="h-3.5 w-3.5 shrink-0"
+                          />
+                          <span>{weapon.name}</span>
                         </div>
                       </div>
                     </div>

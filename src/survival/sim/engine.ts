@@ -753,7 +753,7 @@ function handleEnemyDeath(
       const scheduled = CAMPAIGN_BOSS_TIMINGS[world.bossScheduleIndex];
       world.nextBossAtSec =
         scheduled !== undefined
-          ? Math.max(world.elapsedSec + 10, scheduled)
+          ? Math.max(world.elapsedSec + 25, scheduled)
           : world.elapsedSec + 90;
     } else {
       world.nextBossAtSec = Math.max(
@@ -2454,7 +2454,9 @@ function updateSpawnersAndBosses(
 
   world.spawnTimer -= dt;
   if (world.spawnTimer <= 0) {
-    const baseInterval = Math.max(0.22, 1.15 - (world.elapsedSec / 360) * 0.65);
+    const bossCalmFactor = world.activeBossId !== null ? 1.45 : 1;
+    const baseInterval =
+      Math.max(0.22, 1.15 - (world.elapsedSec / 360) * 0.65) * bossCalmFactor;
     world.spawnTimer = baseInterval / (spawnRateMult * endlessRamp);
 
     const pool = getUnlockedEnemyPool(world.elapsedSec);
@@ -3061,6 +3063,8 @@ export function buildHudSnapshot(
           hp: Math.max(0, Math.ceil(bossEntity.hp)),
           maxHp: bossEntity.maxHp,
           tier: bossEntity.bossTier,
+          isFinalBoss:
+            !world.isEndlessActive && bossEntity.kind === 'boss_snow_dragon',
         }
       : null,
     sandstormActive:

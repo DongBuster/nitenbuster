@@ -214,6 +214,8 @@ function buildClientHudSnapshot(
           hp: Math.max(0, Math.ceil(bossEntity.hp)),
           maxHp: bossEntity.maxHp,
           tier: bossEntity.bossTier,
+          isFinalBoss:
+            !snap.isEndlessActive && bossEntity.kind === 'boss_snow_dragon',
         }
       : null,
     sandstormActive: snap.sandstormActive,
