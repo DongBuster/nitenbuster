@@ -14,6 +14,7 @@ import {
   Wifi,
 } from 'lucide-react';
 import { playSfx } from '../../audio/soundEngine';
+import { AnimalAvatar } from '../../components/AnimalAvatar';
 import { getSortedStandings } from '../sim/matchStore';
 import type { HudSnapshot, MatchState, PressedSkillState } from '../sim/types';
 import { BrawlSkillBar } from './BrawlSkillBar';
@@ -232,9 +233,11 @@ export function BrawlHud({
               </div>
               <div className="space-y-0.5">
                 {topScores.map((s, idx) => (
-                  <div key={s.id} className="flex items-center justify-between gap-4 font-bold">
-                    <span className={s.id === localFighterId ? 'text-amber-300' : 'text-slate-200'}>
-                      #{idx + 1} {s.name}
+                  <div key={s.id} className="flex items-center justify-between gap-3 font-bold">
+                    <span className={`inline-flex items-center gap-1.5 ${s.id === localFighterId ? 'text-amber-300' : 'text-slate-200'}`}>
+                      <span className="font-mono text-[10px] opacity-75">#{idx + 1}</span>
+                      <AnimalAvatar animal={s.animal} size="xs" />
+                      <span>{s.name}</span>
                     </span>
                     <span className="font-mono font-black text-amber-200">{s.points}đ</span>
                   </div>
@@ -279,8 +282,10 @@ export function BrawlHud({
                       : 'bg-white/8 text-slate-200'
                   }`}
                 >
-                  <span>
-                    Hạng #{r.rank} · {r.name}
+                  <span className="inline-flex items-center gap-2">
+                    <span className="font-mono">Hạng #{r.rank}</span>
+                    <AnimalAvatar animal={r.animal} size="xs" />
+                    <span>{r.name}</span>
                   </span>
                   <span className="font-mono font-black">
                     {r.pointsAwarded > 0 ? `+${r.pointsAwarded}đ` : '0đ'} (Tổng: {r.totalPoints}đ)

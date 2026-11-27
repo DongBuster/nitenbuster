@@ -6,6 +6,7 @@ import {
   Trophy,
 } from 'lucide-react';
 import { playSfx } from '../../audio/soundEngine';
+import { AnimalAvatar } from '../../components/AnimalAvatar';
 import { getHumanFinalRank, getSortedStandings } from '../sim/matchStore';
 import type { MatchState } from '../sim/types';
 
@@ -76,6 +77,7 @@ export function BrawlResult({
                 <span className="w-6 text-center font-mono text-base font-black text-amber-300">
                   #{idx + 1}
                 </span>
+                <AnimalAvatar animal={entry.animal} size="sm" />
                 <span>{entry.name}</span>
               </div>
 

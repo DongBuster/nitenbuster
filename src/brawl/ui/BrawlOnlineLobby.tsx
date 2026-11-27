@@ -17,6 +17,7 @@ import {
   Wifi,
 } from 'lucide-react';
 import { playSfx } from '../../audio/soundEngine';
+import { AnimalAvatar } from '../../components/AnimalAvatar';
 import { ANIMALS, type AnimalId } from '../../engine/types';
 import { normalizeRoomCode } from '../../online/sanitize';
 import {
@@ -254,9 +255,10 @@ export function BrawlOnlineLobby({
                             : 'border-sky-900/40 bg-black/25 text-slate-200 hover:bg-white/10'
                         }`}
                       >
-                        <span
-                          className="h-6 w-6 rounded-full ring-2 ring-white/30 shadow-md"
-                          style={{ backgroundColor: a.accentHex }}
+                        <AnimalAvatar
+                          animal={a.id}
+                          size="lg"
+                          className={active ? 'ring-amber-950/35' : ''}
                         />
                         <span
                           className={`text-xs font-black ${
@@ -434,10 +436,7 @@ export function BrawlOnlineLobby({
                         }`}
                       >
                         <div className="flex items-center gap-3">
-                          <span
-                            className="h-7 w-7 rounded-full ring-2 ring-white/30 shadow"
-                            style={{ backgroundColor: meta.accentHex }}
-                          />
+                          <AnimalAvatar animal={m.animal} size="md" />
                           <div>
                             <div className="flex items-center gap-1.5 font-black text-white">
                               <span>{m.name}</span>
@@ -499,9 +498,10 @@ export function BrawlOnlineLobby({
                             : 'border-white/10 bg-black/25 text-slate-200 hover:bg-white/10'
                         }`}
                       >
-                        <span
-                          className="h-4 w-4 rounded-full ring-1 ring-white/40"
-                          style={{ backgroundColor: a.accentHex }}
+                        <AnimalAvatar
+                          animal={a.id}
+                          size="sm"
+                          className={active ? 'ring-amber-950/35' : ''}
                         />
                         <span className="truncate">{a.name.split(' ')[0]}</span>
                       </button>
