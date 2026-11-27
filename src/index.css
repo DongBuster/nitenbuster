@@ -118,6 +118,15 @@ dialog::backdrop {
 
 /* Block Blast Drag Handle & Reduced-Motion-Safe Animations */
 @layer components {
+  .arcade-mode-card {
+    container-type: inline-size;
+    display: grid;
+    grid-row: span 4;
+    grid-template-rows: auto auto 1fr auto;
+    grid-template-rows: subgrid;
+    row-gap: 0;
+  }
+
   .bb-drag-handle {
     cursor: grab;
     touch-action: none;

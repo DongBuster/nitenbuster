@@ -184,8 +184,8 @@ export function ModeSelectScreen({
   ];
 
   return (
-    <div className="min-h-screen bg-[#1a100b] bg-[radial-gradient(circle_at_18%_0%,_#3a2114_0%,_transparent_44%),radial-gradient(circle_at_50%_0%,_#112840_0%,_transparent_44%),radial-gradient(circle_at_84%_0%,_#103326_0%,_transparent_44%),linear-gradient(180deg,_#1c110c_0%,_#120b08_100%)] text-[#FFF9F0] selection:bg-amber-300 selection:text-[#2C1B11]">
-      <div className="mx-auto flex min-h-screen max-w-[92rem] flex-col justify-between gap-5 px-4 py-5 sm:px-6 lg:px-8">
+    <div className="min-h-dvh bg-[#1a100b] bg-[radial-gradient(circle_at_18%_0%,_#3a2114_0%,_transparent_44%),radial-gradient(circle_at_50%_0%,_#112840_0%,_transparent_44%),radial-gradient(circle_at_84%_0%,_#103326_0%,_transparent_44%),linear-gradient(180deg,_#1c110c_0%,_#120b08_100%)] text-[#FFF9F0] selection:bg-amber-300 selection:text-[#2C1B11]">
+      <div className="mx-auto flex min-h-dvh max-w-[92rem] flex-col gap-5 px-4 py-5 sm:px-6 lg:px-8">
         {/* Hero Showcase Header */}
         <header className="relative overflow-hidden rounded-3xl border border-amber-500/25 bg-gradient-to-r from-[#341c11]/95 via-[#182235]/95 to-[#0f2920]/95 px-6 py-4 shadow-[0_14px_34px_rgba(0,0,0,0.42)]">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -296,11 +296,11 @@ export function ModeSelectScreen({
         </section>
 
         {/* Four Distinct Game Mode Cards */}
-        <main className="grid flex-1 grid-cols-1 items-stretch gap-5 md:grid-cols-2 xl:grid-cols-4">
+        <main className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
           {gameModes.map((mode) => (
             <article
               key={mode.id}
-              className={`group relative flex flex-col justify-between overflow-hidden rounded-3xl border-2 shadow-[0_14px_36px_rgba(0,0,0,0.45)] transition-[transform,border-color,box-shadow] duration-200 hover:-translate-y-1 motion-reduce:transition-colors motion-reduce:hover:translate-y-0 has-[button:focus-visible]:outline-2 has-[button:focus-visible]:outline-offset-2 ${mode.cardClass}`}
+              className={`arcade-mode-card group relative overflow-clip rounded-3xl border-2 shadow-[0_14px_36px_rgba(0,0,0,0.45)] transition-[transform,border-color,box-shadow] duration-200 hover:-translate-y-1 motion-reduce:transition-colors motion-reduce:hover:translate-y-0 has-[button:focus-visible]:outline-2 has-[button:focus-visible]:outline-offset-2 ${mode.cardClass}`}
             >
               <picture className="block border-b border-white/10 bg-black/40">
                 {mode.bannerWebp && (
@@ -313,37 +313,37 @@ export function ModeSelectScreen({
                   height={768}
                   fetchPriority="high"
                   decoding="async"
-                  className="aspect-[16/9] w-full object-cover transition-transform duration-300 ease-out group-hover:scale-[1.03] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
+                  className="block aspect-[16/9] w-full object-cover transition-transform duration-300 ease-out group-hover:scale-[1.03] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
                 />
               </picture>
 
-              <header className="px-6 pt-5">
+              <header className="px-5 pt-4">
                 <span
                   className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-black ${mode.badgeClass}`}
                 >
                   {mode.badgeIcon}
                   <span>{mode.genreBadge}</span>
                 </span>
-                <h2 className="mt-3 font-display text-2xl font-black text-white xl:text-3xl">
+                <h2 className="mt-2.5 font-display text-2xl font-black text-white">
                   {mode.title}
                 </h2>
               </header>
 
-              <div className="flex flex-1 flex-col justify-between gap-4 px-6 pt-2.5 pb-5">
+              <div className="flex flex-col justify-between gap-4 px-5 pt-2.5 pb-4">
                 <p className="text-sm leading-relaxed text-amber-50/85">
                   {mode.description}
                 </p>
 
-                <dl className="grid grid-cols-1 gap-2 sm:grid-cols-3 md:grid-cols-1 xl:grid-cols-3">
+                <dl className="grid grid-cols-1 gap-1.5 @[24rem]:grid-cols-3 @[24rem]:gap-2">
                   {mode.specs.map((spec) => (
                     <div
                       key={spec.label}
-                      className={`rounded-xl border px-3 py-2 ${mode.specClass}`}
+                      className={`flex items-center justify-between gap-2 rounded-xl border px-3 py-1.5 @[24rem]:block @[24rem]:py-2 ${mode.specClass}`}
                     >
                       <dt className="text-[11px] font-bold text-white/55">
                         {spec.label}
                       </dt>
-                      <dd className="mt-0.5 text-xs font-black text-white/95">
+                      <dd className="text-right text-xs font-black text-white/95 @[24rem]:mt-0.5 @[24rem]:text-left">
                         {spec.value}
                       </dd>
                     </div>
@@ -351,7 +351,7 @@ export function ModeSelectScreen({
                 </dl>
               </div>
 
-              <footer className="px-6 pb-6">
+              <footer className="px-5 pb-5">
                 <button
                   type="button"
                   onClick={() => {
@@ -361,7 +361,7 @@ export function ModeSelectScreen({
                   className="block w-full cursor-pointer rounded-2xl text-left focus-visible:outline-none after:absolute after:inset-0 after:z-10 after:content-['']"
                 >
                   <span
-                    className={`${mode.ctaClass} ${mode.ctaTextClass} pointer-events-none flex w-full items-center justify-between rounded-2xl px-5 py-3.5 text-sm font-black group-active:translate-y-[3px] motion-reduce:group-active:translate-y-0`}
+                    className={`${mode.ctaClass} ${mode.ctaTextClass} pointer-events-none flex w-full items-center justify-between rounded-2xl px-5 py-3 text-sm font-black group-active:translate-y-[3px] motion-reduce:group-active:translate-y-0`}
                   >
                     <span>{mode.ctaLabel}</span>
                     <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1 motion-reduce:transition-none motion-reduce:group-hover:translate-x-0" />
@@ -373,7 +373,7 @@ export function ModeSelectScreen({
         </main>
 
         {/* Footer note */}
-        <footer className="text-center text-xs text-amber-200/55">
+        <footer className="mt-auto pt-2 text-center text-xs text-amber-200/55">
           Dùng chung bộ 8 nhân vật 3D, 15 phụ kiện phối đồ và ví Cookies giữa cả bốn chế độ.
         </footer>
       </div>
