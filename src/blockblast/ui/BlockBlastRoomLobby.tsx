@@ -229,7 +229,7 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
           <div className="mt-3 inline-flex flex-wrap items-center gap-2 rounded-2xl border border-emerald-400/30 bg-emerald-950/40 px-3.5 py-2 text-xs font-bold text-emerald-100">
             <ShieldCheck aria-hidden="true" className="h-4 w-4 text-emerald-300" />
             <span>
-              Chung Seed · Tối đa 8 người · Không Bom Cứu Nguy Cookies · Chống hack tự động
+              Chung Seed · Tối đa 8 người · Thuần xếp khối · 1 Đổi Khay · Chống hack tự động
             </span>
           </div>
 
@@ -495,7 +495,7 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
               <ul className="space-y-1.5 text-xs leading-relaxed text-emerald-100/85">
                 <li>• Cùng chơi trên 1 <strong>seed giống nhau</strong>.</li>
                 <li>• Không giới hạn giờ, ai trụ lâu điểm cao sẽ thắng.</li>
-                <li>• Đấu Pure Skill: tắt Bom 15 Cookies, giữ 1 Đổi Khay.</li>
+                <li>• Đấu Pure Skill: thuần xếp khối thông minh, giữ 1 Đổi Khay.</li>
                 <li>• Người xong trước xem trực tiếp bàn 8×8 người còn trụ.</li>
               </ul>
             </div>

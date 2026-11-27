@@ -12,7 +12,6 @@ import {
 } from './types.ts';
 import {
   BLOCK_PIECES,
-  createCandyBombPiece,
   createTrayPieceFromDef,
 } from './pieces.ts';
 import { getStageNumber, getStageTheme } from './stages.ts';
@@ -573,6 +572,10 @@ function pickSmartPieceForSlot(
   const weights = top.map((item, idx) => {
     const base = baseWeights[idx];
     if (item.isAllClear) return base * ALL_CLEAR_WEIGHT_MULTIPLIER;
+    // Reward snug pocket fits & line clears on primary slots so exact-fitting blocks appear reliably
+    if (idx === 0 && !isVarietySlot && item.score >= 75) {
+      return base * 2;
+    }
     if (isVarietySlot && item.defPiece.group !== 'small') {
       return Math.round(base * 1.5);
     }
@@ -586,7 +589,7 @@ function pickSmartPieceForSlot(
   };
 }
 
-/** Spawns 3 deterministic stage-colored pieces using sequential gap-fitting simulation. */
+/** Spawns 3 deterministic stage-colored polyomino pieces using sequential gap-fitting simulation. */
 export function spawnSmartTray(
   grid: Grid,
   prngState: number,
@@ -595,23 +598,12 @@ export function spawnSmartTray(
 ): { tray: TrayPiece[]; nextPrng: number; nextTrayCounter: number } {
   let rng = prngState;
   let simGrid = cloneGrid(grid);
-  const fillRatio = getBoardFillRatio(grid);
-  const bombChance = fillRatio > 0.65 ? 0.12 : 0.08;
   const tray: TrayPiece[] = [];
   const usedIds = new Set<string>();
-  let hasBomb = false;
 
   for (let i = 0; i < 3; i++) {
     const colorPick = pickStageColor(allClears, rng);
     rng = colorPick.nextState;
-
-    const bombRoll = nextRandom(rng);
-    rng = bombRoll.nextState;
-    if (!hasBomb && bombRoll.value < bombChance) {
-      hasBomb = true;
-      tray.push(createCandyBombPiece(`t${trayCounter}_${i}_bomb`, colorPick.color));
-      continue;
-    }
 
     const picked = pickSmartPieceForSlot(simGrid, rng, i, usedIds);
     rng = picked.nextPrng;

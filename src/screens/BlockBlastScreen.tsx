@@ -12,7 +12,6 @@ import {
 import {
   AlertTriangle,
   ArrowLeft,
-  Bomb,
   Cookie,
   Eye,
   EyeOff,
@@ -32,8 +31,6 @@ import { playSfx, setAudioPreferences } from '../audio/soundEngine';
 import {
   canPlacePiece,
   createInitialState,
-  declineRescue,
-  detonateCandyBombAt,
   getBoardFillRatio,
   getPlacementPreview,
   placePiece,
@@ -47,7 +44,6 @@ import {
 } from '../blockblast/engine/stages';
 import {
   BOARD_SIZE,
-  CANDY_BOMB_COST,
   type BlastGameState,
   type BlockColor,
   type MoveOutcome,
@@ -59,7 +55,6 @@ import type { BbEmoteEvent } from '../blockblast/online/protocol';
 import {
   GameOverDialog,
   HelpDialog,
-  RescueDialog,
   RestartConfirmDialog,
 } from '../blockblast/ui/BlockBlastModals';
 import {
@@ -239,7 +234,7 @@ function createMatchSession(
     matchId: generateMatchId(),
     seed: generateSeed32(),
     initialCookies: cookiesAtStart,
-    rescueEligible: cookiesAtStart >= CANDY_BOMB_COST,
+    rescueEligible: false,
   };
 }
 
@@ -274,34 +269,6 @@ function clientToBoardAnchor(
   const col = Math.round((topLeftX - rect.left) / cellSize);
 
   return { row, col };
-}
-
-function clientToBoardCell(
-  boardEl: HTMLDivElement | null,
-  clientX: number,
-  clientY: number,
-): { r: number; c: number } | null {
-  if (!boardEl) return null;
-  const rect = boardEl.getBoundingClientRect();
-  if (rect.width <= 0 || rect.height <= 0) return null;
-  if (
-    clientX < rect.left ||
-    clientX > rect.right ||
-    clientY < rect.top ||
-    clientY > rect.bottom
-  ) {
-    return null;
-  }
-
-  const c = Math.min(
-    BOARD_SIZE - 1,
-    Math.max(0, Math.floor(((clientX - rect.left) / rect.width) * BOARD_SIZE)),
-  );
-  const r = Math.min(
-    BOARD_SIZE - 1,
-    Math.max(0, Math.floor(((clientY - rect.top) / rect.height) * BOARD_SIZE)),
-  );
-  return { r, c };
 }
 
 function getBurstCenterPct(
@@ -556,7 +523,6 @@ export default function BlockBlastScreen({
     integrityWarning,
     dismissIntegrityWarning,
     updateSettings,
-    spendBlockBlastBomb,
     recordBlockBlastResult,
   } = useProfileStore();
 
@@ -600,7 +566,6 @@ export default function BlockBlastScreen({
   const dragSessionRef = useRef<ActiveDragSession | null>(null);
   const windowDragCleanupRef = useRef<(() => void) | null>(null);
   const hoverAnchorRef = useRef<BoardCoord | null>(null);
-  const bombHoverRef = useRef<{ r: number; c: number } | null>(null);
   const burstCounterRef = useRef<number>(0);
   const scorePulseSeqRef = useRef<number>(0);
   const burstTimersRef = useRef<Set<number>>(new Set());
@@ -610,8 +575,6 @@ export default function BlockBlastScreen({
   const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
   const [dragView, setDragView] = useState<DragVisualState | null>(null);
   const [hoverAnchor, setHoverAnchor] = useState<BoardCoord | null>(null);
-  const [bombAiming, setBombAiming] = useState<boolean>(false);
-  const [bombHoverCell, setBombHoverCell] = useState<{ r: number; c: number } | null>(null);
   const [bursts, setBursts] = useState<BurstEffect[]>([]);
   const [scorePulse, setScorePulse] = useState<ScorePulseEvent | null>(null);
   const [boardShake, setBoardShake] = useState<'none' | 'sm' | 'lg'>('none');
@@ -623,11 +586,6 @@ export default function BlockBlastScreen({
   const [gameOverDismissed, setGameOverDismissed] = useState<boolean>(false);
   const [showHelp, setShowHelp] = useState<boolean>(false);
   const [showRestartConfirm, setShowRestartConfirm] = useState<boolean>(false);
-
-  const bombAimingRef = useRef<boolean>(bombAiming);
-  useEffect(() => {
-    bombAimingRef.current = bombAiming;
-  }, [bombAiming]);
 
   const equippedList = useMemo(
     () => equippedAccessory[selectedAnimal] ?? [],
@@ -671,17 +629,6 @@ export default function BlockBlastScreen({
     hoverAnchorRef.current = next;
     setHoverAnchor(next);
   }, []);
-
-  const updateBombHoverIfChanged = useCallback(
-    (next: { r: number; c: number } | null) => {
-      const prev = bombHoverRef.current;
-      if (prev === null && next === null) return;
-      if (prev && next && prev.r === next.r && prev.c === next.c) return;
-      bombHoverRef.current = next;
-      setBombHoverCell(next);
-    },
-    [],
-  );
 
   const cancelActiveDrag = useCallback(() => {
     dragSessionRef.current = null;
@@ -1078,129 +1025,12 @@ export default function BlockBlastScreen({
     commitPlaceRef.current = commitPlace;
   }, [commitPlace]);
 
-  const handleBombDetonate = useCallback(
-    (r: number, c: number) => {
-      if (roomModeRef.current) {
-        setBombAiming(false);
-        updateBombHoverIfChanged(null);
-        return;
-      }
-      const current = matchRef.current;
-      if (!bombAimingRef.current) return;
-      if (current.state.phase === 'gameOver' || current.state.candyBombUsed) {
-        setBombAiming(false);
-        updateBombHoverIfChanged(null);
-        return;
-      }
-
-      const outcome = detonateCandyBombAt(current.state, r, c);
-      if (!outcome) return;
-
-      const paid = spendBlockBlastBomb(current.session.matchId);
-      if (!paid) {
-        setBombAiming(false);
-        updateBombHoverIfChanged(null);
-        setLiveAnnouncement(
-          'Không đủ Cookies hoặc không thể kích hoạt Bom Kẹo 3×3 lúc này.',
-        );
-        return;
-      }
-
-      bombPaidCountRef.current = 1;
-      actionsRef.current.push({
-        seq: actionsRef.current.length,
-        type: 'bomb',
-        row: r,
-        col: c,
-      });
-
-      setBombAiming(false);
-      updateBombHoverIfChanged(null);
-
-      commitMoveOutcome(outcome, current.session, {
-        source: 'bomb',
-        anchorRow: r,
-        anchorCol: c,
-        pieceColor: 'rose',
-      });
-    },
-    [commitMoveOutcome, spendBlockBlastBomb, updateBombHoverIfChanged],
-  );
-
-  const handleStartBombAim = useCallback(() => {
-    if (roomModeRef.current) return;
-    const current = matchRef.current;
-    if (
-      current.state.phase === 'gameOver' ||
-      current.state.candyBombUsed ||
-      cookies < CANDY_BOMB_COST ||
-      bombPaidCountRef.current > 0
-    ) {
-      return;
-    }
-
-    cancelActiveDrag();
-    setSelectedSlot(null);
-    updateBombHoverIfChanged(null);
-    setBombAiming(true);
-    playSfx('click');
-    setQuip('Ngắm chuẩn vùng 3×3 trên bàn cờ rồi nhấn để kích nổ!');
-    setLiveAnnouncement(
-      'Đã bật chế độ ngắm Bom Kẹo 3×3. Chọn 1 ô trên bàn cờ để kích nổ hoặc nhấn Escape để hủy.',
-    );
-  }, [
-    cancelActiveDrag,
-    cookies,
-    updateBombHoverIfChanged,
-  ]);
-
-  const handleCancelBombAim = useCallback(() => {
-    if (!bombAimingRef.current) return;
-    setBombAiming(false);
-    updateBombHoverIfChanged(null);
-    playSfx('click');
-    if (matchRef.current.state.phase === 'rescuePrompt') {
-      setQuip('Bạn vẫn có thể dùng Bom Kẹo 3×3 giải cứu hoặc kết thúc ván.');
-    } else {
-      setQuip(IDLE_QUIPS[matchRef.current.state.movesCount % IDLE_QUIPS.length]);
-    }
-    setLiveAnnouncement('Đã hủy ngắm Bom Kẹo 3×3, chưa trừ Cookies.');
-  }, [updateBombHoverIfChanged]);
-
-  const handleDeclineRescue = useCallback(() => {
-    const current = matchRef.current;
-    if (current.state.phase !== 'rescuePrompt') return;
-
-    actionsRef.current.push({
-      seq: actionsRef.current.length,
-      type: 'declineRescue',
-    });
-
-    const nextState = declineRescue(current.state);
-    const nextBundle: MatchBundle = {
-      session: current.session,
-      state: nextState,
-    };
-    matchRef.current = nextBundle;
-    setMatch(nextBundle);
-
-    setBombAiming(false);
-    updateBombHoverIfChanged(null);
-    setEmotion('sad');
-    setQuip('Hết nước đi rồi! Nghỉ tay nhận Cookies và thử lại ván mới nhé!');
-    setLiveAnnouncement(
-      `Đã kết thúc ván. Tổng điểm ${nextState.score.toLocaleString('vi-VN')}.`,
-    );
-    settleMatch(nextState, current.session);
-  }, [settleMatch, updateBombHoverIfChanged]);
-
   const handleReroll = useCallback(() => {
     if (roomModeRef.current?.isCountingDown) return;
     const current = matchRef.current;
     if (
       current.state.phase !== 'playing' ||
-      current.state.rerollUsed ||
-      bombAimingRef.current
+      current.state.rerollUsed
     ) {
       return;
     }
@@ -1273,8 +1103,6 @@ export default function BlockBlastScreen({
     matchRef.current = nextBundle;
     setMatch(nextBundle);
     setSelectedSlot(null);
-    setBombAiming(false);
-    updateBombHoverIfChanged(null);
     setBursts([]);
     setScorePulse(null);
     setBoardShake('none');
@@ -1289,7 +1117,6 @@ export default function BlockBlastScreen({
   }, [
     cancelActiveDrag,
     cookies,
-    updateBombHoverIfChanged,
   ]);
 
   const handleRestartRequest = useCallback(() => {
@@ -1306,7 +1133,6 @@ export default function BlockBlastScreen({
     (slotIndex: number, e: ReactPointerEvent<HTMLButtonElement>) => {
       if (
         matchRef.current.state.phase !== 'playing' ||
-        bombAimingRef.current ||
         roomModeRef.current?.isCountingDown
       ) {
         return;
@@ -1440,7 +1266,6 @@ export default function BlockBlastScreen({
   const handleSlotKeySelect = useCallback((slotIndex: number) => {
     if (
       matchRef.current.state.phase !== 'playing' ||
-      bombAimingRef.current ||
       roomModeRef.current?.isCountingDown
     ) {
       return;
@@ -1463,13 +1288,6 @@ export default function BlockBlastScreen({
     (clientX: number, clientY: number) => {
       if (dragSessionRef.current?.isDragging) return;
 
-      if (bombAimingRef.current) {
-        updateBombHoverIfChanged(
-          clientToBoardCell(boardRef.current, clientX, clientY),
-        );
-        return;
-      }
-
       if (selectedSlot !== null) {
         const piece = matchRef.current.state.tray[selectedSlot];
         if (!piece) return;
@@ -1484,25 +1302,17 @@ export default function BlockBlastScreen({
         );
       }
     },
-    [selectedSlot, updateBombHoverIfChanged, updateHoverAnchorIfChanged],
+    [selectedSlot, updateHoverAnchorIfChanged],
   );
 
   const handleBoardPointerLeave = useCallback(() => {
     if (dragSessionRef.current?.isDragging) return;
-    if (bombAimingRef.current) {
-      updateBombHoverIfChanged(null);
-      return;
-    }
     updateHoverAnchorIfChanged(null);
-  }, [updateBombHoverIfChanged, updateHoverAnchorIfChanged]);
+  }, [updateHoverAnchorIfChanged]);
 
   const handleBoardCellClick = useCallback(
     (r: number, c: number) => {
       if (roomModeRef.current?.isCountingDown) return;
-      if (bombAimingRef.current) {
-        handleBombDetonate(r, c);
-        return;
-      }
 
       if (selectedSlot === null) return;
       const current = matchRef.current;
@@ -1533,27 +1343,20 @@ export default function BlockBlastScreen({
 
       setLiveAnnouncement('Vị trí này không đặt vừa mảnh đang chọn.');
     },
-    [commitPlace, handleBombDetonate, selectedSlot],
+    [commitPlace, selectedSlot],
   );
 
-  const rescueModalOpen =
-    !roomMode && state.phase === 'rescuePrompt' && !bombAiming;
   const gameOverModalOpen =
     !roomMode && state.phase === 'gameOver' && !gameOverDismissed;
   const anyDialogOpen =
-    showHelp || showRestartConfirm || rescueModalOpen || gameOverModalOpen;
+    showHelp || showRestartConfirm || gameOverModalOpen;
 
-  // Global Esc handler for cancelling Bomb aiming, active drag, or tray selection
+  // Global Esc handler for cancelling active drag or tray selection
   useEffect(() => {
     if (anyDialogOpen) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
-      if (bombAimingRef.current) {
-        e.preventDefault();
-        handleCancelBombAim();
-        return;
-      }
       if (dragSessionRef.current) {
         e.preventDefault();
         cancelActiveDrag();
@@ -1575,7 +1378,6 @@ export default function BlockBlastScreen({
   }, [
     anyDialogOpen,
     cancelActiveDrag,
-    handleCancelBombAim,
     selectedSlot,
     updateHoverAnchorIfChanged,
   ]);
@@ -1594,7 +1396,6 @@ export default function BlockBlastScreen({
   }, [state.grid, state.tray]);
 
   const preview: PlacementPreview | null = useMemo(() => {
-    if (bombAiming) return null;
     if (dragView && hoverAnchor) {
       return getPlacementPreview(
         state.grid,
@@ -1614,7 +1415,7 @@ export default function BlockBlastScreen({
       );
     }
     return null;
-  }, [bombAiming, dragView, hoverAnchor, selectedSlot, state.grid, state.tray]);
+  }, [dragView, hoverAnchor, selectedSlot, state.grid, state.tray]);
 
   const toggleSfx = useCallback(() => {
     const next = !settings.sfxEnabled;
@@ -1640,14 +1441,8 @@ export default function BlockBlastScreen({
   const canReroll =
     state.phase === 'playing' &&
     !state.rerollUsed &&
-    !bombAiming &&
     !isTrayEmpty &&
     !roomMode?.isCountingDown;
-  const canStartBomb =
-    !roomMode &&
-    state.phase !== 'gameOver' &&
-    !state.candyBombUsed &&
-    cookies >= CANDY_BOMB_COST;
 
   return (
     <div className="min-h-dvh overflow-x-clip bg-[#1a100b] bg-[radial-gradient(circle_at_18%_0%,_#3a2114_0%,_transparent_46%),radial-gradient(circle_at_82%_0%,_#2c1810_0%,_transparent_46%),linear-gradient(180deg,_#1c110c_0%,_#120b08_100%)] text-[#FFF9F0] selection:bg-amber-300 selection:text-[#2C1B11]">
@@ -1912,7 +1707,7 @@ export default function BlockBlastScreen({
             </section>
 
             {/* Skill Buttons */}
-            <div className="grid grid-cols-2 gap-2 lg:grid-cols-1 lg:gap-2.5">
+            <div className={`grid gap-2 lg:grid-cols-1 lg:gap-2.5 ${roomMode ? 'grid-cols-2' : 'grid-cols-1'}`}>
               <button
                 type="button"
                 disabled={!canReroll}
@@ -1932,48 +1727,15 @@ export default function BlockBlastScreen({
                 </span>
               </button>
 
-              {roomMode ? (
+              {roomMode && (
                 <div
                   aria-label="Luật phòng đấu công bằng Pure Skill"
                   className="inline-flex min-h-[42px] items-center justify-center gap-1.5 rounded-2xl border border-emerald-400/35 bg-emerald-950/55 px-2.5 py-2 text-xs font-bold text-emerald-200 sm:min-h-[46px] sm:px-3"
                 >
                   <ShieldCheck aria-hidden="true" className="h-4 w-4 shrink-0 text-emerald-300" />
                   <span className="sm:hidden">Pure Skill</span>
-                  <span className="hidden sm:inline">Chung Seed · Không Bom Cookies</span>
+                  <span className="hidden sm:inline">Chung Seed · Thuần Xếp Khối</span>
                 </div>
-              ) : bombAiming ? (
-                <button
-                  type="button"
-                  onClick={handleCancelBombAim}
-                  className={`inline-flex min-h-[42px] cursor-pointer items-center justify-center gap-1.5 rounded-2xl border-2 border-rose-300 bg-rose-600/90 px-2.5 py-2 text-xs font-black text-white shadow-[0_4px_0_#9F1239,0_0_16px_rgba(244,63,94,0.45)] transition hover:bg-rose-500 sm:min-h-[46px] sm:gap-2 sm:px-3 sm:text-sm ${FOCUS_RING_CLASS}`}
-                >
-                  <X aria-hidden="true" className="h-4 w-4 shrink-0" />
-                  <span className="sm:hidden">Hủy Bom</span>
-                  <span className="hidden sm:inline">Hủy Bom Kẹo (Esc)</span>
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  disabled={!canStartBomb}
-                  onClick={handleStartBombAim}
-                  className={`inline-flex min-h-[42px] items-center justify-center gap-1.5 rounded-2xl border px-2.5 py-2 text-xs font-black transition-all sm:min-h-[46px] sm:gap-2 sm:px-3 sm:text-sm ${FOCUS_RING_CLASS} ${
-                    canStartBomb
-                      ? 'cursor-pointer border-rose-300/65 bg-gradient-to-b from-rose-500 to-rose-600 text-white shadow-[0_4px_0_#9F1239,0_6px_12px_rgba(0,0,0,0.3)] hover:brightness-105 active:translate-y-[2px]'
-                      : 'cursor-not-allowed border-amber-900/45 bg-[#1b100a] text-amber-200/45'
-                  }`}
-                >
-                  <Bomb aria-hidden="true" className="h-4 w-4 shrink-0" />
-                  <span className="sm:hidden">
-                    {state.candyBombUsed
-                      ? 'Bom 3×3 (Đã dùng)'
-                      : `Bom 3×3 (-${CANDY_BOMB_COST})`}
-                  </span>
-                  <span className="hidden sm:inline">
-                    {state.candyBombUsed
-                      ? 'Bom Kẹo 3×3 · Đã dùng'
-                      : `Bom Kẹo 3×3 · ${CANDY_BOMB_COST} Cookies`}
-                  </span>
-                </button>
               )}
             </div>
           </div>
@@ -2012,28 +1774,7 @@ export default function BlockBlastScreen({
             )}
 
             {/* Contextual interaction banner */}
-            {bombAiming && (
-              <div
-                role="status"
-                className="flex w-full max-w-[492px] items-center justify-between gap-2 rounded-2xl border border-rose-400/60 bg-rose-950/75 px-3.5 py-2 text-xs font-bold text-rose-100 shadow-lg"
-              >
-                <span className="flex items-center gap-2">
-                  <Bomb aria-hidden="true" className="h-4 w-4 shrink-0 text-rose-300" />
-                  <span>
-                    Nhấn vào 1 ô trên bàn cờ để nổ vùng 3×3 (-{CANDY_BOMB_COST} Cookies)
-                  </span>
-                </span>
-                <button
-                  type="button"
-                  onClick={handleCancelBombAim}
-                  className={`shrink-0 cursor-pointer rounded-xl border border-rose-300/50 bg-rose-900/70 px-2.5 py-1 text-xs font-black text-white hover:bg-rose-800 ${FOCUS_RING_CLASS}`}
-                >
-                  Hủy
-                </button>
-              </div>
-            )}
-
-            {!bombAiming && state.phase === 'gameOver' && gameOverDismissed && (
+            {state.phase === 'gameOver' && gameOverDismissed && (
               <div
                 role="status"
                 className="flex w-full max-w-[492px] flex-wrap items-center justify-between gap-2 rounded-2xl border border-amber-400/55 bg-[#2a170e]/95 px-3.5 py-2 text-xs font-bold text-amber-100 shadow-lg"
@@ -2063,8 +1804,7 @@ export default function BlockBlastScreen({
               </div>
             )}
 
-            {!bombAiming &&
-              state.phase === 'playing' &&
+            {state.phase === 'playing' &&
               selectedSlot !== null && (
                 <div
                   role="status"
@@ -2093,8 +1833,8 @@ export default function BlockBlastScreen({
                 boardRef={boardRef}
                 grid={state.grid}
                 preview={preview}
-                bombHoverCell={bombHoverCell}
-                bombAiming={bombAiming}
+                bombHoverCell={null}
+                bombAiming={false}
                 colorblindMode={settings.colorblindMode}
                 reducedMotion={settings.reducedMotion}
                 bursts={bursts}
@@ -2130,7 +1870,6 @@ export default function BlockBlastScreen({
               fitStatus={fitStatus}
               disabled={
                 state.phase !== 'playing' ||
-                bombAiming ||
                 Boolean(roomMode?.isCountingDown)
               }
               colorblindMode={settings.colorblindMode}
@@ -2153,14 +1892,6 @@ export default function BlockBlastScreen({
       )}
 
       {/* Native Top-Layer Modals */}
-      <RescueDialog
-        open={rescueModalOpen}
-        cookies={cookies}
-        bombCost={CANDY_BOMB_COST}
-        onUseBomb={handleStartBombAim}
-        onDecline={handleDeclineRescue}
-      />
-
       <GameOverDialog
         open={gameOverModalOpen}
         score={state.score}

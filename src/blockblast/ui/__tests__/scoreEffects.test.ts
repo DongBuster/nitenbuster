@@ -1,11 +1,14 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  buildScoreSparks,
   computeRollDurationMs,
+  getStageScoreVisual,
   interpolateScoreCounter,
   isBeatingBestScore,
   resolveScorePulseTier,
 } from '../scoreEffects.ts';
+import { STAGE_THEMES } from '../../engine/stages.ts';
 
 describe('Block Blast score effects helpers', () => {
   it('1. classifies pulse tiers across allClear, bomb, combo, multi, and normal moves', () => {
@@ -114,5 +117,23 @@ describe('Block Blast score effects helpers', () => {
     assert.equal(isBeatingBestScore(120, 0), false);
     assert.equal(isBeatingBestScore(500, 500), false);
     assert.equal(isBeatingBestScore(510, 500), true);
+  });
+
+  it('5. provides distinct stage score visuals for all 5 stages and scales sparks by tier', () => {
+    const gradients = new Set<string>();
+    for (const theme of STAGE_THEMES) {
+      const visual = getStageScoreVisual(theme.id);
+      assert.ok(visual.cardClass.length > 0);
+      assert.ok(visual.digitGradient.includes('linear-gradient'));
+      assert.ok(visual.sparkColors.length >= 3);
+      gradients.add(visual.digitGradient);
+    }
+    assert.equal(gradients.size, STAGE_THEMES.length);
+
+    assert.equal(buildScoreSparks('normal', 20, 'timber').length, 0);
+    assert.equal(buildScoreSparks('normal', 50, 'timber').length, 4);
+    assert.equal(buildScoreSparks('multi', 200, 'aurora').length, 6);
+    assert.equal(buildScoreSparks('combo', 350, 'sakura').length, 8);
+    assert.equal(buildScoreSparks('allClear', 1200, 'celestial').length, 12);
   });
 });

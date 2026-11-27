@@ -17,7 +17,6 @@ import {
   Trophy,
   X,
 } from 'lucide-react';
-import { CANDY_BOMB_COST } from '../engine/types.ts';
 
 const PROGRAMMATIC_CLOSE = '__programmatic__';
 
@@ -485,16 +484,7 @@ export function HelpDialog({ open, onClose }: HelpDialogProps) {
             <RotateCcw aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
             <span>
               <strong>1 lần Đổi Khay miễn phí:</strong> Dùng nút Đổi Khay (Reroll) một
-              lần mỗi ván để làm mới bộ mảnh đang có.
-            </span>
-          </li>
-
-          <li className="flex items-start gap-2.5 rounded-2xl border border-amber-900/40 bg-[#1a0f0a] p-3">
-            <Bomb aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-rose-300" />
-            <span>
-              <strong>1 lần Bom Kẹo 3×3 ({CANDY_BOMB_COST} Cookies):</strong> Khi bí nước
-              hoặc cần dọn chỗ, kích hoạt 1 lần Bom Kẹo 3×3 giá{' '}
-              <strong>{CANDY_BOMB_COST} Cookies</strong> để nổ sạch vùng 3×3.
+              lần mỗi ván để làm mới bộ 3 mảnh vừa khít khoảng trống trên bàn.
             </span>
           </li>
 

@@ -554,13 +554,12 @@ describe('blockblast board-aware smart spawner & stage progression', () => {
     assert.equal(tray.length, 3);
     assert.equal(hasAnyValidMove(grid, tray), true);
 
-    // At least one piece clears row 0 or fits the remaining pocket on the dense board
-    const canClearRow0 = tray.some((piece) => {
-      if (piece.kind === 'candyBomb') return true;
-      return getPlacementPreview(grid, piece, 0, 5).valid &&
-        getPlacementPreview(grid, piece, 0, 5).clearedRows.includes(0);
+    // At least one piece clears lines at (0,5) (row 0 or cols 5..7) to open space on the dense board
+    const clearsDenseBoard = tray.some((piece) => {
+      const prev = getPlacementPreview(grid, piece, 0, 5);
+      return prev.valid && (prev.clearedRows.length > 0 || prev.clearedCols.length > 0);
     });
-    assert.equal(canClearRow0, true);
+    assert.equal(clearsDenseBoard, true);
 
     // Build an L-shaped pocket board (fillRatio >= 0.12) where an L-piece fits snug against blocks
     const pocketGrid = createEmptyGrid();
@@ -695,5 +694,29 @@ describe('blockblast board-aware smart spawner & stage progression', () => {
       finisherHits >= 5,
       `expected bar_h2 All Clear finisher in >=5/10 seeds for 6-cell board, got ${finisherHits}/10`,
     );
+  });
+
+  it('never spawns candyBomb pieces in spawnSmartTray across empty, half-full, and dense boards', () => {
+    const empty = createEmptyGrid();
+    const dense = createEmptyGrid();
+    for (let r = 0; r < 6; r++) {
+      for (let c = 0; c < 7; c++) {
+        dense[r][c] = { color: 'amber' };
+      }
+    }
+
+    for (const board of [empty, dense]) {
+      for (let seed = 1; seed <= 60; seed++) {
+        const { tray } = spawnSmartTray(board, seed, 1, seed % 5);
+        assert.equal(tray.length, 3);
+        for (const piece of tray) {
+          assert.equal(
+            piece.kind,
+            'normal',
+            `expected normal polyomino piece for seed ${seed}, got ${piece.kind}`,
+          );
+        }
+      }
+    }
   });
 });
