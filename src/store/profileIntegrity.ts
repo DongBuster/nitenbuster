@@ -19,6 +19,18 @@ const H0 = new Uint32Array([
 
 const APP_PEPPER = 'PAWS-ARCADE-CABIN-INTEGRITY-2026-V2';
 const UNSAFE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+const LEGACY_V1_DISALLOWED_KEYS = [
+  'blockBlastBestScore',
+  'settledMatchIds',
+  'survivalBestScore',
+  'survivalBestTimeSec',
+  'survivalWins',
+  'coopRecords',
+  'glassBestTimeSec',
+  'glassBestStars',
+  'sig',
+  'v',
+] as const;
 
 export type UnwrapStatus = 'empty' | 'legacy_v1' | 'valid_v2' | 'tampered';
 
@@ -212,8 +224,8 @@ export function unwrapSignedProfile(raw: string | null | undefined): {
       return { status: 'valid_v2', data: obj.data as Record<string, unknown> };
     }
 
-    // Legacy v1 cannot legitimately carry v2+ Block Blast or envelope fields; reject downgrade spoofing
-    if ('blockBlastBestScore' in obj || 'settledMatchIds' in obj || 'sig' in obj || 'v' in obj) {
+    // Legacy v1 cannot legitimately carry v2+ mode records, settled IDs, or envelope fields; reject downgrade spoofing
+    if (LEGACY_V1_DISALLOWED_KEYS.some((key) => key in obj)) {
       return { status: 'tampered' };
     }
     return { status: 'legacy_v1', data: obj };

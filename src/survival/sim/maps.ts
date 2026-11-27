@@ -1,0 +1,271 @@
+import type {
+  MapObstacle,
+  MapZone,
+  SurvivalMapId,
+  SurvivalMapMeta,
+} from './types.ts';
+
+export const WORLD_SIZE = 3600;
+
+export const SURVIVAL_MAPS: readonly SurvivalMapMeta[] = [
+  {
+    id: 'winter_cabin',
+    order: 1,
+    name: 'Rừng Tuyết Cabin',
+    subtitle: 'Chiến dịch 6 phút · Cân bằng',
+    description:
+      'Khu rừng thông phủ tuyết quanh căn cabin ấm áp với những mảng băng trượt tăng tốc.',
+    mechanicSummary: 'Sàn băng trượt tăng +18% tốc độ di chuyển',
+    isEndless: false,
+    targetDurationSec: 360,
+    theme: {
+      bg: '#0f1d2e',
+      grid: '#1a2f47',
+      accent: '#38bdf8',
+      obstaclePrimary: '#1e3a5f',
+      obstacleSecondary: '#93c5fd',
+      zoneColor: '#7dd3fc',
+    },
+  },
+  {
+    id: 'candy_canyon',
+    order: 2,
+    name: 'Hoang Mạc Kẹo Đá',
+    subtitle: 'Chiến dịch 6 phút · Thoáng rộng',
+    description:
+      'Hẻm núi kẹo đường rộng mở, nơi bão cát ngọt định kỳ thổi qua kèm hòm tiếp tế.',
+    mechanicSummary: 'Bão cát 75s/lần đẩy gió nhẹ & tăng hòm tiếp tế',
+    isEndless: false,
+    targetDurationSec: 360,
+    theme: {
+      bg: '#26171d',
+      grid: '#3a232b',
+      accent: '#fb923c',
+      obstaclePrimary: '#7c3f2c',
+      obstacleSecondary: '#fdba74',
+      zoneColor: '#f59e0b',
+    },
+  },
+  {
+    id: 'crystal_cavern',
+    order: 3,
+    name: 'Hầm Mỏ Pha Lê',
+    subtitle: 'Chiến dịch 6 phút · Chiến thuật',
+    description:
+      'Hang động pha lê phát sáng chứa các trụ năng lượng kích hoạt hào quang cường hóa.',
+    mechanicSummary: 'Trụ Pha Lê kích hoạt +20% tốc bắn trong 10s (hồi 30s)',
+    isEndless: false,
+    targetDurationSec: 360,
+    theme: {
+      bg: '#16132b',
+      grid: '#262147',
+      accent: '#c084fc',
+      obstaclePrimary: '#4c1d95',
+      obstacleSecondary: '#d8b4fe',
+      zoneColor: '#a855f7',
+    },
+  },
+  {
+    id: 'endless_abyss',
+    order: 4,
+    name: 'Đấu Trường Vô Cực',
+    subtitle: 'Vô tận · So kè điểm cao',
+    description:
+      'Đấu trường không giới hạn thời gian với Boss xoay vòng mỗi 90 giây và bậc sức mạnh tăng dần.',
+    mechanicSummary: 'Boss xoay vòng 90s/lần · Bệ ấn tăng điểm & tốc chạy',
+    isEndless: true,
+    targetDurationSec: 0,
+    theme: {
+      bg: '#0b101b',
+      grid: '#182238',
+      accent: '#f43f5e',
+      obstaclePrimary: '#334155',
+      obstacleSecondary: '#94a3b8',
+      zoneColor: '#fbbf24',
+    },
+  },
+] as const;
+
+const MAP_BY_ID: Record<SurvivalMapId, SurvivalMapMeta> = Object.fromEntries(
+  SURVIVAL_MAPS.map((m) => [m.id, m]),
+) as Record<SurvivalMapId, SurvivalMapMeta>;
+
+const MAP_SEED_OFFSETS: Record<SurvivalMapId, number> = {
+  winter_cabin: 101,
+  candy_canyon: 202,
+  crystal_cavern: 303,
+  endless_abyss: 404,
+};
+
+export function isSurvivalMapId(val: unknown): val is SurvivalMapId {
+  return (
+    val === 'winter_cabin' ||
+    val === 'candy_canyon' ||
+    val === 'crystal_cavern' ||
+    val === 'endless_abyss'
+  );
+}
+
+export function getSurvivalMapMeta(id: SurvivalMapId): SurvivalMapMeta {
+  return MAP_BY_ID[id];
+}
+
+function mulberry32(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+interface ObstacleTemplate {
+  kinds: readonly MapObstacle['kind'][];
+  targetCount: number;
+  minRadius: number;
+  maxRadius: number;
+  zoneKind: MapZone['kind'];
+  zoneCount: number;
+  zoneRadius: number;
+  zoneCooldownSec: number;
+}
+
+const MAP_LAYOUT_TEMPLATES: Record<SurvivalMapId, ObstacleTemplate> = {
+  winter_cabin: {
+    kinds: ['tree', 'rock', 'cabin'],
+    targetCount: 34,
+    minRadius: 34,
+    maxRadius: 56,
+    zoneKind: 'ice',
+    zoneCount: 6,
+    zoneRadius: 150,
+    zoneCooldownSec: 0,
+  },
+  candy_canyon: {
+    kinds: ['cactus', 'rock'],
+    targetCount: 28,
+    minRadius: 30,
+    maxRadius: 48,
+    zoneKind: 'sandstorm_beacon',
+    zoneCount: 4,
+    zoneRadius: 135,
+    zoneCooldownSec: 0,
+  },
+  crystal_cavern: {
+    kinds: ['crystal', 'rock', 'pillar'],
+    targetCount: 36,
+    minRadius: 32,
+    maxRadius: 54,
+    zoneKind: 'crystal_pylon',
+    zoneCount: 4,
+    zoneRadius: 130,
+    zoneCooldownSec: 30,
+  },
+  endless_abyss: {
+    kinds: ['pillar', 'crystal', 'rock'],
+    targetCount: 30,
+    minRadius: 34,
+    maxRadius: 52,
+    zoneKind: 'score_pad',
+    zoneCount: 4,
+    zoneRadius: 130,
+    zoneCooldownSec: 20,
+  },
+};
+
+export function generateMapLayout(
+  mapId: SurvivalMapId,
+  seed: number,
+): {
+  obstacles: MapObstacle[];
+  zones: MapZone[];
+  spawnPoints: Array<{ x: number; y: number }>;
+} {
+  const rng = mulberry32((seed ^ MAP_SEED_OFFSETS[mapId]) >>> 0);
+  const template = MAP_LAYOUT_TEMPLATES[mapId];
+  const center = WORLD_SIZE / 2;
+  const margin = 140;
+  const maxCoord = WORLD_SIZE - margin;
+
+  const obstacles: MapObstacle[] = [];
+  const maxAttempts = 600;
+  let attempts = 0;
+
+  while (obstacles.length < template.targetCount && attempts < maxAttempts) {
+    attempts++;
+    const x = Math.round(margin + rng() * (maxCoord - margin));
+    const y = Math.round(margin + rng() * (maxCoord - margin));
+    const kind =
+      template.kinds[Math.floor(rng() * template.kinds.length)];
+    const radius = Math.round(
+      template.minRadius + rng() * (template.maxRadius - template.minRadius),
+    );
+
+    const distFromCenter = Math.hypot(x - center, y - center);
+    if (distFromCenter - radius < 280) {
+      continue;
+    }
+
+    const overlaps = obstacles.some(
+      (other) => Math.hypot(x - other.x, y - other.y) < radius + other.radius + 95,
+    );
+    if (overlaps) {
+      continue;
+    }
+
+    obstacles.push({
+      id: `obs_${obstacles.length + 1}`,
+      x,
+      y,
+      radius,
+      kind,
+    });
+  }
+
+  const zones: MapZone[] = [];
+  const zoneAngleOffset = rng() * Math.PI * 2;
+
+  for (let i = 0; i < template.zoneCount; i++) {
+    const baseAngle = zoneAngleOffset + (i * Math.PI * 2) / template.zoneCount;
+    const dist = 520 + (i % 2) * 320 + rng() * 140;
+    let zx = Math.round(center + Math.cos(baseAngle) * dist);
+    let zy = Math.round(center + Math.sin(baseAngle) * dist);
+
+    zx = Math.max(260, Math.min(WORLD_SIZE - 260, zx));
+    zy = Math.max(260, Math.min(WORLD_SIZE - 260, zy));
+
+    // Nudge zone away if overlapping an obstacle
+    for (const obs of obstacles) {
+      const dx = zx - obs.x;
+      const dy = zy - obs.y;
+      const d = Math.hypot(dx, dy);
+      const minGap = obs.radius + 36;
+      if (d < minGap) {
+        const nx = d > 0.001 ? dx / d : 1;
+        const ny = d > 0.001 ? dy / d : 0;
+        zx = Math.round(obs.x + nx * minGap);
+        zy = Math.round(obs.y + ny * minGap);
+      }
+    }
+
+    zones.push({
+      id: `zone_${i + 1}`,
+      x: zx,
+      y: zy,
+      radius: template.zoneRadius,
+      kind: template.zoneKind,
+      cooldownSec: 0,
+      activeTimerSec: template.zoneKind === 'ice' ? 9999 : 0,
+    });
+  }
+
+  const spawnPoints = [
+    { x: center - 72, y: center - 54 },
+    { x: center + 72, y: center - 54 },
+    { x: center - 72, y: center + 54 },
+    { x: center + 72, y: center + 54 },
+  ];
+
+  return { obstacles, zones, spawnPoints };
+}

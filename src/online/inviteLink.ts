@@ -1,12 +1,13 @@
 import { normalizeRoomCode } from './sanitize.ts';
 
-export type InviteRoomKind = 'event' | 'cards' | 'blockblast' | 'glass';
+export type InviteRoomKind = 'event' | 'cards' | 'blockblast' | 'glass' | 'survival';
 
 export const INVITE_PARAM_KEYS: Record<InviteRoomKind, string> = {
   event: 'eventRoom',
   cards: 'cardsRoom',
   blockblast: 'bbRoom',
   glass: 'glassRoom',
+  survival: 'survivalRoom',
 };
 
 /**

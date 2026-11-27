@@ -3,6 +3,7 @@ import {
   ArrowRight,
   Boxes,
   Cookie,
+  Flame,
   Gamepad2,
   LayoutGrid,
   Sparkles,
@@ -22,6 +23,7 @@ export interface ModeSelectScreenProps {
   onSelectBrawlArena: () => void;
   onSelectBlockBlast: () => void;
   onSelectGlassCarry: () => void;
+  onSelectSurvival: () => void;
   onSelectEventCup: () => void;
   onOpenStudio3D: () => void;
 }
@@ -32,7 +34,7 @@ interface ModeSpecItem {
 }
 
 interface GameModeEntry {
-  id: 'cards' | 'brawl' | 'blockblast' | 'glassCarry';
+  id: 'cards' | 'brawl' | 'blockblast' | 'glassCarry' | 'survival';
   title: string;
   genreBadge: string;
   badgeIcon: ReactNode;
@@ -53,13 +55,14 @@ interface GameModeEntry {
 /**
  * Arcade mode hub with bespoke 16:9 key-art banners and explicit genre specs
  * so players immediately distinguish turn-based card strategy, physics brawl,
- * 8x8 block puzzle, and 2-player online co-op glass carry modes.
+ * 8x8 block puzzle, 2-player online co-op glass carry, and 2D survival modes.
  */
 export function ModeSelectScreen({
   onSelectPawsCards,
   onSelectBrawlArena,
   onSelectBlockBlast,
   onSelectGlassCarry,
+  onSelectSurvival,
   onSelectEventCup,
   onOpenStudio3D,
 }: ModeSelectScreenProps) {
@@ -69,6 +72,7 @@ export function ModeSelectScreen({
     gamesPlayed,
     blockBlastBestScore,
     coopRecords,
+    survivalBestScore,
     selectedAnimal,
     equippedAccessory,
   } = useProfileStore();
@@ -182,6 +186,36 @@ export function ModeSelectScreen({
       ],
       onEnter: onSelectGlassCarry,
     },
+    {
+      id: 'survival',
+      title: 'PAWS Survival 2D',
+      genreBadge: 'Sinh Tồn Hành Động · Solo & Team',
+      badgeIcon: <Flame className="h-3.5 w-3.5 text-fuchsia-300" />,
+      description:
+        'Chọn vũ khí & trang bị, bắn đàn quái vật & Boss theo thời gian trên 4 bản đồ rộng (gồm Đấu Trường Vô Cực so kè điểm), nhặt XP lên cấp chọn 14 kỹ năng!',
+      bannerJpg: '/banners/survival-banner.jpg',
+      bannerAlt:
+        'Đội thú bông PAWS cầm súng kẹo, cung băng và gậy sét chiến đấu giữa vòng hào quang trước đàn slime tuyết, dơi băng và Rồng Tuyết Boss cùng ngọc XP',
+      ctaLabel: 'Vào Đấu Trường Survival',
+      cardClass:
+        'border-fuchsia-500/40 bg-[#1c1026] hover:border-fuchsia-400 hover:shadow-[0_22px_46px_rgba(217,70,239,0.24)] has-[button:focus-visible]:outline-fuchsia-300',
+      badgeClass: 'border-fuchsia-400/35 bg-fuchsia-400/15 text-fuchsia-200',
+      specClass: 'border-fuchsia-900/50 bg-black/25',
+      ctaClass: 'btn-tactile-amber',
+      ctaTextClass: 'text-[#26160b]',
+      specs: [
+        { label: 'Chế độ', value: 'Solo · Bot · 4p Online' },
+        { label: 'Kho đồ', value: '6 Vũ khí · 4 Map' },
+        {
+          label: 'Kỷ lục',
+          value:
+            survivalBestScore > 0
+              ? `${survivalBestScore.toLocaleString()} điểm`
+              : 'Chưa có',
+        },
+      ],
+      onEnter: onSelectSurvival,
+    },
   ];
 
   return (
@@ -201,8 +235,9 @@ export function ModeSelectScreen({
               <p className="mt-1 text-sm text-amber-100/80">
                 Chọn <span className="font-bold text-amber-300">Đấu Bài</span> cân não,{' '}
                 <span className="font-bold text-sky-300">Hỗn Chiến</span> vật lý,{' '}
-                <span className="font-bold text-emerald-300">Xếp Khối 8×8</span> hoặc{' '}
-                <span className="font-bold text-cyan-300">Duo Co-op 4 Map</span> cùng thú bông 3D.
+                <span className="font-bold text-emerald-300">Xếp Khối 8×8</span>,{' '}
+                <span className="font-bold text-cyan-300">Duo Co-op 4 Map</span> hoặc{' '}
+                <span className="font-bold text-fuchsia-300">Sinh Tồn 2D</span> cùng thú bông PAWS.
               </p>
             </div>
 
@@ -293,8 +328,8 @@ export function ModeSelectScreen({
           </div>
         </section>
 
-        {/* Four Distinct Game Mode Cards */}
-        <main className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
+        {/* Five Distinct Game Mode Cards */}
+        <main className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
           {gameModes.map((mode) => (
             <article
               key={mode.id}
@@ -372,7 +407,7 @@ export function ModeSelectScreen({
 
         {/* Footer note */}
         <footer className="mt-auto pt-2 text-center text-xs text-amber-200/55">
-          Dùng chung bộ 8 nhân vật 3D, 15 phụ kiện phối đồ và ví Cookies giữa cả bốn chế độ.
+          Dùng chung bộ 8 nhân vật, 15 phụ kiện phối đồ và ví Cookies giữa cả năm chế độ.
         </footer>
       </div>
     </div>

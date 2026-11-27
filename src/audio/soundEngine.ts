@@ -35,7 +35,11 @@ export type SfxType =
   | 'paddleSplash'
   | 'raftBoost'
   | 'ropePull'
-  | 'cartClack';
+  | 'cartClack'
+  | 'shoot'
+  | 'hit'
+  | 'levelUp'
+  | 'bossWarn';
 
 export interface AudioPreferences {
   sfxEnabled?: boolean;
@@ -123,6 +127,37 @@ function playTone(
   osc.stop(now + dur + 0.02);
 }
 
+const NOISE_CACHE_DURATION_SEC = 0.25;
+const noiseBufferCache = new WeakMap<AudioContext, AudioBuffer>();
+
+function createWhiteNoiseBuffer(
+  ctx: AudioContext,
+  durationSec: number,
+): AudioBuffer {
+  const sampleCount = Math.max(1, Math.floor(ctx.sampleRate * durationSec));
+  const buffer = ctx.createBuffer(1, sampleCount, ctx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < sampleCount; i++) {
+    data[i] = Math.random() * 2 - 1;
+  }
+  return buffer;
+}
+
+function getWhiteNoiseBuffer(
+  ctx: AudioContext,
+  durationSec: number,
+): AudioBuffer {
+  if (durationSec <= NOISE_CACHE_DURATION_SEC) {
+    let cached = noiseBufferCache.get(ctx);
+    if (!cached) {
+      cached = createWhiteNoiseBuffer(ctx, NOISE_CACHE_DURATION_SEC);
+      noiseBufferCache.set(ctx, cached);
+    }
+    return cached;
+  }
+  return createWhiteNoiseBuffer(ctx, durationSec);
+}
+
 function playNoiseBurst(
   ctx: AudioContext,
   opts: {
@@ -133,17 +168,15 @@ function playNoiseBurst(
     filterType?: BiquadFilterType;
   },
 ): void {
-  const dur = opts.duration ?? 0.12;
+  const rawDur = opts.duration ?? 0.12;
+  const dur = Math.max(
+    0.001,
+    Number.isFinite(rawDur) ? rawDur : 0.12,
+  );
   const now = ctx.currentTime + (opts.startOffset ?? 0);
-  const sampleCount = Math.max(1, Math.floor(ctx.sampleRate * dur));
-  const buffer = ctx.createBuffer(1, sampleCount, ctx.sampleRate);
-  const data = buffer.getChannelData(0);
-  for (let i = 0; i < sampleCount; i++) {
-    data[i] = Math.random() * 2 - 1;
-  }
 
   const src = ctx.createBufferSource();
-  src.buffer = buffer;
+  src.buffer = getWhiteNoiseBuffer(ctx, dur);
 
   const filter = ctx.createBiquadFilter();
   filter.type = opts.filterType ?? 'bandpass';
@@ -157,8 +190,7 @@ function playNoiseBurst(
   src.connect(filter);
   filter.connect(gainNode);
   gainNode.connect(ctx.destination);
-  src.start(now);
-  src.stop(now + dur + 0.02);
+  src.start(now, 0, dur);
 }
 
 export function playSfx(type: SfxType, opts?: { combo?: number }): void {
@@ -411,6 +443,39 @@ export function playSfx(type: SfxType, opts?: { combo?: number }): void {
           gain: 0.16,
         });
         playTone(ctx, { freq: 520, endFreq: 860, type: 'triangle', startOffset: 0.01, duration: 0.08, gain: 0.18 });
+        break;
+
+      case 'shoot':
+        playTone(ctx, { freq: 480, endFreq: 210, type: 'triangle', duration: 0.065, gain: 0.14 });
+        playNoiseBurst(ctx, {
+          duration: 0.03,
+          filterFreq: 1800,
+          filterType: 'bandpass',
+          gain: 0.08,
+        });
+        break;
+
+      case 'hit':
+        playTone(ctx, { freq: 340, endFreq: 160, type: 'sine', duration: 0.045, gain: 0.1 });
+        playNoiseBurst(ctx, {
+          duration: 0.025,
+          filterFreq: 2400,
+          filterType: 'highpass',
+          gain: 0.06,
+        });
+        break;
+
+      case 'levelUp':
+        playTone(ctx, { freq: 523.25, type: 'triangle', startOffset: 0, duration: 0.11, gain: 0.18 });
+        playTone(ctx, { freq: 659.25, type: 'triangle', startOffset: 0.06, duration: 0.11, gain: 0.19 });
+        playTone(ctx, { freq: 783.99, type: 'triangle', startOffset: 0.12, duration: 0.12, gain: 0.2 });
+        playTone(ctx, { freq: 1046.5, type: 'sine', startOffset: 0.18, duration: 0.24, gain: 0.22 });
+        break;
+
+      case 'bossWarn':
+        playTone(ctx, { freq: 146.83, endFreq: 130.81, type: 'sawtooth', startOffset: 0, duration: 0.22, gain: 0.14 });
+        playTone(ctx, { freq: 146.83, endFreq: 116.54, type: 'sawtooth', startOffset: 0.26, duration: 0.3, gain: 0.16 });
+        playTone(ctx, { freq: 73.42, type: 'triangle', startOffset: 0, duration: 0.56, gain: 0.14 });
         break;
     }
   } catch {

@@ -16,6 +16,7 @@ const LazyBlockBlastRoomContainer = lazy(
 );
 const LazyGlassCarryScreen = lazy(() => import('./screens/GlassCarryScreen'));
 const LazyEventRoomScreen = lazy(() => import('./screens/EventRoomScreen'));
+const LazySurvivalScreen = lazy(() => import('./screens/SurvivalScreen'));
 
 type AppScreen =
   | 'modeSelect'
@@ -27,7 +28,8 @@ type AppScreen =
   | 'blockblast'
   | 'blockblastRoom'
   | 'glassCarry'
-  | 'event';
+  | 'event'
+  | 'survival';
 
 function OnlineModeContainer({
   initialRoomCode,
@@ -163,11 +165,15 @@ export function App() {
   const [initialCardsRoomCode] = useState<string>(() =>
     readInitialRoomCodeParam('cardsRoom'),
   );
+  const [initialSurvivalRoomCode, setInitialSurvivalRoomCode] = useState<string>(
+    () => readInitialRoomCodeParam('survivalRoom'),
+  );
   const [screen, setScreen] = useState<AppScreen>(() => {
     if (initialEventRoomCode) return 'event';
     if (initialCardsRoomCode) return 'online';
     if (initialBbRoomCode) return 'blockblastRoom';
     if (initialGlassRoomCode) return 'glassCarry';
+    if (initialSurvivalRoomCode) return 'survival';
     return 'modeSelect';
   });
 
@@ -176,14 +182,22 @@ export function App() {
       (!initialBbRoomCode &&
         !initialGlassRoomCode &&
         !initialEventRoomCode &&
-        !initialCardsRoomCode) ||
+        !initialCardsRoomCode &&
+        !initialSurvivalRoomCode) ||
       typeof window === 'undefined'
     ) {
       return;
     }
     const params = new URLSearchParams(window.location.search);
     let changed = false;
-    for (const key of ['bbRoom', 'coopRoom', 'glassRoom', 'eventRoom', 'cardsRoom']) {
+    for (const key of [
+      'bbRoom',
+      'coopRoom',
+      'glassRoom',
+      'eventRoom',
+      'cardsRoom',
+      'survivalRoom',
+    ]) {
       if (params.has(key)) {
         params.delete(key);
         changed = true;
@@ -199,6 +213,7 @@ export function App() {
     initialCardsRoomCode,
     initialEventRoomCode,
     initialGlassRoomCode,
+    initialSurvivalRoomCode,
   ]);
 
   return (
@@ -236,6 +251,7 @@ export function App() {
           onSelectBrawlArena={() => setScreen('brawl')}
           onSelectBlockBlast={() => setScreen('blockblast')}
           onSelectGlassCarry={() => setScreen('glassCarry')}
+          onSelectSurvival={() => setScreen('survival')}
           onSelectEventCup={() => setScreen('event')}
           onOpenStudio3D={() => setScreen('studio3d')}
         />
@@ -380,6 +396,34 @@ export function App() {
             <LazyEventRoomScreen
               initialRoomCode={initialEventRoomCode}
               onBackToModeSelect={() => setScreen('modeSelect')}
+            />
+          </Suspense>
+        </ModeErrorBoundary>
+      )}
+
+      {screen === 'survival' && (
+        <ModeErrorBoundary
+          title="Không thể mở PAWS Survival 2D"
+          fallbackMessage="Không thể khởi tạo đấu trường sinh tồn PAWS Survival."
+          bgClass="bg-[#120d1d]"
+          onBack={() => setScreen('modeSelect')}
+        >
+          <Suspense
+            fallback={
+              <ModeLoadingFallback
+                label="Đang tải đấu trường PAWS Survival..."
+                bgClass="bg-[#120d1d]"
+                spinnerClass="border-fuchsia-400"
+                textClass="text-fuchsia-200"
+              />
+            }
+          >
+            <LazySurvivalScreen
+              initialRoomCode={initialSurvivalRoomCode}
+              onBackToModeSelect={() => {
+                setInitialSurvivalRoomCode('');
+                setScreen('modeSelect');
+              }}
             />
           </Suspense>
         </ModeErrorBoundary>

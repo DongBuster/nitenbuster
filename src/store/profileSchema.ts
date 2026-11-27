@@ -16,6 +16,8 @@ import {
   type CoopMapRecord,
 } from '../coop/maps/registry.ts';
 import { getEventCookieReward } from '../event/scoring.ts';
+import { isSurvivalMapId } from '../survival/sim/maps.ts';
+import type { SurvivalMapId } from '../survival/sim/types.ts';
 
 export const MAX_COOKIES = 1_000_000;
 export const MAX_BLOCK_BLAST_SCORE = 10_000_000;
@@ -41,6 +43,9 @@ export interface PlayerProfile {
   glassBestTimeSec: number | null;
   glassBestStars: number;
   coopRecords: Partial<Record<CoopMapId, CoopMapRecord>>;
+  survivalBestScore: number;
+  survivalBestTimeSec: number;
+  survivalWins: number;
   settledMatchIds: string[];
   selectedAnimal: AnimalId;
   unlockedAccessories: string[];
@@ -79,6 +84,14 @@ export interface EventSettlementResult {
   reward: number;
 }
 
+export interface SurvivalSettlementResult {
+  nextProfile: PlayerProfile;
+  ok: boolean;
+  reward: number;
+  isNewBestScore: boolean;
+  isNewBestTime: boolean;
+}
+
 export const VALID_ANIMALS: AnimalId[] = [
   'dog',
   'cat',
@@ -98,6 +111,9 @@ export const DEFAULT_PROFILE: PlayerProfile = {
   glassBestTimeSec: null,
   glassBestStars: 0,
   coopRecords: {},
+  survivalBestScore: 0,
+  survivalBestTimeSec: 0,
+  survivalWins: 0,
   settledMatchIds: [],
   selectedAnimal: 'dog',
   unlockedAccessories: [...DEFAULT_UNLOCKED_ACCESSORIES],
@@ -303,6 +319,17 @@ export function sanitizeProfileData(
     glassBestTimeSec: syncedGlassBestTimeSec,
     glassBestStars,
     coopRecords,
+    survivalBestScore: clampNonNegInt(
+      safeRaw.survivalBestScore,
+      MAX_BLOCK_BLAST_SCORE,
+      0,
+    ),
+    survivalBestTimeSec: clampNonNegInt(
+      safeRaw.survivalBestTimeSec,
+      MAX_GLASS_TIME_SEC,
+      0,
+    ),
+    survivalWins: clampNonNegInt(safeRaw.survivalWins, MAX_GAMES, 0),
     settledMatchIds: sanitizeSettledMatchIds(safeRaw.settledMatchIds),
     selectedAnimal,
     unlockedAccessories: Array.from(unlockedSet),
@@ -573,5 +600,128 @@ export function settleEventMatch(
     nextProfile,
     ok: true,
     reward,
+  };
+}
+
+export function settleSurvivalMatch(
+  profile: PlayerProfile,
+  payload: {
+    matchId: string;
+    mapId: SurvivalMapId;
+    victory: boolean;
+    score: number;
+    elapsedSec: number;
+    endlessContinuation?: boolean;
+  },
+): SurvivalSettlementResult {
+  const fail: SurvivalSettlementResult = {
+    nextProfile: profile,
+    ok: false,
+    reward: 0,
+    isNewBestScore: false,
+    isNewBestTime: false,
+  };
+
+  if (
+    !payload ||
+    typeof payload !== 'object' ||
+    typeof payload.matchId !== 'string' ||
+    payload.matchId.trim().length < 4 ||
+    payload.matchId.length > 80 ||
+    !isSurvivalMapId(payload.mapId) ||
+    typeof payload.victory !== 'boolean' ||
+    (payload.endlessContinuation !== undefined &&
+      typeof payload.endlessContinuation !== 'boolean') ||
+    typeof payload.score !== 'number' ||
+    !Number.isFinite(payload.score) ||
+    payload.score < 0 ||
+    typeof payload.elapsedSec !== 'number' ||
+    !Number.isFinite(payload.elapsedSec) ||
+    payload.elapsedSec < 0
+  ) {
+    return fail;
+  }
+
+  if (profile.settledMatchIds.includes(payload.matchId)) {
+    return fail;
+  }
+
+  const cleanScore = Math.min(MAX_BLOCK_BLAST_SCORE, Math.floor(payload.score));
+  const cleanElapsed = Math.min(
+    MAX_GLASS_TIME_SEC,
+    Math.floor(payload.elapsedSec),
+  );
+
+  const isEndlessContinuation = payload.endlessContinuation === true;
+  const isCampaignEndlessContinuation =
+    isEndlessContinuation && payload.mapId !== 'endless_abyss';
+  const effectiveVictory =
+    payload.victory &&
+    payload.mapId !== 'endless_abyss' &&
+    !isEndlessContinuation;
+
+  let reward: number;
+  if (effectiveVictory) {
+    reward = Math.min(
+      120,
+      60 + Math.floor(Math.max(0, cleanElapsed - 360) / 60) * 10,
+    );
+  } else if (isCampaignEndlessContinuation) {
+    // Base +60 victory Cookies & win counters were already settled at Campaign Victory;
+    // award only the incremental Endless bonus delta up to the 120-Cookie run cap.
+    reward = Math.max(
+      0,
+      Math.min(
+        120,
+        60 + Math.floor(Math.max(0, cleanElapsed - 360) / 60) * 10,
+      ) - 60,
+    );
+  } else {
+    const raw =
+      Math.floor(cleanScore / 400) + Math.floor(cleanElapsed / 30) * 4;
+    reward =
+      cleanElapsed >= 20
+        ? Math.min(100, Math.max(5, raw))
+        : Math.min(100, raw);
+  }
+
+  const isNewBestScore =
+    cleanScore > profile.survivalBestScore && cleanScore > 0;
+  const isNewBestTime =
+    cleanElapsed > profile.survivalBestTimeSec && cleanElapsed > 0;
+
+  const nextGamesPlayed = Math.min(
+    MAX_GAMES,
+    profile.gamesPlayed + (isCampaignEndlessContinuation ? 0 : 1),
+  );
+  const nextGamesWon = Math.min(
+    nextGamesPlayed,
+    profile.gamesWon + (effectiveVictory ? 1 : 0),
+  );
+  const nextSurvivalWins = Math.min(
+    MAX_GAMES,
+    profile.survivalWins + (effectiveVictory ? 1 : 0),
+  );
+  const nextSettled = [...profile.settledMatchIds, payload.matchId].slice(
+    -MAX_SETTLED_MATCH_IDS,
+  );
+
+  const nextProfile: PlayerProfile = {
+    ...profile,
+    cookies: Math.min(MAX_COOKIES, profile.cookies + reward),
+    gamesPlayed: nextGamesPlayed,
+    gamesWon: nextGamesWon,
+    survivalWins: nextSurvivalWins,
+    survivalBestScore: Math.max(profile.survivalBestScore, cleanScore),
+    survivalBestTimeSec: Math.max(profile.survivalBestTimeSec, cleanElapsed),
+    settledMatchIds: nextSettled,
+  };
+
+  return {
+    nextProfile,
+    ok: true,
+    reward,
+    isNewBestScore,
+    isNewBestTime,
   };
 }

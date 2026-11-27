@@ -9,6 +9,7 @@ import {
   type ShopItem,
 } from '../scene3d/accessoryCatalog.ts';
 import type { CoopMapId, CoopMapRecord } from '../coop/maps/registry.ts';
+import type { SurvivalMapId } from '../survival/sim/types.ts';
 import { unwrapSignedProfile, wrapSignedProfile } from './profileIntegrity.ts';
 import {
   DEFAULT_PROFILE,
@@ -17,12 +18,14 @@ import {
   settleCoopMatch,
   settleEventMatch,
   settleGlassCarryMatch,
+  settleSurvivalMatch,
   type BlockBlastSettlementResult,
   type CoopSettlementResult,
   type EventSettlementResult,
   type GlassSettlementResult,
   type PlayerProfile,
   type ProfileSettings,
+  type SurvivalSettlementResult,
 } from './profileSchema.ts';
 
 export {
@@ -31,6 +34,7 @@ export {
   settleCoopMatch,
   settleEventMatch,
   settleGlassCarryMatch,
+  settleSurvivalMatch,
   type BlockBlastSettlementResult,
   type CoopMapRecord,
   type CoopSettlementResult,
@@ -39,6 +43,7 @@ export {
   type PlayerProfile,
   type ProfileSettings,
   type ShopItem,
+  type SurvivalSettlementResult,
 };
 
 const STORAGE_KEY = 'paws_3d_profile_v1';
@@ -293,6 +298,29 @@ export function useProfileStore() {
     [],
   );
 
+  const recordSurvivalResult = useCallback(
+    (payload: {
+      matchId: string;
+      mapId: SurvivalMapId;
+      victory: boolean;
+      score: number;
+      elapsedSec: number;
+      endlessContinuation?: boolean;
+    }) => {
+      const settlement = settleSurvivalMatch(currentProfile, payload);
+      if (settlement.ok) {
+        persistAndNotify(settlement.nextProfile);
+      }
+      return {
+        ok: settlement.ok,
+        reward: settlement.reward,
+        isNewBestScore: settlement.isNewBestScore,
+        isNewBestTime: settlement.isNewBestTime,
+      };
+    },
+    [],
+  );
+
   const buyAccessory = useCallback((id: string): boolean => {
     const item = SHOP_ITEMS.find((i) => i.id === id);
     if (!item) return false;
@@ -349,6 +377,7 @@ export function useProfileStore() {
     recordGlassMatchResult,
     recordCoopMatchResult,
     recordEventResult,
+    recordSurvivalResult,
     buyAccessory,
     equipAccessory,
     clearAccessories,

@@ -12,6 +12,7 @@ import {
   settleBlockBlastMatch,
   settleCoopMatch,
   settleGlassCarryMatch,
+  settleSurvivalMatch,
 } from '../profileSchema.ts';
 import {
   computeHmacSha256Hex,
@@ -187,6 +188,18 @@ describe('profileIntegrity & anti-hack boundaries', () => {
       cookies: 9999,
     });
     assert.equal(unwrapSignedProfile(spoofedSig).status, 'tampered');
+
+    const spoofedV2Fields = [
+      { cookies: 9999, survivalBestScore: 50000 },
+      { cookies: 9999, survivalBestTimeSec: 900 },
+      { cookies: 9999, survivalWins: 5 },
+      { cookies: 9999, coopRecords: { glass_carry: { bestStars: 3, bestTimeSec: 90 } } },
+      { cookies: 9999, glassBestTimeSec: 90 },
+      { cookies: 9999, glassBestStars: 3 },
+    ];
+    for (const payload of spoofedV2Fields) {
+      assert.equal(unwrapSignedProfile(JSON.stringify(payload)).status, 'tampered');
+    }
   });
 
   it('strips prototype pollution keys during JSON parse and clamps impossible bounds', () => {
@@ -681,5 +694,295 @@ describe('settleCoopMatch & multi-map coopRecords migration', () => {
     });
     assert.equal(invalidFailures.ok, false);
     assert.deepEqual(invalidFailures.nextProfile, DEFAULT_PROFILE);
+  });
+});
+
+describe('settleSurvivalMatch & survival profile migration', () => {
+  it('defaults survival fields to 0 on fresh/legacy profiles and clamps bounds in sanitizeProfileData', () => {
+    assert.equal(DEFAULT_PROFILE.survivalBestScore, 0);
+    assert.equal(DEFAULT_PROFILE.survivalBestTimeSec, 0);
+    assert.equal(DEFAULT_PROFILE.survivalWins, 0);
+
+    const legacy = sanitizeProfileData({ cookies: 80, selectedAnimal: 'cat' });
+    assert.equal(legacy.survivalBestScore, 0);
+    assert.equal(legacy.survivalBestTimeSec, 0);
+    assert.equal(legacy.survivalWins, 0);
+
+    const clamped = sanitizeProfileData({
+      survivalBestScore: MAX_BLOCK_BLAST_SCORE + 999,
+      survivalBestTimeSec: MAX_GLASS_TIME_SEC + 50,
+      survivalWins: MAX_GAMES + 100,
+    });
+    assert.equal(clamped.survivalBestScore, MAX_BLOCK_BLAST_SCORE);
+    assert.equal(clamped.survivalBestTimeSec, MAX_GLASS_TIME_SEC);
+    assert.equal(clamped.survivalWins, MAX_GAMES);
+
+    const flooredAndNegative = sanitizeProfileData({
+      survivalBestScore: 1234.9,
+      survivalBestTimeSec: 365.7,
+      survivalWins: -4,
+    });
+    assert.equal(flooredAndNegative.survivalBestScore, 1234);
+    assert.equal(flooredAndNegative.survivalBestTimeSec, 365);
+    assert.equal(flooredAndNegative.survivalWins, 0);
+  });
+
+  it('awards campaign victory cookies (60 base + 10/min past 360s, capped at 120) and increments survivalWins', () => {
+    const baseWin = settleSurvivalMatch(DEFAULT_PROFILE, {
+      matchId: 'surv-win-360',
+      mapId: 'winter_cabin',
+      victory: true,
+      score: 14500.8,
+      elapsedSec: 360.9,
+    });
+    assert.equal(baseWin.ok, true);
+    assert.equal(baseWin.reward, 60);
+    assert.equal(baseWin.isNewBestScore, true);
+    assert.equal(baseWin.isNewBestTime, true);
+    assert.equal(baseWin.nextProfile.cookies, DEFAULT_PROFILE.cookies + 60);
+    assert.equal(baseWin.nextProfile.gamesPlayed, 1);
+    assert.equal(baseWin.nextProfile.gamesWon, 1);
+    assert.equal(baseWin.nextProfile.survivalWins, 1);
+    assert.equal(baseWin.nextProfile.survivalBestScore, 14500);
+    assert.equal(baseWin.nextProfile.survivalBestTimeSec, 360);
+    assert.deepEqual(baseWin.nextProfile.settledMatchIds, ['surv-win-360']);
+
+    const bonusWin = settleSurvivalMatch(baseWin.nextProfile, {
+      matchId: 'surv-win-540',
+      mapId: 'crystal_cavern',
+      victory: true,
+      score: 24000,
+      elapsedSec: 540,
+    });
+    assert.equal(bonusWin.ok, true);
+    assert.equal(bonusWin.reward, 90);
+    assert.equal(bonusWin.nextProfile.survivalWins, 2);
+    assert.equal(bonusWin.nextProfile.survivalBestScore, 24000);
+    assert.equal(bonusWin.nextProfile.survivalBestTimeSec, 540);
+
+    const cappedWin = settleSurvivalMatch(bonusWin.nextProfile, {
+      matchId: 'surv-win-900',
+      mapId: 'candy_canyon',
+      victory: true,
+      score: 20000,
+      elapsedSec: 900,
+    });
+    assert.equal(cappedWin.ok, true);
+    assert.equal(cappedWin.reward, 120);
+    assert.equal(cappedWin.isNewBestScore, false);
+    assert.equal(cappedWin.isNewBestTime, true);
+    assert.equal(cappedWin.nextProfile.survivalBestScore, 24000);
+    assert.equal(cappedWin.nextProfile.survivalBestTimeSec, 900);
+    assert.equal(cappedWin.nextProfile.survivalWins, 3);
+  });
+
+  it('awards defeat and endless_abyss cookie formula (min 5 at >=20s, raw under 20s, capped at 100)', () => {
+    const shortDefeat = settleSurvivalMatch(DEFAULT_PROFILE, {
+      matchId: 'surv-short-10',
+      mapId: 'winter_cabin',
+      victory: false,
+      score: 250,
+      elapsedSec: 12,
+    });
+    assert.equal(shortDefeat.ok, true);
+    assert.equal(shortDefeat.reward, 0);
+    assert.equal(shortDefeat.nextProfile.gamesPlayed, 1);
+    assert.equal(shortDefeat.nextProfile.gamesWon, 0);
+    assert.equal(shortDefeat.nextProfile.survivalWins, 0);
+    assert.equal(shortDefeat.isNewBestScore, true);
+    assert.equal(shortDefeat.isNewBestTime, true);
+
+    const minFloorDefeat = settleSurvivalMatch(DEFAULT_PROFILE, {
+      matchId: 'surv-floor-20',
+      mapId: 'winter_cabin',
+      victory: false,
+      score: 100,
+      elapsedSec: 20,
+    });
+    assert.equal(minFloorDefeat.ok, true);
+    assert.equal(minFloorDefeat.reward, 5);
+
+    const midDefeat = settleSurvivalMatch(DEFAULT_PROFILE, {
+      matchId: 'surv-mid-180',
+      mapId: 'candy_canyon',
+      victory: false,
+      score: 8400,
+      elapsedSec: 185,
+    });
+    // floor(8400/400) + floor(185/30)*4 = 21 + 24 = 45
+    assert.equal(midDefeat.ok, true);
+    assert.equal(midDefeat.reward, 45);
+    assert.equal(midDefeat.nextProfile.survivalWins, 0);
+
+    const endlessRun = settleSurvivalMatch(DEFAULT_PROFILE, {
+      matchId: 'surv-endless-600',
+      mapId: 'endless_abyss',
+      victory: true,
+      score: 50000,
+      elapsedSec: 600,
+    });
+    assert.equal(endlessRun.ok, true);
+    assert.equal(endlessRun.reward, 100);
+    assert.equal(endlessRun.nextProfile.gamesPlayed, 1);
+    assert.equal(endlessRun.nextProfile.gamesWon, 0);
+    assert.equal(endlessRun.nextProfile.survivalWins, 0);
+  });
+
+  it('awards incremental endlessContinuation bonus without double-counting wins/games and caps total at 120', () => {
+    const campaignWin = settleSurvivalMatch(DEFAULT_PROFILE, {
+      matchId: 'surv-camp-01',
+      mapId: 'winter_cabin',
+      victory: true,
+      score: 12000,
+      elapsedSec: 360,
+    });
+    assert.equal(campaignWin.ok, true);
+    assert.equal(campaignWin.reward, 60);
+    assert.equal(campaignWin.nextProfile.cookies, DEFAULT_PROFILE.cookies + 60);
+    assert.equal(campaignWin.nextProfile.gamesPlayed, 1);
+    assert.equal(campaignWin.nextProfile.gamesWon, 1);
+    assert.equal(campaignWin.nextProfile.survivalWins, 1);
+    assert.equal(campaignWin.nextProfile.survivalBestScore, 12000);
+    assert.equal(campaignWin.nextProfile.survivalBestTimeSec, 360);
+
+    // Continue Endless until 540s (+3 min past 360s -> +30 delta -> 90 total for run)
+    const endlessCont540 = settleSurvivalMatch(campaignWin.nextProfile, {
+      matchId: 'surv-camp-01:endless',
+      mapId: 'winter_cabin',
+      victory: false,
+      score: 26500,
+      elapsedSec: 540,
+      endlessContinuation: true,
+    });
+    assert.equal(endlessCont540.ok, true);
+    assert.equal(endlessCont540.reward, 30);
+    assert.equal(endlessCont540.isNewBestScore, true);
+    assert.equal(endlessCont540.isNewBestTime, true);
+    assert.equal(endlessCont540.nextProfile.cookies, DEFAULT_PROFILE.cookies + 90);
+    assert.equal(endlessCont540.nextProfile.gamesPlayed, 1);
+    assert.equal(endlessCont540.nextProfile.gamesWon, 1);
+    assert.equal(endlessCont540.nextProfile.survivalWins, 1);
+    assert.equal(endlessCont540.nextProfile.survivalBestScore, 26500);
+    assert.equal(endlessCont540.nextProfile.survivalBestTimeSec, 540);
+    assert.deepEqual(endlessCont540.nextProfile.settledMatchIds, [
+      'surv-camp-01',
+      'surv-camp-01:endless',
+    ]);
+
+    // Second Campaign run reaching 900s in Endless caps continuation delta at +60 (60 + 60 = 120 total)
+    const secondCampWin = settleSurvivalMatch(endlessCont540.nextProfile, {
+      matchId: 'surv-camp-02',
+      mapId: 'crystal_cavern',
+      victory: true,
+      score: 15000,
+      elapsedSec: 360,
+    });
+    assert.equal(secondCampWin.ok, true);
+    assert.equal(secondCampWin.reward, 60);
+    assert.equal(secondCampWin.nextProfile.gamesPlayed, 2);
+    assert.equal(secondCampWin.nextProfile.gamesWon, 2);
+    assert.equal(secondCampWin.nextProfile.survivalWins, 2);
+
+    const endlessCont900 = settleSurvivalMatch(secondCampWin.nextProfile, {
+      matchId: 'surv-camp-02:endless',
+      mapId: 'crystal_cavern',
+      victory: true,
+      score: 48000,
+      elapsedSec: 900,
+      endlessContinuation: true,
+    });
+    assert.equal(endlessCont900.ok, true);
+    assert.equal(endlessCont900.reward, 60);
+    assert.equal(endlessCont900.nextProfile.cookies, DEFAULT_PROFILE.cookies + 90 + 120);
+    assert.equal(endlessCont900.nextProfile.gamesPlayed, 2);
+    assert.equal(endlessCont900.nextProfile.gamesWon, 2);
+    assert.equal(endlessCont900.nextProfile.survivalWins, 2);
+    assert.equal(endlessCont900.nextProfile.survivalBestScore, 48000);
+    assert.equal(endlessCont900.nextProfile.survivalBestTimeSec, 900);
+  });
+
+  it('yields isNewBestScore=false and isNewBestTime=false for zero-score/zero-time on DEFAULT_PROFILE', () => {
+    const zeroRun = settleSurvivalMatch(DEFAULT_PROFILE, {
+      matchId: 'surv-zero-01',
+      mapId: 'winter_cabin',
+      victory: false,
+      score: 0,
+      elapsedSec: 0,
+    });
+    assert.equal(zeroRun.ok, true);
+    assert.equal(zeroRun.reward, 0);
+    assert.equal(zeroRun.isNewBestScore, false);
+    assert.equal(zeroRun.isNewBestTime, false);
+    assert.equal(zeroRun.nextProfile.survivalBestScore, 0);
+    assert.equal(zeroRun.nextProfile.survivalBestTimeSec, 0);
+    assert.equal(zeroRun.nextProfile.gamesPlayed, 1);
+    assert.equal(zeroRun.nextProfile.gamesWon, 0);
+    assert.equal(zeroRun.nextProfile.survivalWins, 0);
+  });
+
+  it('rejects duplicate matchId, invalid payloads, preserves higher bests, and caps settledMatchIds', () => {
+    const first = settleSurvivalMatch(DEFAULT_PROFILE, {
+      matchId: 'surv-dup-01',
+      mapId: 'winter_cabin',
+      victory: false,
+      score: 5000,
+      elapsedSec: 150,
+    });
+    assert.equal(first.ok, true);
+
+    const dup = settleSurvivalMatch(first.nextProfile, {
+      matchId: 'surv-dup-01',
+      mapId: 'winter_cabin',
+      victory: true,
+      score: 99999,
+      elapsedSec: 400,
+    });
+    assert.equal(dup.ok, false);
+    assert.equal(dup.reward, 0);
+    assert.equal(dup.isNewBestScore, false);
+    assert.equal(dup.isNewBestTime, false);
+    assert.deepEqual(dup.nextProfile, first.nextProfile);
+
+    const badPayloads = [
+      { matchId: 'abc', mapId: 'winter_cabin' as const, victory: false, score: 100, elapsedSec: 30 },
+      { matchId: 'x'.repeat(81), mapId: 'winter_cabin' as const, victory: false, score: 100, elapsedSec: 30 },
+      { matchId: 'surv-bad-map', mapId: 'unknown_map' as never, victory: false, score: 100, elapsedSec: 30 },
+      { matchId: 'surv-neg-score', mapId: 'winter_cabin' as const, victory: false, score: -1, elapsedSec: 30 },
+      { matchId: 'surv-nan-time', mapId: 'winter_cabin' as const, victory: false, score: 100, elapsedSec: Number.NaN },
+      { matchId: 'surv-bad-vic', mapId: 'winter_cabin' as const, victory: 'yes' as never, score: 100, elapsedSec: 30 },
+      { matchId: 'surv-bad-cont', mapId: 'winter_cabin' as const, victory: false, score: 100, elapsedSec: 30, endlessContinuation: 'yes' as never },
+    ];
+    for (const payload of badPayloads) {
+      const res = settleSurvivalMatch(DEFAULT_PROFILE, payload);
+      assert.equal(res.ok, false);
+      assert.equal(res.reward, 0);
+      assert.deepEqual(res.nextProfile, DEFAULT_PROFILE);
+    }
+
+    const existingIds = Array.from(
+      { length: MAX_SETTLED_MATCH_IDS },
+      (_, i) => `prev-surv-${String(i).padStart(2, '0')}`,
+    );
+    const highProfile = {
+      ...DEFAULT_PROFILE,
+      survivalBestScore: 10000,
+      survivalBestTimeSec: 300,
+      settledMatchIds: existingIds,
+    };
+    const lowerRun = settleSurvivalMatch(highProfile, {
+      matchId: 'surv-capped-21',
+      mapId: 'endless_abyss',
+      victory: false,
+      score: 0,
+      elapsedSec: 0,
+    });
+    assert.equal(lowerRun.ok, true);
+    assert.equal(lowerRun.isNewBestScore, false);
+    assert.equal(lowerRun.isNewBestTime, false);
+    assert.equal(lowerRun.nextProfile.survivalBestScore, 10000);
+    assert.equal(lowerRun.nextProfile.survivalBestTimeSec, 300);
+    assert.equal(lowerRun.nextProfile.settledMatchIds.length, MAX_SETTLED_MATCH_IDS);
+    assert.equal(lowerRun.nextProfile.settledMatchIds[0], 'prev-surv-01');
+    assert.equal(lowerRun.nextProfile.settledMatchIds[MAX_SETTLED_MATCH_IDS - 1], 'surv-capped-21');
   });
 });
