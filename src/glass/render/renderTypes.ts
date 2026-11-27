@@ -5,6 +5,7 @@ import type {
 } from '../online/protocol';
 import { createInitialSimState } from '../sim/physics';
 import type {
+  FragilePlatformState,
   GlassSimState,
   PlayerSimState,
   PlayerSlot,
@@ -15,6 +16,9 @@ export interface GlassHudSnapshot {
   matchTime: number;
   stageNumber: number;
   stageName: string;
+  totalStages?: number;
+  level?: number;
+  mapPackTitle?: string;
   checkpointIndex: number;
   totalCheckpoints: number;
   shatters: number;
@@ -41,6 +45,7 @@ export interface GlassRenderState {
   p1: PackedPlayerState;
   p2: PackedPlayerState;
   glass: GlassSnapshotPayload['glass'];
+  fragileStates: Record<string, FragilePlatformState>;
   cameraShake: number;
   lastCrackAt: number;
   shatterBurstId: number;
@@ -67,6 +72,11 @@ function toPackedPlayer(p: PlayerSimState): PackedPlayerState {
 export function createInitialRenderState(
   sim: GlassSimState = createInitialSimState(),
 ): GlassRenderState {
+  const fragileStates: Record<string, FragilePlatformState> = {};
+  for (const [id, entry] of Object.entries(sim.fragileStates)) {
+    fragileStates[id] = { state: entry.state, timer: entry.timer };
+  }
+
   return {
     matchTime: sim.matchTime,
     checkpointIndex: sim.checkpointIndex,
@@ -88,6 +98,7 @@ export function createInitialRenderState(
       lastImpactY: sim.glass.lastImpactY,
       lastImpactZ: sim.glass.lastImpactZ,
     },
+    fragileStates,
     cameraShake: 0,
     lastCrackAt: 0,
     shatterBurstId: 0,

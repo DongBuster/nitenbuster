@@ -19,9 +19,12 @@ import {
 } from 'lucide-react';
 import { playSfx } from '../../audio/soundEngine';
 import {
-  calculateCoopResult,
+  calculateCoopLevelResult,
+  getCoopLevelMeta,
   getCoopMapMeta,
-  getNextCoopMapId,
+  getCoopMapPack,
+  getNextPlayableCoopStage,
+  type CoopLevelNumber,
   type CoopMapId,
 } from '../../coop/maps/registry';
 import type { GlassRoomController } from '../online/useGlassRoom';
@@ -29,6 +32,8 @@ import type { GlassRoomController } from '../online/useGlassRoom';
 export interface GlassResultModalProps {
   room: GlassRoomController;
   mapId?: CoopMapId;
+  mapPackId?: string;
+  level?: CoopLevelNumber;
   elapsedSec: number;
   shatters: number;
   settlement: {
@@ -36,6 +41,7 @@ export interface GlassResultModalProps {
     reward: number;
     stars: 1 | 2 | 3;
     isNewBest: boolean;
+    unlockedNextLevel?: CoopLevelNumber | null;
   } | null;
   onBackToModeSelect: () => void;
 }
@@ -68,6 +74,8 @@ function formatTotalTime(sec: number): string {
 export function GlassResultModal({
   room,
   mapId,
+  mapPackId,
+  level,
   elapsedSec,
   shatters,
   settlement,
@@ -99,11 +107,42 @@ export function GlassResultModal({
     };
   }, []);
 
-  const resolvedMapId = mapId ?? room.finalResult?.mapId ?? room.selectedMap;
-  const mapMeta = getCoopMapMeta(resolvedMapId);
-  const nextMapMeta = getCoopMapMeta(getNextCoopMapId(resolvedMapId));
+  const resolvedActionId =
+    mapId ?? room.finalResult?.mapId ?? room.selectedMap;
+  const resolvedPackId =
+    mapPackId ?? room.finalResult?.mapPackId ?? room.selectedMapPack;
+  const resolvedLevel =
+    level ?? room.finalResult?.level ?? room.selectedLevel;
+  const mapMeta = getCoopMapMeta(resolvedActionId);
+  const packMeta = getCoopMapPack(resolvedActionId, resolvedPackId);
+  const levelMeta = getCoopLevelMeta(
+    resolvedActionId,
+    packMeta.id,
+    resolvedLevel,
+  );
 
-  const fallback = calculateCoopResult(resolvedMapId, elapsedSec, shatters);
+  const nextStage = getNextPlayableCoopStage(
+    resolvedActionId,
+    packMeta.id,
+    levelMeta.level,
+  );
+  const nextActionMeta = getCoopMapMeta(nextStage.actionId);
+  const nextPackMeta = getCoopMapPack(nextStage.actionId, nextStage.mapPackId);
+  const nextButtonLabel =
+    nextStage.actionId === resolvedActionId &&
+    nextStage.mapPackId === packMeta.id
+      ? `Màn Tiếp Theo (Màn ${nextStage.level})`
+      : nextStage.actionId === resolvedActionId
+        ? `Map Tiếp Theo (${nextPackMeta.shortTitle})`
+        : `Kiểu Tiếp Theo (${nextActionMeta.shortTitle})`;
+
+  const fallback = calculateCoopLevelResult(
+    resolvedActionId,
+    packMeta.id,
+    levelMeta.level,
+    elapsedSec,
+    shatters,
+  );
   const stars = settlement?.stars ?? fallback.stars;
   const cookies = settlement
     ? settlement.ok
@@ -206,20 +245,35 @@ export function GlassResultModal({
 
             <h1
               id={titleId}
-              className="mt-3 font-display text-2xl font-black text-white sm:text-3xl"
+              className="mt-3 font-display text-xl font-black text-white sm:text-2xl"
             >
-              Hoàn Thành: {mapMeta.title}!
+              Hoàn Thành: {mapMeta.shortTitle} · {packMeta.shortTitle} · Màn{' '}
+              {levelMeta.level}!
             </h1>
 
             <p id={descId} className="mt-1 text-xs font-bold text-slate-300">
+              {levelMeta.title} ({levelMeta.difficultyLabel}) —{' '}
               {room.p1Member?.name ?? 'P1'} &amp; {room.p2Member?.name ?? 'P2'}{' '}
-              đã chinh phục chặng {mapMeta.shortTitle} an toàn.
+              đã về đích an toàn.
             </p>
 
-            {settlement?.isNewBest && (
-              <div className="mt-2.5 inline-flex items-center gap-1.5 rounded-full border border-amber-300/70 bg-gradient-to-r from-amber-400 to-orange-400 px-3 py-1 text-xs font-black uppercase tracking-wide text-[#24130a] shadow">
-                <Sparkles aria-hidden="true" className="h-3.5 w-3.5" />
-                <span>Kỷ Lục Mới!</span>
+            {(settlement?.isNewBest || settlement?.unlockedNextLevel) && (
+              <div className="mt-2.5 flex flex-wrap items-center justify-center gap-2">
+                {settlement?.isNewBest && (
+                  <div className="inline-flex items-center gap-1.5 rounded-full border border-amber-300/70 bg-gradient-to-r from-amber-400 to-orange-400 px-3 py-1 text-xs font-black uppercase tracking-wide text-[#24130a] shadow">
+                    <Sparkles aria-hidden="true" className="h-3.5 w-3.5" />
+                    <span>Kỷ Lục Mới!</span>
+                  </div>
+                )}
+
+                {settlement?.unlockedNextLevel && (
+                  <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/70 bg-gradient-to-r from-emerald-500/30 to-amber-500/25 px-3 py-1 text-xs font-black text-emerald-100 shadow">
+                    <span aria-hidden="true">🔓</span>
+                    <span>
+                      Đã Mở Khóa Màn {settlement.unlockedNextLevel}!
+                    </span>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -275,7 +329,7 @@ export function GlassResultModal({
                 value="next"
                 className={`btn-tactile-cyan inline-flex min-h-[48px] w-full cursor-pointer items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-black text-[#06222c] ${FOCUS_RING_CLASS}`}
               >
-                <span>Map Tiếp Theo ({nextMapMeta.shortTitle})</span>
+                <span>{nextButtonLabel}</span>
                 <ArrowRight aria-hidden="true" className="h-4 w-4" />
               </button>
 

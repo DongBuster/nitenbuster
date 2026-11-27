@@ -14,7 +14,11 @@ import {
   Zap,
 } from 'lucide-react';
 import { playSfx } from '../../audio/soundEngine';
-import { getCoopMapMeta, type CoopMapId } from '../../coop/maps/registry';
+import {
+  getCoopMapMeta,
+  getCoopMapPack,
+  type CoopMapId,
+} from '../../coop/maps/registry';
 import { CoopSkillBar } from '../../coop/ui/CoopSkillBar';
 import type { GlassRoomController } from '../online/useGlassRoom';
 import type { GlassHudSnapshot } from '../render/renderTypes';
@@ -31,8 +35,6 @@ export interface GlassHudProps {
 
 const FOCUS_RING_CLASS =
   'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300';
-
-const STAGE_NUMBERS = [1, 2, 3, 4, 5] as const;
 
 const MINECART_JUMP_THRESHOLD_PCT = 35;
 
@@ -170,6 +172,12 @@ export function GlassHud({
 
   const activeMapId: CoopMapId = hud.mapId ?? room.selectedMap;
   const activeMapMeta = getCoopMapMeta(activeMapId);
+  const activeLevel = hud.level ?? room.selectedLevel;
+  const activePackTitle =
+    hud.mapPackTitle ??
+    getCoopMapPack(activeMapId, room.selectedMapPack).shortTitle;
+  const stageCount = Math.max(1, Math.min(5, hud.totalStages ?? 5));
+  const stageNumbers = Array.from({ length: stageCount }, (_, i) => i + 1);
 
   const stressRatio = Math.max(
     0,
@@ -249,6 +257,16 @@ export function GlassHud({
             >
               {activeMapMeta.shortTitle}
             </span>
+
+            <span className="rounded-lg border border-amber-400/45 bg-amber-400/15 px-2 py-0.5 text-[10px] font-black text-amber-200 tabular-nums">
+              Màn {activeLevel}
+            </span>
+
+            {activePackTitle && (
+              <span className="max-w-[9.5rem] truncate text-[11px] font-bold text-cyan-100/80">
+                {activePackTitle}
+              </span>
+            )}
 
             <div className="flex items-center gap-1" aria-hidden="true">
               {Array.from({ length: maxHp }, (_, idx) => {
@@ -375,14 +393,14 @@ export function GlassHud({
           )}
         </div>
 
-        {/* Top-center: 5-Stage Progress Stepper + Time + Failures */}
+        {/* Top-center: Dynamic Stage Progress Stepper + Time + Failures */}
         <div className="order-3 col-span-2 justify-self-center rounded-2xl border border-cyan-400/35 bg-[#0e1827]/90 px-3.5 py-2 text-white shadow-xl backdrop-blur-md lg:order-2 lg:col-span-1">
           <div className="flex flex-wrap items-center justify-center gap-2">
             <ol
-              aria-label="Tiến độ 5 chặng"
+              aria-label={`Tiến độ ${stageCount} chặng`}
               className="flex items-center gap-1"
             >
-              {STAGE_NUMBERS.map((stageNum) => {
+              {stageNumbers.map((stageNum) => {
                 const isActive = stageNum === hud.stageNumber;
                 const isDone = stageNum < hud.stageNumber;
                 return (
@@ -489,7 +507,8 @@ export function GlassHud({
             className="flex flex-col items-center gap-2 rounded-3xl border-2 border-cyan-300/60 bg-[#0e1827]/90 px-10 py-6 text-center shadow-2xl backdrop-blur-md"
           >
             <span className="text-xs font-black uppercase tracking-widest text-cyan-200">
-              Chuẩn Bị: {activeMapMeta.title}
+              Chuẩn Bị: {activeMapMeta.shortTitle} · {activePackTitle} · Màn{' '}
+              {activeLevel}
             </span>
             <div className="font-display text-6xl font-black text-amber-300 drop-shadow">
               {room.countdownSec > 0 ? `${room.countdownSec}` : '1!'}

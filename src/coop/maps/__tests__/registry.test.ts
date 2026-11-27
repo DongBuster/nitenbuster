@@ -1,23 +1,44 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  ALL_PLAYABLE_STAGE_KEYS,
   COOP_COOKIE_REWARDS,
+  COOP_LEVEL_NUMBERS,
   COOP_MAPS,
   COOP_MAP_IDS,
   DEFAULT_COOP_MAP_ID,
   MAX_COOP_STARS,
+  TOTAL_PLAYABLE_COOP_LEVELS,
+  buildUnlockedByPackMap,
+  calculateCoopLevelResult,
   calculateCoopResult,
+  countCoopActionStars,
+  countCoopPackStars,
+  countTotalCoopLevelStars,
   countTotalCoopStars,
+  getCoopLevelMeta,
   getCoopMapMeta,
+  getCoopMapPack,
+  getDefaultMapPackId,
+  getMaxPlayableLevelForPack,
   getNextCoopMapId,
+  getNextPlayableCoopStage,
+  getUnlockedLevelForPack,
+  isCoopLevelNumber,
+  isCoopLevelUnlocked,
   isCoopMapId,
   isNewCoopBest,
+  makeCoopPackKey,
+  makeCoopStageKey,
 } from '../registry.ts';
 
 describe('coop/maps/registry metadata', () => {
   it('defines all 4 maps in expected order with consistent constants', () => {
     assert.equal(DEFAULT_COOP_MAP_ID, 'glass_carry');
-    assert.equal(MAX_COOP_STARS, 12);
+    assert.equal(TOTAL_PLAYABLE_COOP_LEVELS, 18);
+    assert.equal(MAX_COOP_STARS, 54);
+    assert.equal(ALL_PLAYABLE_STAGE_KEYS.length, 18);
+    assert.deepEqual(COOP_LEVEL_NUMBERS, [1, 2, 3, 4, 5]);
     assert.deepEqual(COOP_COOKIE_REWARDS, { 3: 50, 2: 30, 1: 15 });
     assert.deepEqual(COOP_MAP_IDS, [
       'glass_carry',
@@ -201,5 +222,235 @@ describe('coop/maps/registry scoring & records', () => {
       }),
       11,
     );
+  });
+});
+
+describe('coop/maps/registry 3-level packs, progression, and level scoring', () => {
+  it('defines 3 packs x 5 playable levels for glass_carry and 1 playable + 4 comingSoon for other actions', () => {
+    const glass = getCoopMapMeta('glass_carry');
+    assert.equal(glass.maps.length, 3);
+    assert.deepEqual(
+      glass.maps.map((m) => m.id),
+      ['cabin_bridge', 'sky_scaffold', 'candy_factory'],
+    );
+    assert.equal(glass.maps[0].title, 'Cầu Gỗ Cabin Tuyết');
+    assert.equal(glass.maps[0].shortTitle, 'Cầu Gỗ Cabin');
+    assert.equal(glass.maps[0].accentHex, '#22d3ee');
+    assert.equal(glass.maps[1].title, 'Công Trường Cao Ốc');
+    assert.equal(glass.maps[1].accentHex, '#f59e0b');
+    assert.equal(glass.maps[2].title, 'Xưởng Kẹo Băng Chuyền');
+    assert.equal(glass.maps[2].accentHex, '#f472b6');
+
+    for (const pack of glass.maps) {
+      assert.equal(pack.levels.length, 5);
+      assert.equal(getMaxPlayableLevelForPack('glass_carry', pack.id), 5);
+      for (const lvl of pack.levels) {
+        assert.notEqual(lvl.comingSoon, true);
+        assert.equal(lvl.key, makeCoopStageKey('glass_carry', pack.id, lvl.level));
+        assert.ok(ALL_PLAYABLE_STAGE_KEYS.includes(lvl.key));
+      }
+    }
+
+    const cabinL1 = getCoopLevelMeta('glass_carry', 'cabin_bridge', 1);
+    assert.equal(cabinL1.title, 'Khởi Động Cổng Gỗ');
+    assert.equal(cabinL1.finishZ, 65);
+    assert.equal(cabinL1.stageCount, 2);
+    assert.equal(cabinL1.difficulty, 'easy');
+    assert.equal(cabinL1.difficultyLabel, 'Dễ');
+    assert.equal(cabinL1.difficultyColorHex, '#4ade80');
+    assert.deepEqual(cabinL1.starThresholds, {
+      three: { maxElapsedSec: 75, maxFailures: 1 },
+      two: { maxElapsedSec: 125, maxFailures: 4 },
+    });
+
+    const cabinL5 = getCoopLevelMeta('glass_carry', 'cabin_bridge', 5);
+    assert.equal(cabinL5.title, 'Đỉnh Bão Tuyết Cabin');
+    assert.equal(cabinL5.finishZ, 145);
+    assert.equal(cabinL5.stageCount, 5);
+    assert.equal(cabinL5.difficulty, 'extreme');
+    assert.equal(cabinL5.difficultyLabel, 'Siêu Khó');
+    assert.equal(cabinL5.difficultyColorHex, '#fb7185');
+
+    const skyL5 = getCoopLevelMeta('glass_carry', 'sky_scaffold', 5);
+    assert.equal(skyL5.finishZ, 150);
+    assert.deepEqual(skyL5.starThresholds, {
+      three: { maxElapsedSec: 205, maxFailures: 2 },
+      two: { maxElapsedSec: 325, maxFailures: 6 },
+    });
+
+    const candyL3 = getCoopLevelMeta('glass_carry', 'candy_factory', 3);
+    assert.equal(candyL3.title, 'Dập Piston Kẹo Cứng');
+    assert.equal(candyL3.finishZ, 115);
+    assert.equal(candyL3.difficulty, 'hard');
+    assert.equal(candyL3.difficultyLabel, 'Khá Khó');
+    assert.equal(candyL3.difficultyColorHex, '#fbbf24');
+
+    const singleLevelActions = [
+      { id: 'raft_rapids' as const, packId: 'glacier_river', finishZ: 160, threeSec: 140 },
+      { id: 'rope_tether' as const, packId: 'lantern_peaks', finishZ: 135, threeSec: 180 },
+      { id: 'minecart_rails' as const, packId: 'frost_mine', finishZ: 180, threeSec: 145 },
+    ];
+    for (const item of singleLevelActions) {
+      assert.equal(getDefaultMapPackId(item.id), item.packId);
+      assert.equal(getMaxPlayableLevelForPack(item.id, item.packId), 1);
+      const pack = getCoopMapPack(item.id, item.packId);
+      assert.equal(pack.levels.length, 5);
+      assert.notEqual(pack.levels[0].comingSoon, true);
+      assert.equal(pack.levels[0].finishZ, item.finishZ);
+      assert.equal(pack.levels[0].starThresholds.three.maxElapsedSec, item.threeSec);
+      for (let i = 1; i < 5; i++) {
+        assert.equal(pack.levels[i].comingSoon, true);
+        assert.equal(ALL_PLAYABLE_STAGE_KEYS.includes(pack.levels[i].key), false);
+      }
+    }
+  });
+
+  it('validates level numbers, pack keys, and fallback getters', () => {
+    assert.equal(makeCoopPackKey('glass_carry', 'cabin_bridge'), 'glass_carry:cabin_bridge');
+    assert.equal(makeCoopStageKey('glass_carry', 'cabin_bridge', 3), 'glass_carry:cabin_bridge:3');
+    for (const n of [1, 2, 3, 4, 5]) {
+      assert.equal(isCoopLevelNumber(n), true);
+    }
+    for (const bad of [0, 6, 1.5, '1', null, undefined]) {
+      assert.equal(isCoopLevelNumber(bad), false);
+    }
+
+    assert.equal(getDefaultMapPackId('glass_carry'), 'cabin_bridge');
+    assert.equal(getCoopMapPack('glass_carry', 'missing_pack').id, 'cabin_bridge');
+    assert.equal(getCoopLevelMeta('glass_carry', 'sky_scaffold').level, 1);
+  });
+
+  it('unlocks levels sequentially per pack and respects comingSoon and overrides', () => {
+    assert.equal(getUnlockedLevelForPack(undefined, 'glass_carry', 'cabin_bridge'), 1);
+    assert.equal(isCoopLevelUnlocked(undefined, 'glass_carry', 'cabin_bridge', 1), true);
+    assert.equal(isCoopLevelUnlocked(undefined, 'glass_carry', 'cabin_bridge', 2), false);
+    assert.equal(isCoopLevelUnlocked(undefined, 'raft_rapids', 'glacier_river', 2), false);
+
+    // Skipping level 2 does not unlock level 3
+    const skippedL2 = {
+      'glass_carry:cabin_bridge:1': { bestStars: 2, bestTimeSec: 110 },
+      'glass_carry:cabin_bridge:3': { bestStars: 3, bestTimeSec: 90 },
+    };
+    assert.equal(getUnlockedLevelForPack(skippedL2, 'glass_carry', 'cabin_bridge'), 2);
+    assert.equal(isCoopLevelUnlocked(skippedL2, 'glass_carry', 'cabin_bridge', 2), true);
+    assert.equal(isCoopLevelUnlocked(skippedL2, 'glass_carry', 'cabin_bridge', 3), false);
+
+    // Sequential progression unlocks up to 5
+    const upTo5 = {
+      'glass_carry:cabin_bridge:1': { bestStars: 1, bestTimeSec: 150 },
+      'glass_carry:cabin_bridge:2': { bestStars: 2, bestTimeSec: 140 },
+      'glass_carry:cabin_bridge:3': { bestStars: 3, bestTimeSec: 120 },
+      'glass_carry:cabin_bridge:4': { bestStars: 1, bestTimeSec: 280 },
+      'raft_rapids:glacier_river:1': { bestStars: 3, bestTimeSec: 120 },
+    };
+    assert.equal(getUnlockedLevelForPack(upTo5, 'glass_carry', 'cabin_bridge'), 5);
+    assert.equal(isCoopLevelUnlocked(upTo5, 'glass_carry', 'cabin_bridge', 5), true);
+    // ComingSoon level 2 of raft_rapids stays locked even after clearing level 1
+    assert.equal(getUnlockedLevelForPack(upTo5, 'raft_rapids', 'glacier_river'), 1);
+    assert.equal(isCoopLevelUnlocked(upTo5, 'raft_rapids', 'glacier_river', 2), false);
+
+    const unlockedMap = buildUnlockedByPackMap(upTo5);
+    assert.equal(unlockedMap['glass_carry:cabin_bridge'], 5);
+    assert.equal(unlockedMap['glass_carry:sky_scaffold'], 1);
+    assert.equal(unlockedMap['raft_rapids:glacier_river'], 1);
+
+    assert.equal(
+      isCoopLevelUnlocked(undefined, 'glass_carry', 'sky_scaffold', 3, {
+        'glass_carry:sky_scaffold': 3,
+      }),
+      true,
+    );
+  });
+
+  it('cycles through playable stages across levels, packs, and actions via getNextPlayableCoopStage', () => {
+    assert.deepEqual(getNextPlayableCoopStage('glass_carry', 'cabin_bridge', 1), {
+      actionId: 'glass_carry',
+      mapPackId: 'cabin_bridge',
+      level: 2,
+    });
+    assert.deepEqual(getNextPlayableCoopStage('glass_carry', 'cabin_bridge', 5), {
+      actionId: 'glass_carry',
+      mapPackId: 'sky_scaffold',
+      level: 1,
+    });
+    assert.deepEqual(getNextPlayableCoopStage('glass_carry', 'candy_factory', 5), {
+      actionId: 'raft_rapids',
+      mapPackId: 'glacier_river',
+      level: 1,
+    });
+    assert.deepEqual(getNextPlayableCoopStage('raft_rapids', 'glacier_river', 1), {
+      actionId: 'rope_tether',
+      mapPackId: 'lantern_peaks',
+      level: 1,
+    });
+    assert.deepEqual(getNextPlayableCoopStage('minecart_rails', 'frost_mine', 1), {
+      actionId: 'glass_carry',
+      mapPackId: 'cabin_bridge',
+      level: 1,
+    });
+  });
+
+  it('computes per-level results and pack/action/total star counts', () => {
+    assert.deepEqual(
+      calculateCoopLevelResult('glass_carry', 'cabin_bridge', 1, 75, 1),
+      {
+        mapId: 'glass_carry',
+        mapPackId: 'cabin_bridge',
+        level: 1,
+        stageKey: 'glass_carry:cabin_bridge:1',
+        stars: 3,
+        cookies: 50,
+        elapsedSec: 75,
+        failures: 1,
+      },
+    );
+    assert.deepEqual(
+      calculateCoopLevelResult('glass_carry', 'cabin_bridge', 1, 80, 1),
+      {
+        mapId: 'glass_carry',
+        mapPackId: 'cabin_bridge',
+        level: 1,
+        stageKey: 'glass_carry:cabin_bridge:1',
+        stars: 2,
+        cookies: 30,
+        elapsedSec: 80,
+        failures: 1,
+      },
+    );
+    assert.deepEqual(
+      calculateCoopLevelResult('glass_carry', 'cabin_bridge', 1, 130, 0),
+      {
+        mapId: 'glass_carry',
+        mapPackId: 'cabin_bridge',
+        level: 1,
+        stageKey: 'glass_carry:cabin_bridge:1',
+        stars: 1,
+        cookies: 15,
+        elapsedSec: 130,
+        failures: 0,
+      },
+    );
+
+    const fullRecords: Record<string, { bestStars: number; bestTimeSec: number }> = {};
+    for (const key of ALL_PLAYABLE_STAGE_KEYS) {
+      fullRecords[key] = { bestStars: 3, bestTimeSec: 50 };
+    }
+    // Add invalid/comingSoon key that must be ignored
+    fullRecords['raft_rapids:glacier_river:2'] = { bestStars: 3, bestTimeSec: 50 };
+
+    assert.deepEqual(countCoopPackStars(fullRecords, 'glass_carry', 'cabin_bridge'), {
+      earned: 15,
+      max: 15,
+    });
+    assert.deepEqual(countCoopActionStars(fullRecords, 'glass_carry'), {
+      earned: 45,
+      max: 45,
+    });
+    assert.deepEqual(countCoopActionStars(fullRecords, 'raft_rapids'), {
+      earned: 3,
+      max: 3,
+    });
+    assert.equal(countTotalCoopLevelStars(fullRecords), 54);
+    assert.equal(countTotalCoopLevelStars(undefined), 0);
   });
 });

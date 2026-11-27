@@ -16,6 +16,7 @@ import { SnapshotInterpolator } from '../online/snapshotInterpolation';
 import type { GlassRoomController } from '../online/useGlassRoom';
 import { FIXED_DT, GLASS_MAX_HP } from '../sim/constants';
 import { GLASS_COURSE, getStageNumberForZ } from '../sim/course';
+import { GLASS_MAP_THEMES } from '../sim/levels';
 import {
   NEUTRAL_INPUT,
   computeSoloStabilizerInput,
@@ -23,6 +24,8 @@ import {
   stepGlassSim,
 } from '../sim/physics';
 import type {
+  CourseDef,
+  FragilePlatformState,
   GlassSimState,
   LiftIntent,
   PlayerInput,
@@ -43,6 +46,9 @@ export interface GlassSceneProps {
   paused: boolean;
   onHudSnapshot: (hud: GlassHudSnapshot) => void;
   soloAutoBalance?: boolean;
+  course?: CourseDef;
+  level?: number;
+  mapPackTitle?: string;
 }
 
 const FALLBACK_P1_MEMBER: GlassRoomMember = {
@@ -108,6 +114,22 @@ function copySimToRenderState(
   target.glass.lastImpactX = sim.glass.lastImpactX;
   target.glass.lastImpactY = sim.glass.lastImpactY;
   target.glass.lastImpactZ = sim.glass.lastImpactZ;
+
+  const srcFragile = sim.fragileStates;
+  for (const key of Object.keys(target.fragileStates)) {
+    if (!(key in srcFragile)) {
+      delete target.fragileStates[key];
+    }
+  }
+  for (const [id, entry] of Object.entries(srcFragile)) {
+    const existing = target.fragileStates[id];
+    if (existing) {
+      existing.state = entry.state;
+      existing.timer = entry.timer;
+    } else {
+      target.fragileStates[id] = { state: entry.state, timer: entry.timer };
+    }
+  }
 }
 
 function copySnapshotToRenderState(
@@ -120,24 +142,48 @@ function copySnapshotToRenderState(
   Object.assign(target.p1, snapshot.p1);
   Object.assign(target.p2, snapshot.p2);
   Object.assign(target.glass, snapshot.glass);
+
+  const packedFragile = snapshot.fragileStates;
+  if (packedFragile) {
+    for (const key of Object.keys(target.fragileStates)) {
+      if (!(key in packedFragile)) {
+        delete target.fragileStates[key];
+      }
+    }
+    for (const [id, entry] of Object.entries(packedFragile)) {
+      const mappedState: FragilePlatformState['state'] =
+        entry.s === 1 ? 'shaking' : entry.s === 2 ? 'gone' : 'solid';
+      const existing = target.fragileStates[id];
+      if (existing) {
+        existing.state = mappedState;
+        existing.timer = entry.t;
+      } else {
+        target.fragileStates[id] = { state: mappedState, timer: entry.t };
+      }
+    }
+  } else {
+    for (const key of Object.keys(target.fragileStates)) {
+      delete target.fragileStates[key];
+    }
+  }
 }
 
 function buildHudSnapshot(
   renderState: GlassRenderState,
   shatters: number,
+  course: CourseDef,
+  level?: number,
+  mapPackTitle?: string,
 ): GlassHudSnapshot {
-  const stageNumber = getStageNumberForZ(
-    GLASS_COURSE,
-    renderState.glass.centerZ,
-  );
+  const stageNumber = getStageNumberForZ(course, renderState.glass.centerZ);
   const stageName =
-    GLASS_COURSE.stages.find((s) => s.number === stageNumber)?.name ??
-    GLASS_COURSE.stages[0]?.name ??
+    course.stages.find((s) => s.number === stageNumber)?.name ??
+    course.stages[0]?.name ??
     '';
-  const totalCheckpoints = Math.max(0, GLASS_COURSE.checkpoints.length - 1);
+  const totalCheckpoints = Math.max(0, course.checkpoints.length - 1);
   const progressPct = Math.max(
     0,
-    Math.min(100, (renderState.glass.centerZ / GLASS_COURSE.finishZ) * 100),
+    Math.min(100, (renderState.glass.centerZ / course.finishZ) * 100),
   );
 
   return {
@@ -145,6 +191,9 @@ function buildHudSnapshot(
     matchTime: renderState.matchTime,
     stageNumber,
     stageName,
+    totalStages: course.stages.length,
+    ...(level !== undefined ? { level } : {}),
+    ...(mapPackTitle !== undefined ? { mapPackTitle } : {}),
     checkpointIndex: renderState.checkpointIndex,
     totalCheckpoints,
     shatters,
@@ -166,8 +215,10 @@ function buildHudSnapshot(
 
 function FollowShadowLight({
   renderRef,
+  sunLightHex,
 }: {
   renderRef: RefObject<GlassRenderState>;
+  sunLightHex: string;
 }) {
   const lightRef = useRef<THREE.DirectionalLight | null>(null);
   const targetObj = useMemo(() => new THREE.Object3D(), []);
@@ -191,7 +242,7 @@ function FollowShadowLight({
         target={targetObj}
         position={[8, 16, -4.5]}
         intensity={1.45}
-        color="#FFE8CC"
+        color={sunLightHex}
         castShadow
         shadow-mapSize={[1024, 1024]}
         shadow-camera-near={1}
@@ -213,6 +264,9 @@ interface GlassWorldDriverProps {
   renderRef: RefObject<GlassRenderState>;
   onHudSnapshot: (hud: GlassHudSnapshot) => void;
   soloAutoBalance?: boolean;
+  course: CourseDef;
+  level?: number;
+  mapPackTitle?: string;
 }
 
 function GlassWorldDriver({
@@ -222,8 +276,11 @@ function GlassWorldDriver({
   renderRef,
   onHudSnapshot,
   soloAutoBalance = false,
+  course,
+  level,
+  mapPackTitle,
 }: GlassWorldDriverProps) {
-  const simRef = useRef<GlassSimState>(createInitialSimState());
+  const simRef = useRef<GlassSimState>(createInitialSimState(course));
   const accumulatorRef = useRef<number>(0);
   const lastSnapshotSentMsRef = useRef<number>(0);
   const finishNotifiedRef = useRef<boolean>(false);
@@ -241,6 +298,16 @@ function GlassWorldDriver({
   const prevLocalLiftRef = useRef<LiftIntent>(0);
   const hudAccumRef = useRef<number>(0);
   const activeMatchIdRef = useRef<string>(room.matchId);
+  const prevCourseRef = useRef<CourseDef>(course);
+
+  const courseRef = useRef<CourseDef>(course);
+  courseRef.current = course;
+
+  const levelRef = useRef<number | undefined>(level);
+  levelRef.current = level;
+
+  const mapPackTitleRef = useRef<string | undefined>(mapPackTitle);
+  mapPackTitleRef.current = mapPackTitle;
 
   const isHostRef = useRef<boolean>(room.isHost);
   const prevIsHostRef = useRef<boolean>(room.isHost);
@@ -254,12 +321,20 @@ function GlassWorldDriver({
     if (!wasHost && room.isHost && phaseRef.current === 'playing') {
       const r = renderRef.current;
       const base = simRef.current;
+      const hydratedFragile: Record<string, FragilePlatformState> = {};
+      for (const [id, entry] of Object.entries(base.fragileStates)) {
+        const rendered = r.fragileStates[id];
+        hydratedFragile[id] = rendered
+          ? { state: rendered.state, timer: rendered.timer }
+          : { state: entry.state, timer: entry.timer };
+      }
       simRef.current = {
         ...base,
         phase: 'playing',
         matchTime: r.matchTime,
         checkpointIndex: r.checkpointIndex,
         shatters: shattersRef.current,
+        fragileStates: hydratedFragile,
         p1: {
           ...base.p1,
           x: r.p1.x,
@@ -328,7 +403,8 @@ function GlassWorldDriver({
   const resetSimulationForMatch = useCallback(
     (nextMatchId: string) => {
       activeMatchIdRef.current = nextMatchId;
-      const initialSim = createInitialSimState();
+      prevCourseRef.current = courseRef.current;
+      const initialSim = createInitialSimState(courseRef.current);
       simRef.current = initialSim;
       accumulatorRef.current = 0;
       lastSnapshotSentMsRef.current = 0;
@@ -355,7 +431,13 @@ function GlassWorldDriver({
       ];
 
       onHudSnapshotRef.current(
-        buildHudSnapshot(renderRef.current, shattersRef.current),
+        buildHudSnapshot(
+          renderRef.current,
+          shattersRef.current,
+          courseRef.current,
+          levelRef.current,
+          mapPackTitleRef.current,
+        ),
       );
     },
     [renderRef],
@@ -368,10 +450,23 @@ function GlassWorldDriver({
     }
   }, [room.matchId, resetSimulationForMatch]);
 
+  // Reset simulation when active course changes (e.g. Host switches level or map pack)
+  useEffect(() => {
+    if (prevCourseRef.current !== course) {
+      resetSimulationForMatch(roomMatchIdRef.current);
+    }
+  }, [course, resetSimulationForMatch]);
+
   // Emit initial HUD snapshot once on mount
   useEffect(() => {
     onHudSnapshotRef.current(
-      buildHudSnapshot(renderRef.current, shattersRef.current),
+      buildHudSnapshot(
+        renderRef.current,
+        shattersRef.current,
+        courseRef.current,
+        levelRef.current,
+        mapPackTitleRef.current,
+      ),
     );
   }, [renderRef]);
 
@@ -515,6 +610,7 @@ function GlassWorldDriver({
             localInput,
             stepP2Input,
             FIXED_DT,
+            courseRef.current,
           );
           simRef.current = nextSim;
           if (nextSim.events.length > 0) {
@@ -555,7 +651,13 @@ function GlassWorldDriver({
         if (justFinished) {
           finishNotifiedRef.current = true;
           onHudSnapshotRef.current(
-            buildHudSnapshot(renderRef.current, shattersRef.current),
+            buildHudSnapshot(
+              renderRef.current,
+              shattersRef.current,
+              courseRef.current,
+              levelRef.current,
+              mapPackTitleRef.current,
+            ),
           );
           room.notifyMatchFinished(
             simRef.current.matchTime,
@@ -590,7 +692,13 @@ function GlassWorldDriver({
     if (hudAccumRef.current >= 0.1) {
       hudAccumRef.current = 0;
       onHudSnapshotRef.current(
-        buildHudSnapshot(renderRef.current, shattersRef.current),
+        buildHudSnapshot(
+          renderRef.current,
+          shattersRef.current,
+          courseRef.current,
+          levelRef.current,
+          mapPackTitleRef.current,
+        ),
       );
     }
   });
@@ -603,8 +711,16 @@ export function GlassScene({
   paused,
   onHudSnapshot,
   soloAutoBalance = false,
+  course,
+  level,
+  mapPackTitle,
 }: GlassSceneProps) {
-  const renderRef = useRef<GlassRenderState>(createInitialRenderState());
+  const activeCourse = course ?? GLASS_COURSE;
+  const theme = activeCourse.theme ?? GLASS_MAP_THEMES.cabin_bridge;
+
+  const renderRef = useRef<GlassRenderState>(
+    createInitialRenderState(createInitialSimState(activeCourse)),
+  );
 
   const { sendEmote } = room;
   const handleEmote = useCallback(
@@ -632,8 +748,8 @@ export function GlassScene({
       camera={{ position: [0, 9.2, -10.0], fov: 46, near: 0.3, far: 160 }}
       className="h-full w-full"
     >
-      <color attach="background" args={['#0d1b2e']} />
-      <fog attach="fog" args={['#0d1b2e', 34, 92]} />
+      <color attach="background" args={[theme.skyHex]} />
+      <fog attach="fog" args={[theme.fogHex, 34, 92]} />
 
       <Environment resolution={128} frames={1}>
         <Lightformer
@@ -670,12 +786,12 @@ export function GlassScene({
         />
       </Environment>
 
-      <ambientLight intensity={0.62} color="#F8FAFC" />
-      <hemisphereLight args={['#FFF7ED', '#1E3A5F', 0.72]} />
+      <ambientLight intensity={0.62} color={theme.ambientLightHex} />
+      <hemisphereLight args={[theme.sunLightHex, theme.abyssHex, 0.72]} />
       <directionalLight
         position={[-6, 9, -8]}
         intensity={0.55}
-        color="#BAE6FD"
+        color={theme.ambientLightHex}
       />
       {/* Step simulation/interpolation before scene consumers read renderRef */}
       <GlassWorldDriver
@@ -685,13 +801,23 @@ export function GlassScene({
         renderRef={renderRef}
         onHudSnapshot={onHudSnapshot}
         soloAutoBalance={soloAutoBalance}
+        course={activeCourse}
+        level={level}
+        mapPackTitle={mapPackTitle}
       />
 
-      <FollowShadowLight renderRef={renderRef} />
+      <FollowShadowLight
+        renderRef={renderRef}
+        sunLightHex={theme.sunLightHex}
+      />
 
       <GlassCamera renderRef={renderRef} />
 
-      <GlassCourseMesh renderRef={renderRef} />
+      <GlassCourseMesh
+        key={`${theme.id}-${level ?? 1}-${activeCourse.finishZ}`}
+        renderRef={renderRef}
+        course={activeCourse}
+      />
 
       <CarrierActor
         slot="p1"

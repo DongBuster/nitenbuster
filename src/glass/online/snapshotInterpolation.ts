@@ -1,6 +1,7 @@
 import {
   GLASS_INTERPOLATION_DELAY_MS,
   type GlassSnapshotPayload,
+  type PackedFragileState,
   type PackedPlayerState,
 } from './protocol.ts';
 
@@ -33,17 +34,30 @@ export function lerpAngle(a: number, b: number, t: number): number {
   return wrapAngle(a + delta * t);
 }
 
+function cloneFragileStates(
+  fragileStates: Record<string, PackedFragileState> | undefined,
+): Record<string, PackedFragileState> | undefined {
+  if (!fragileStates) return undefined;
+  const cloned: Record<string, PackedFragileState> = {};
+  for (const [id, entry] of Object.entries(fragileStates)) {
+    cloned[id] = { s: entry.s, t: entry.t };
+  }
+  return cloned;
+}
+
 function clonePlayer(p: PackedPlayerState): PackedPlayerState {
   return { ...p };
 }
 
 function cloneSnapshot(s: GlassSnapshotPayload): GlassSnapshotPayload {
+  const fragileStates = cloneFragileStates(s.fragileStates);
   return {
     ...s,
     p1: clonePlayer(s.p1),
     p2: clonePlayer(s.p2),
     glass: { ...s.glass },
     events: s.events.map((evt) => ({ ...evt })),
+    ...(fragileStates ? { fragileStates } : {}),
   };
 }
 
@@ -72,6 +86,7 @@ function interpolateSnapshots(
   b: GlassSnapshotPayload,
   t: number,
 ): GlassSnapshotPayload {
+  const fragileStates = cloneFragileStates(b.fragileStates);
   return {
     ...(b.mapId !== undefined ? { mapId: b.mapId } : {}),
     matchId: b.matchId,
@@ -99,6 +114,7 @@ function interpolateSnapshots(
       lastImpactZ: b.glass.lastImpactZ,
     },
     events: b.events.map((evt) => ({ ...evt })),
+    ...(fragileStates ? { fragileStates } : {}),
   };
 }
 

@@ -1,4 +1,4 @@
-import type { CoopMapId } from '../../coop/maps/registry.ts';
+import type { CoopLevelNumber, CoopMapId } from '../../coop/maps/registry.ts';
 import type { MinecartSnapshotPayload } from '../../coop/maps/minecart/types.ts';
 import type { RaftSnapshotPayload } from '../../coop/maps/raft/types.ts';
 import type { RopeSnapshotPayload } from '../../coop/maps/rope/types.ts';
@@ -48,6 +48,14 @@ export type GlassRoomMember = {
   ready: boolean;
   joinedAt: number;
   selectedMap?: CoopMapId;
+  selectedMapPack?: string;
+  selectedLevel?: CoopLevelNumber;
+  unlockedByPack?: Record<string, number>;
+};
+
+export type PackedFragileState = {
+  s: 0 | 1 | 2;
+  t: number;
 };
 
 export type PackedPlayerState = {
@@ -91,6 +99,7 @@ export type GlassSnapshotPayload = {
     lastImpactZ: number;
   };
   events: SimEvent[];
+  fragileStates?: Record<string, PackedFragileState>;
 };
 
 export type CoopSnapshotPayload =
@@ -102,6 +111,8 @@ export type CoopSnapshotPayload =
 export type CoopSelectMapPayload = {
   hostPeerId: string;
   mapId: CoopMapId;
+  mapPackId?: string;
+  level?: CoopLevelNumber;
 };
 
 export type GlassInputPayload = {
@@ -121,6 +132,8 @@ export type GlassStartPayload = {
   countdownMs: number;
   startedAt: number;
   mapId?: CoopMapId;
+  mapPackId?: string;
+  level?: CoopLevelNumber;
 };
 
 export type GlassEmotePayload = {
@@ -134,6 +147,8 @@ export type GlassEmotePayload = {
 export type GlassFinishPayload = {
   matchId: string;
   mapId?: CoopMapId;
+  mapPackId?: string;
+  level?: CoopLevelNumber;
   elapsedSec: number;
   shatters: number;
 };
@@ -153,6 +168,8 @@ export type GlassSyncStatePayload = {
   hostPeerId: string;
   guestPeerId: string;
   mapId?: CoopMapId;
+  mapPackId?: string;
+  level?: CoopLevelNumber;
   phase: 'countdown' | 'playing' | 'finished';
   countdownRemainingMs: number;
   latestSnapshot: CoopSnapshotPayload | null;
@@ -181,6 +198,21 @@ function packPlayerState(player: PlayerSimState): PackedPlayerState {
   };
 }
 
+function packFragileStates(
+  fragileStates: GlassSimState['fragileStates'] | undefined,
+): Record<string, PackedFragileState> | undefined {
+  if (!fragileStates) return undefined;
+  const entries = Object.entries(fragileStates);
+  if (entries.length === 0) return undefined;
+  const packed: Record<string, PackedFragileState> = {};
+  for (const [id, entry] of entries) {
+    const s: 0 | 1 | 2 =
+      entry.state === 'shaking' ? 1 : entry.state === 'gone' ? 2 : 0;
+    packed[id] = { s, t: round2(entry.timer) };
+  }
+  return packed;
+}
+
 /**
  * Compresses a 60Hz `GlassSimState` into a compact network snapshot by rounding
  * floating-point coordinates, angles, and timers to 2 decimals while preserving
@@ -190,6 +222,7 @@ export function packSimSnapshot(
   matchId: string,
   state: GlassSimState,
 ): GlassSnapshotPayload {
+  const fragileStates = packFragileStates(state.fragileStates);
   return {
     mapId: 'glass_carry',
     matchId,
@@ -217,5 +250,6 @@ export function packSimSnapshot(
       lastImpactZ: round2(state.glass.lastImpactZ),
     },
     events: state.events.map((evt) => ({ ...evt })),
+    ...(fragileStates ? { fragileStates } : {}),
   };
 }

@@ -15,7 +15,7 @@ import {
   PLAYER_MAX_SPEED,
   SHATTER_RESPAWN_SEC,
 } from '../constants.ts';
-import { GLASS_COURSE } from '../course.ts';
+import { GLASS_COURSE, evaluateDynamicObstacles } from '../course.ts';
 import {
   NEUTRAL_INPUT,
   checkGlassSegmentBoxHit,
@@ -696,5 +696,289 @@ describe('additional physics mechanics: wind, moving platforms, pendulum/spinner
     const tiltShatter = tiltEvents.find((e) => e.kind === 'glass_shatter');
     assert.ok(tiltShatter);
     assert.equal(tiltShatter.reason, 'tilt');
+  });
+});
+
+describe('Task 2 physics extensions: conveyors, fragile platforms, Y elevators, Y pistons, diagonal tilt', () => {
+  it('10. shifts standing players steadily on conveyor platforms even with NEUTRAL_INPUT', () => {
+    const conveyorCourse = makeSimpleCourse({
+      platforms: [
+        {
+          id: 'conveyor-1',
+          surface: 'wood',
+          box: { minX: -10, maxX: 10, minY: -1, maxY: 0, minZ: -10, maxZ: 20 },
+          conveyorVx: 3.0,
+          conveyorVz: -2.0,
+        },
+      ],
+    });
+
+    const init = createInitialSimState(conveyorCourse);
+    const { state } = stepMany(init, 30, NEUTRAL_INPUT, NEUTRAL_INPUT, FIXED_DT, conveyorCourse);
+    const expectedDx = 3.0 * 30 * FIXED_DT;
+    const expectedDz = -2.0 * 30 * FIXED_DT;
+
+    assert.ok(Math.abs(state.p1.x - (init.p1.x + expectedDx)) < 1e-5);
+    assert.ok(Math.abs(state.p1.z - (init.p1.z + expectedDz)) < 1e-5);
+    assert.ok(Math.abs(state.p2.x - (init.p2.x + expectedDx)) < 1e-5);
+    assert.ok(Math.abs(state.p2.z - (init.p2.z + expectedDz)) < 1e-5);
+    assert.equal(state.shatters, 0);
+  });
+
+  it('11. transitions fragile platforms solid -> shaking -> gone -> solid and resets on shatter respawn', () => {
+    const fragileCourse = makeSimpleCourse({
+      platforms: [
+        {
+          id: 'frag-1',
+          surface: 'wood',
+          box: { minX: -5, maxX: 5, minY: -1, maxY: 0, minZ: -2, maxZ: 10 },
+          fragile: { fallDelaySec: 1.5, respawnDelaySec: 3.0 },
+        },
+        {
+          id: 'safe-ledge',
+          surface: 'wood',
+          box: { minX: 6, maxX: 14, minY: -1, maxY: 0, minZ: -2, maxZ: 10 },
+        },
+      ],
+    });
+
+    const init = createInitialSimState(fragileCourse);
+    assert.deepEqual(init.fragileStates['frag-1'], { state: 'solid', timer: 0 });
+
+    // Stepping starts shaking
+    const tick1 = stepGlassSim(init, NEUTRAL_INPUT, NEUTRAL_INPUT, FIXED_DT, fragileCourse);
+    assert.equal(tick1.fragileStates['frag-1']?.state, 'shaking');
+    assert.equal(tick1.fragileStates['frag-1']?.timer, 1.5);
+    assert.equal(tick1.p1.grounded, true);
+
+    // After 1.5s (90 ticks) shaking expires -> gone
+    const { state: goneState } = stepMany(
+      tick1,
+      90,
+      NEUTRAL_INPUT,
+      NEUTRAL_INPUT,
+      FIXED_DT,
+      fragileCourse,
+    );
+    assert.equal(goneState.fragileStates['frag-1']?.state, 'gone');
+
+    // Standing players lose support and drop below y = 0
+    const { state: fallingState } = stepMany(
+      goneState,
+      20,
+      NEUTRAL_INPUT,
+      NEUTRAL_INPUT,
+      FIXED_DT,
+      fragileCourse,
+    );
+    assert.equal(fallingState.p1.grounded, false);
+    assert.ok(fallingState.p1.y < 0);
+    assert.ok(fallingState.p2.y < 0);
+
+    // Move players onto safe-ledge so they don't fall below -5 while waiting out the 3.0s respawn timer
+    const watchingFromLedge: GlassSimState = {
+      ...fallingState,
+      p1: { ...fallingState.p1, x: 8.4, y: 0, vy: 0, grounded: true },
+      p2: { ...fallingState.p2, x: 11.6, y: 0, vy: 0, grounded: true },
+    };
+    const { state: respawnedPlat } = stepMany(
+      watchingFromLedge,
+      160,
+      NEUTRAL_INPUT,
+      NEUTRAL_INPUT,
+      FIXED_DT,
+      fragileCourse,
+    );
+    assert.equal(respawnedPlat.fragileStates['frag-1']?.state, 'solid');
+    assert.equal(respawnedPlat.fragileStates['frag-1']?.timer, 0);
+
+    // Shatter respawn immediately resets shaking/gone fragile platforms to solid
+    const shaking = stepGlassSim(init, NEUTRAL_INPUT, NEUTRAL_INPUT, FIXED_DT, fragileCourse);
+    assert.equal(shaking.fragileStates['frag-1']?.state, 'shaking');
+    const overStretched: GlassSimState = {
+      ...shaking,
+      p1: { ...shaking.p1, x: -(GLASS_BREAK_DIST * 0.5 + 0.2) },
+      p2: { ...shaking.p2, x: GLASS_BREAK_DIST * 0.5 + 0.2 },
+    };
+    const shattered = stepGlassSim(overStretched, NEUTRAL_INPUT, NEUTRAL_INPUT, FIXED_DT, fragileCourse);
+    assert.equal(shattered.shatters, 1);
+    const { state: afterRespawn } = stepMany(
+      shattered,
+      72,
+      NEUTRAL_INPUT,
+      NEUTRAL_INPUT,
+      FIXED_DT,
+      fragileCourse,
+    );
+    assert.deepEqual(afterRespawn.fragileStates['frag-1'], { state: 'solid', timer: 0 });
+  });
+
+  it('12. carries standing players smoothly up and down on Y-axis moving elevators', () => {
+    const elevatorCourse = makeSimpleCourse({
+      platforms: [],
+      movingPlatforms: [
+        {
+          id: 'elev-y',
+          surface: 'wood',
+          baseBox: { minX: -5, maxX: 5, minY: -1, maxY: 0, minZ: -2, maxZ: 10 },
+          axis: 'y',
+          amplitude: 2.0,
+          speed: 1.2,
+          phase: 0,
+        },
+      ],
+    });
+
+    const init = createInitialSimState(elevatorCourse);
+
+    // Ascend for 1.0s (60 ticks)
+    const { state: upState } = stepMany(
+      init,
+      60,
+      NEUTRAL_INPUT,
+      NEUTRAL_INPUT,
+      FIXED_DT,
+      elevatorCourse,
+    );
+    const expectedUpY = Math.sin(upState.matchTime * 1.2) * 2.0;
+    assert.equal(upState.p1.grounded, true);
+    assert.equal(upState.p2.grounded, true);
+    assert.ok(upState.p1.y > 1.5);
+    assert.ok(Math.abs(upState.p1.y - expectedUpY) < 1e-5);
+    assert.equal(upState.shatters, 0);
+
+    // Continue through peak and descent for 1.5s (90 ticks)
+    const { state: downState } = stepMany(
+      upState,
+      90,
+      NEUTRAL_INPUT,
+      NEUTRAL_INPUT,
+      FIXED_DT,
+      elevatorCourse,
+    );
+    const expectedDownY = Math.sin(downState.matchTime * 1.2) * 2.0;
+    assert.equal(downState.p1.grounded, true);
+    assert.equal(downState.p2.grounded, true);
+    assert.ok(downState.p1.y < upState.p1.y);
+    assert.ok(Math.abs(downState.p1.y - expectedDownY) < 1e-5);
+    assert.equal(downState.shatters, 0);
+  });
+
+  it('13. shifts Y-axis moving barrier hitbox over time (candy piston)', () => {
+    const pistonCourse = makeSimpleCourse({
+      barriers: [
+        {
+          id: 'candy-piston',
+          kind: 'lowGap',
+          box: { minX: -4.6, maxX: 4.6, minY: 0.95, maxY: 2.6, minZ: 5.0, maxZ: 5.6 },
+          damage: 1,
+          blocksPlayers: false,
+          moveAxis: 'y',
+          moveAmplitude: 1.5,
+          moveSpeed: 2.0,
+          movePhase: 0,
+        },
+      ],
+    });
+
+    const tPeak = Math.PI / 4; // sin(2 * pi/4) = +1.0
+    const obsPeak = evaluateDynamicObstacles(pistonCourse, tPeak);
+    const piston = obsPeak.barriers.find((b) => b.id === 'candy-piston');
+    assert.ok(piston);
+    assert.ok(Math.abs(piston.box.minY - (0.95 + 1.5)) < 1e-9);
+    assert.ok(Math.abs(piston.box.maxY - (2.6 + 1.5)) < 1e-9);
+
+    // Walking past while piston is raised at tPeak clears cleanly; lowered at t=0 cracks glass
+    const base = createInitialSimState(pistonCourse);
+    const atRaised: GlassSimState = {
+      ...base,
+      matchTime: tPeak - 0.25,
+      p1: { ...base.p1, z: 4.2 },
+      p2: { ...base.p2, z: 4.2 },
+    };
+    const { state: cleared } = stepMany(
+      atRaised,
+      25,
+      { moveX: 0, moveZ: 1, jump: false, lift: 0 },
+      { moveX: 0, moveZ: 1, jump: false, lift: 0 },
+      FIXED_DT,
+      pistonCourse,
+    );
+    assert.equal(cleared.glass.hp, GLASS_MAX_HP);
+
+    const atLowered: GlassSimState = {
+      ...base,
+      matchTime: 0,
+      p1: { ...base.p1, z: 4.8 },
+      p2: { ...base.p2, z: 4.8 },
+    };
+    const { state: cracked } = stepMany(
+      atLowered,
+      20,
+      { moveX: 0, moveZ: 1, jump: false, lift: 0 },
+      { moveX: 0, moveZ: 1, jump: false, lift: 0 },
+      FIXED_DT,
+      pistonCourse,
+    );
+    assert.equal(cracked.glass.hp, 2);
+  });
+
+  it('14. cracks flat neutral glass on diagonal tilt gate, while P1 (+X) lift -1 and P2 (-X) lift +1 clears with hp === 3', () => {
+    const tiltGateCourse = makeSimpleCourse({
+      checkpoints: [
+        {
+          index: 0,
+          stageNumber: 1,
+          stageName: 'Test Stage',
+          triggerZ: 0,
+          p1Spawn: { x: 1.6, y: 0, z: 1.5 },
+          p2Spawn: { x: -1.6, y: 0, z: 1.5 },
+        },
+      ],
+      barriers: [
+        {
+          id: 'diag-low-gap',
+          kind: 'lowGap',
+          box: { minX: 0.9, maxX: 4.6, minY: 0.95, maxY: 2.6, minZ: 5.0, maxZ: 5.6 },
+          damage: 1,
+          blocksPlayers: false,
+        },
+        {
+          id: 'diag-high-wall',
+          kind: 'highWall',
+          box: { minX: -4.6, maxX: -0.9, minY: 0, maxY: 1.25, minZ: 5.0, maxZ: 5.6 },
+          damage: 1,
+          blocksPlayers: false,
+        },
+      ],
+    });
+
+    const start = createInitialSimState(tiltGateCourse);
+
+    // Flat neutral cracks glass
+    const { state: neutralEnd, events: neutralEvents } = stepMany(
+      start,
+      60,
+      { moveX: 0, moveZ: 1, jump: false, lift: 0 },
+      { moveX: 0, moveZ: 1, jump: false, lift: 0 },
+      FIXED_DT,
+      tiltGateCourse,
+    );
+    assert.ok(neutralEnd.glass.hp < GLASS_MAX_HP);
+    assert.ok(neutralEvents.some((e) => e.kind === 'glass_crack'));
+
+    // P1 (+X) holding lift: -1 and P2 (-X) holding lift: +1 clears cleanly with hp === 3 and zero tilt shatter
+    const { state: tiltedEnd, events: tiltedEvents } = stepMany(
+      start,
+      60,
+      { moveX: 0, moveZ: 1, jump: false, lift: -1 },
+      { moveX: 0, moveZ: 1, jump: false, lift: 1 },
+      FIXED_DT,
+      tiltGateCourse,
+    );
+    assert.ok(tiltedEnd.p1.z > 6.0 && tiltedEnd.p2.z > 6.0);
+    assert.equal(tiltedEnd.glass.hp, GLASS_MAX_HP);
+    assert.equal(tiltedEnd.shatters, 0);
+    assert.equal(tiltedEvents.length, 0);
   });
 });

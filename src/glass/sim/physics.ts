@@ -38,6 +38,7 @@ import type {
   EvaluatedPlatform,
   EvaluatedSpinner,
   EvaluatedWindZone,
+  FragilePlatformState,
   GlassSimPhase,
   GlassSimState,
   GlassState,
@@ -357,12 +358,18 @@ function resolveLandingPlatform(
   vy: number,
   platforms: readonly EvaluatedPlatform[],
 ): EvaluatedPlatform | null {
-  if (vy > 0) return null;
-
   let best: EvaluatedPlatform | null = null;
   for (const plat of platforms) {
-    if (prevY < plat.box.maxY - LANDING_SNAP_TOLERANCE) continue;
-    if (newY > plat.box.maxY) continue;
+    const platVy = plat.vy ?? 0;
+    const isVerticalMoving = platVy !== 0;
+    const maxLandingVy = Math.max(0, platVy) + (isVerticalMoving ? 0.25 : 0);
+    if (vy > maxLandingVy) continue;
+
+    const snapBelow = isVerticalMoving ? 0.32 : LANDING_SNAP_TOLERANCE;
+    const snapAbove = isVerticalMoving ? 0.12 : 0;
+    if (prevY < plat.box.maxY - snapBelow) continue;
+    if (newY > plat.box.maxY + snapAbove) continue;
+
     if (
       x < plat.box.minX - LANDING_EDGE_MARGIN ||
       x > plat.box.maxX + LANDING_EDGE_MARGIN ||
@@ -473,7 +480,7 @@ function stepPlayer(
   input: PlayerInput,
   dt: number,
   obs: EvaluatedCourseObstacles,
-): PlayerSimState {
+): { player: PlayerSimState; steppedFragileIds: string[] } {
   const rawMag = Math.hypot(input.moveX, input.moveZ);
   const moveX = rawMag > 1 ? input.moveX / rawMag : input.moveX;
   const moveZ = rawMag > 1 ? input.moveZ / rawMag : input.moveZ;
@@ -490,9 +497,13 @@ function stepPlayer(
   const accel = onIce ? ICE_ACCEL : WOOD_ACCEL;
   const friction = onIce ? ICE_FRICTION : WOOD_FRICTION;
 
-  let x = player.x + (standingPlat ? standingPlat.vx * dt : 0);
-  let z = player.z + (standingPlat ? standingPlat.vz * dt : 0);
-  let y = player.y;
+  let x =
+    player.x +
+    (standingPlat ? (standingPlat.vx + (standingPlat.conveyorVx ?? 0)) * dt : 0);
+  let z =
+    player.z +
+    (standingPlat ? (standingPlat.vz + (standingPlat.conveyorVz ?? 0)) * dt : 0);
+  let y = player.y + (standingPlat ? (standingPlat.vy ?? 0) * dt : 0);
   let vx = player.vx;
   let vz = player.vz;
   let vy = player.vy;
@@ -557,26 +568,35 @@ function stepPlayer(
     input.lift > 0 ? LIFT_UP_OFFSET : input.lift < 0 ? LIFT_DOWN_OFFSET : 0;
   const liftOffset = moveToward(player.liftOffset, targetLift, LIFT_SPEED * dt);
 
-  return resolvePlayerBarriers(
-    {
-      slot: player.slot,
-      x,
-      y,
-      z,
-      vx,
-      vy,
-      vz,
-      yaw,
-      grounded,
-      coyoteTimer,
-      jumpBufferTimer,
-      liftOffset,
-      liftIntent: input.lift,
-      onIce,
-      inWind: wind.inWind,
-    },
-    obs.barriers,
-  );
+  const steppedFragileIds: string[] = [];
+  if (standingPlat?.fragile) steppedFragileIds.push(standingPlat.id);
+  if (landedPlat?.fragile && landedPlat.id !== standingPlat?.id) {
+    steppedFragileIds.push(landedPlat.id);
+  }
+
+  return {
+    player: resolvePlayerBarriers(
+      {
+        slot: player.slot,
+        x,
+        y,
+        z,
+        vx,
+        vy,
+        vz,
+        yaw,
+        grounded,
+        coyoteTimer,
+        jumpBufferTimer,
+        liftOffset,
+        liftIntent: input.lift,
+        onIce,
+        inWind: wind.inWind,
+      },
+      obs.barriers,
+    ),
+    steppedFragileIds,
+  };
 }
 
 function createSpawnedPlayer(
@@ -628,6 +648,68 @@ function buildGlassState(
   };
 }
 
+function createInitialFragileStates(
+  course: CourseDef,
+): Record<string, FragilePlatformState> {
+  const fragileStates: Record<string, FragilePlatformState> = {};
+  for (const plat of course.platforms) {
+    if (plat.fragile) {
+      fragileStates[plat.id] = { state: 'solid', timer: 0 };
+    }
+  }
+  return fragileStates;
+}
+
+function cloneFragileStates(
+  fragileStates: Record<string, FragilePlatformState>,
+): Record<string, FragilePlatformState> {
+  const cloned: Record<string, FragilePlatformState> = {};
+  for (const [id, entry] of Object.entries(fragileStates)) {
+    cloned[id] = { ...entry };
+  }
+  return cloned;
+}
+
+function resetFragileStates(
+  course: CourseDef,
+  current: Record<string, FragilePlatformState>,
+): Record<string, FragilePlatformState> {
+  const reset = createInitialFragileStates(course);
+  for (const id of Object.keys(current)) {
+    reset[id] = { state: 'solid', timer: 0 };
+  }
+  return reset;
+}
+
+function advanceFragileStates(
+  fragileStates: Record<string, FragilePlatformState>,
+  platforms: readonly EvaluatedPlatform[],
+  steppedFragileIds: ReadonlySet<string>,
+  dt: number,
+): void {
+  for (const plat of platforms) {
+    if (!plat.fragile) continue;
+    const entry = fragileStates[plat.id] ?? { state: 'solid', timer: 0 };
+    if (entry.state === 'solid' && steppedFragileIds.has(plat.id)) {
+      fragileStates[plat.id] = { state: 'shaking', timer: plat.fragile.fallDelaySec };
+    } else if (entry.state === 'shaking') {
+      const nextTimer = decrementTimer(entry.timer, dt);
+      fragileStates[plat.id] =
+        nextTimer <= 0
+          ? { state: 'gone', timer: plat.fragile.respawnDelaySec }
+          : { state: 'shaking', timer: nextTimer };
+    } else if (entry.state === 'gone') {
+      const nextTimer = decrementTimer(entry.timer, dt);
+      fragileStates[plat.id] =
+        nextTimer <= 0
+          ? { state: 'solid', timer: 0 }
+          : { state: 'gone', timer: nextTimer };
+    } else {
+      fragileStates[plat.id] = entry;
+    }
+  }
+}
+
 function stepShatterLock(
   state: GlassSimState,
   course: CourseDef,
@@ -646,11 +728,13 @@ function stepShatterLock(
       p1: { ...state.p1 },
       p2: { ...state.p2 },
       glass: { ...state.glass, shatterTimer: nextShatterTimer },
+      fragileStates: cloneFragileStates(state.fragileStates),
       nextEventId,
       events: [],
     };
   }
 
+  const resetFragile = resetFragileStates(course, state.fragileStates);
   const cp = course.checkpoints[state.checkpointIndex] ?? course.checkpoints[0];
   const respawnedP1 = createSpawnedPlayer('p1', cp.p1Spawn, obs.platforms);
   const respawnedP2 = createSpawnedPlayer('p2', cp.p2Spawn, obs.platforms);
@@ -680,6 +764,7 @@ function stepShatterLock(
     p1: respawnedP1,
     p2: respawnedP2,
     glass: respawnedGlass,
+    fragileStates: resetFragile,
     nextEventId: nextEventId + 1,
     events,
   };
@@ -791,6 +876,7 @@ export function createInitialSimState(course: CourseDef = GLASS_COURSE): GlassSi
     p1,
     p2,
     glass: buildGlassState(computeGlassTransform(p1, p2)),
+    fragileStates: createInitialFragileStates(course),
     nextEventId: 1,
     events: [],
   };
@@ -813,6 +899,7 @@ export function stepGlassSim(
       p1: { ...state.p1 },
       p2: { ...state.p2 },
       glass: { ...state.glass },
+      fragileStates: cloneFragileStates(state.fragileStates),
       events: [],
     };
   }
@@ -839,12 +926,23 @@ export function stepGlassSim(
     events.push({ id: nextEventId++, kind, x, y, z, ...extra });
   };
 
-  const steppedP1 = stepPlayer(state.p1, p1Input, dt, obs);
-  const steppedP2 = stepPlayer(state.p2, p2Input, dt, obs);
+  const fragileStates = cloneFragileStates(state.fragileStates);
+  const activePlatforms = obs.platforms.filter(
+    (p) => !p.fragile || fragileStates[p.id]?.state !== 'gone',
+  );
+  const activeObs: EvaluatedCourseObstacles = { ...obs, platforms: activePlatforms };
+
+  const p1Step = stepPlayer(state.p1, p1Input, dt, activeObs);
+  const p2Step = stepPlayer(state.p2, p2Input, dt, activeObs);
+  const steppedFragileIds = new Set([
+    ...p1Step.steppedFragileIds,
+    ...p2Step.steppedFragileIds,
+  ]);
+  advanceFragileStates(fragileStates, obs.platforms, steppedFragileIds, dt);
 
   const spring = applySpringAndStress(
-    steppedP1,
-    steppedP2,
+    p1Step.player,
+    p2Step.player,
     state.glass.stress,
     dt,
     obs.barriers,
@@ -947,6 +1045,7 @@ export function stepGlassSim(
       lastImpactY,
       lastImpactZ,
     }),
+    fragileStates,
     nextEventId,
     events,
   };

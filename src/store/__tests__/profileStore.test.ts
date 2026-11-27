@@ -697,6 +697,176 @@ describe('settleCoopMatch & multi-map coopRecords migration', () => {
   });
 });
 
+describe('coopLevelRecords multi-level persistence, migration & settlement', () => {
+  it('defaults coopLevelRecords to {} and sanitizes only playable stage keys with clamped stats', () => {
+    assert.deepEqual(DEFAULT_PROFILE.coopLevelRecords, {});
+
+    const sanitized = sanitizeProfileData({
+      coopLevelRecords: {
+        'glass_carry:cabin_bridge:1': { bestStars: 5, bestTimeSec: 64.129 },
+        'glass_carry:sky_scaffold:3': { bestStars: 2.7, bestTimeSec: MAX_GLASS_TIME_SEC + 50 },
+        'raft_rapids:glacier_river:2': { bestStars: 3, bestTimeSec: 90 }, // comingSoon -> dropped
+        'glass_carry:cabin_bridge:6': { bestStars: 3, bestTimeSec: 90 }, // invalid level -> dropped
+        'unknown_action:pack:1': { bestStars: 3, bestTimeSec: 90 }, // unknown action -> dropped
+        'glass_carry:candy_factory:1': { bestStars: 0, bestTimeSec: 70 }, // < 1 star -> dropped
+        'glass_carry:candy_factory:2': { bestStars: 2, bestTimeSec: -5 }, // <= 0 time -> dropped
+      },
+    });
+
+    assert.deepEqual(sanitized.coopLevelRecords, {
+      'glass_carry:cabin_bridge:1': { bestStars: 3, bestTimeSec: 64.13 },
+      'glass_carry:sky_scaffold:3': { bestStars: 2, bestTimeSec: MAX_GLASS_TIME_SEC },
+    });
+  });
+
+  it('migrates legacy coopRecords/glass fields into default pack L1 and vice versa', () => {
+    const fromLegacy = sanitizeProfileData({
+      glassBestStars: 3,
+      glassBestTimeSec: 142.5,
+      coopRecords: {
+        raft_rapids: { bestStars: 2, bestTimeSec: 185 },
+      },
+    });
+    assert.deepEqual(fromLegacy.coopLevelRecords['glass_carry:cabin_bridge:1'], {
+      bestStars: 3,
+      bestTimeSec: 142.5,
+    });
+    assert.deepEqual(fromLegacy.coopLevelRecords['raft_rapids:glacier_river:1'], {
+      bestStars: 2,
+      bestTimeSec: 185,
+    });
+
+    const fromLevelRecords = sanitizeProfileData({
+      coopLevelRecords: {
+        'glass_carry:cabin_bridge:1': { bestStars: 3, bestTimeSec: 68.4 },
+        'rope_tether:lantern_peaks:1': { bestStars: 2, bestTimeSec: 210 },
+      },
+    });
+    assert.deepEqual(fromLevelRecords.coopRecords.glass_carry, {
+      bestStars: 3,
+      bestTimeSec: 68.4,
+    });
+    assert.equal(fromLevelRecords.glassBestStars, 3);
+    assert.equal(fromLevelRecords.glassBestTimeSec, 68.4);
+    assert.deepEqual(fromLevelRecords.coopRecords.rope_tether, {
+      bestStars: 2,
+      bestTimeSec: 210,
+    });
+  });
+
+  it('settles explicit pack & level stages using level thresholds, unlocks next level, and rejects comingSoon/invalid stages', () => {
+    // L1 cabin_bridge: 3* <= 75s & <=1 failure, 2* <= 125s & <=4 failures
+    const l1Run = settleCoopMatch(DEFAULT_PROFILE, {
+      matchId: 'coop-3lvl-l1-1',
+      mapId: 'glass_carry',
+      mapPackId: 'cabin_bridge',
+      level: 1,
+      elapsedSec: 70.126,
+      failures: 1,
+    });
+    assert.equal(l1Run.ok, true);
+    assert.equal(l1Run.mapId, 'glass_carry');
+    assert.equal(l1Run.mapPackId, 'cabin_bridge');
+    assert.equal(l1Run.level, 1);
+    assert.equal(l1Run.stageKey, 'glass_carry:cabin_bridge:1');
+    assert.equal(l1Run.stars, 3);
+    assert.equal(l1Run.reward, 50);
+    assert.equal(l1Run.isNewBest, true);
+    assert.equal(l1Run.unlockedNextLevel, 2);
+    assert.deepEqual(l1Run.nextProfile.coopLevelRecords['glass_carry:cabin_bridge:1'], {
+      bestStars: 3,
+      bestTimeSec: 70.13,
+    });
+    assert.deepEqual(l1Run.nextProfile.coopRecords.glass_carry, {
+      bestStars: 3,
+      bestTimeSec: 70.13,
+    });
+    assert.equal(l1Run.nextProfile.glassBestStars, 3);
+    assert.equal(l1Run.nextProfile.glassBestTimeSec, 70.13);
+
+    // Re-running L1 does not re-announce unlockedNextLevel
+    const l1Replay = settleCoopMatch(l1Run.nextProfile, {
+      matchId: 'coop-3lvl-l1-2',
+      mapId: 'glass_carry',
+      mapPackId: 'cabin_bridge',
+      level: 1,
+      elapsedSec: 95,
+      failures: 1,
+    });
+    assert.equal(l1Replay.ok, true);
+    assert.equal(l1Replay.stars, 2);
+    assert.equal(l1Replay.isNewBest, false);
+    assert.equal(l1Replay.unlockedNextLevel, null);
+
+    // Settling L2 unlocks L3
+    const l2Run = settleCoopMatch(l1Replay.nextProfile, {
+      matchId: 'coop-3lvl-l2-1',
+      mapId: 'glass_carry',
+      mapPackId: 'cabin_bridge',
+      level: 2,
+      elapsedSec: 100,
+      failures: 1,
+    });
+    assert.equal(l2Run.ok, true);
+    assert.equal(l2Run.level, 2);
+    assert.equal(l2Run.stageKey, 'glass_carry:cabin_bridge:2');
+    assert.equal(l2Run.stars, 3);
+    assert.equal(l2Run.unlockedNextLevel, 3);
+
+    // Settling L5 on candy_factory has no next level to unlock
+    const l5Run = settleCoopMatch(DEFAULT_PROFILE, {
+      matchId: 'coop-3lvl-candy-l5',
+      mapId: 'glass_carry',
+      mapPackId: 'candy_factory',
+      level: 5,
+      elapsedSec: 200,
+      failures: 2,
+    });
+    assert.equal(l5Run.ok, true);
+    assert.equal(l5Run.mapPackId, 'candy_factory');
+    assert.equal(l5Run.level, 5);
+    assert.equal(l5Run.stars, 3);
+    assert.equal(l5Run.unlockedNextLevel, null);
+
+    // Rejects comingSoon level (raft_rapids level 2)
+    const comingSoonRes = settleCoopMatch(DEFAULT_PROFILE, {
+      matchId: 'coop-coming-soon',
+      mapId: 'raft_rapids',
+      mapPackId: 'glacier_river',
+      level: 2,
+      elapsedSec: 100,
+      failures: 0,
+    });
+    assert.equal(comingSoonRes.ok, false);
+    assert.equal(comingSoonRes.reward, 0);
+    assert.equal(comingSoonRes.unlockedNextLevel, null);
+    assert.deepEqual(comingSoonRes.nextProfile, DEFAULT_PROFILE);
+
+    // Rejects invalid level and unknown pack
+    const invalidLevel = settleCoopMatch(DEFAULT_PROFILE, {
+      matchId: 'coop-bad-lvl',
+      mapId: 'glass_carry',
+      mapPackId: 'cabin_bridge',
+      level: 99 as never,
+      elapsedSec: 60,
+      failures: 0,
+    });
+    assert.equal(invalidLevel.ok, false);
+    assert.deepEqual(invalidLevel.nextProfile, DEFAULT_PROFILE);
+
+    const invalidPack = settleCoopMatch(DEFAULT_PROFILE, {
+      matchId: 'coop-bad-pack',
+      mapId: 'glass_carry',
+      mapPackId: 'nonexistent_pack',
+      level: 1,
+      elapsedSec: 60,
+      failures: 0,
+    });
+    assert.equal(invalidPack.ok, false);
+    assert.deepEqual(invalidPack.nextProfile, DEFAULT_PROFILE);
+  });
+});
+
 describe('settleSurvivalMatch & survival profile migration', () => {
   it('defaults survival fields to 0 on fresh/legacy profiles and clamps bounds in sanitizeProfileData', () => {
     assert.equal(DEFAULT_PROFILE.survivalBestScore, 0);
@@ -727,7 +897,7 @@ describe('settleSurvivalMatch & survival profile migration', () => {
     assert.equal(flooredAndNegative.survivalWins, 0);
   });
 
-  it('awards campaign victory cookies (60 base + 10/min past 360s, capped at 120) and increments survivalWins', () => {
+  it('awards campaign victory cookies scaled by map difficulty multiplier (winter 1x, candy 1.25x, crystal 1.55x) and increments survivalWins', () => {
     const baseWin = settleSurvivalMatch(DEFAULT_PROFILE, {
       matchId: 'surv-win-360',
       mapId: 'winter_cabin',
@@ -736,7 +906,7 @@ describe('settleSurvivalMatch & survival profile migration', () => {
       elapsedSec: 360.9,
     });
     assert.equal(baseWin.ok, true);
-    assert.equal(baseWin.reward, 60);
+    assert.equal(baseWin.reward, 60); // 60 * 1.0
     assert.equal(baseWin.isNewBestScore, true);
     assert.equal(baseWin.isNewBestTime, true);
     assert.equal(baseWin.nextProfile.cookies, DEFAULT_PROFILE.cookies + 60);
@@ -755,7 +925,7 @@ describe('settleSurvivalMatch & survival profile migration', () => {
       elapsedSec: 540,
     });
     assert.equal(bonusWin.ok, true);
-    assert.equal(bonusWin.reward, 90);
+    assert.equal(bonusWin.reward, Math.round(90 * 1.55)); // 140
     assert.equal(bonusWin.nextProfile.survivalWins, 2);
     assert.equal(bonusWin.nextProfile.survivalBestScore, 24000);
     assert.equal(bonusWin.nextProfile.survivalBestTimeSec, 540);
@@ -768,7 +938,7 @@ describe('settleSurvivalMatch & survival profile migration', () => {
       elapsedSec: 900,
     });
     assert.equal(cappedWin.ok, true);
-    assert.equal(cappedWin.reward, 120);
+    assert.equal(cappedWin.reward, Math.round(120 * 1.25)); // 150
     assert.equal(cappedWin.isNewBestScore, false);
     assert.equal(cappedWin.isNewBestTime, true);
     assert.equal(cappedWin.nextProfile.survivalBestScore, 24000);
@@ -776,7 +946,7 @@ describe('settleSurvivalMatch & survival profile migration', () => {
     assert.equal(cappedWin.nextProfile.survivalWins, 3);
   });
 
-  it('awards defeat and endless_abyss cookie formula (min 5 at >=20s, raw under 20s, capped at 100)', () => {
+  it('awards defeat and endless_abyss cookie formula scaled by map cookieMultiplier', () => {
     const shortDefeat = settleSurvivalMatch(DEFAULT_PROFILE, {
       matchId: 'surv-short-10',
       mapId: 'winter_cabin',
@@ -809,9 +979,9 @@ describe('settleSurvivalMatch & survival profile migration', () => {
       score: 8400,
       elapsedSec: 185,
     });
-    // floor(8400/400) + floor(185/30)*4 = 21 + 24 = 45
+    // round((floor(8400/400) + floor(185/30)*4) * 1.25) = round(45 * 1.25) = 56
     assert.equal(midDefeat.ok, true);
-    assert.equal(midDefeat.reward, 45);
+    assert.equal(midDefeat.reward, Math.round(45 * 1.25));
     assert.equal(midDefeat.nextProfile.survivalWins, 0);
 
     const endlessRun = settleSurvivalMatch(DEFAULT_PROFILE, {
@@ -822,13 +992,13 @@ describe('settleSurvivalMatch & survival profile migration', () => {
       elapsedSec: 600,
     });
     assert.equal(endlessRun.ok, true);
-    assert.equal(endlessRun.reward, 100);
+    assert.equal(endlessRun.reward, Math.round(100 * 1.4)); // 140
     assert.equal(endlessRun.nextProfile.gamesPlayed, 1);
     assert.equal(endlessRun.nextProfile.gamesWon, 0);
     assert.equal(endlessRun.nextProfile.survivalWins, 0);
   });
 
-  it('awards incremental endlessContinuation bonus without double-counting wins/games and caps total at 120', () => {
+  it('awards incremental endlessContinuation bonus without double-counting wins/games and scales cleanly', () => {
     const campaignWin = settleSurvivalMatch(DEFAULT_PROFILE, {
       matchId: 'surv-camp-01',
       mapId: 'winter_cabin',
@@ -869,7 +1039,7 @@ describe('settleSurvivalMatch & survival profile migration', () => {
       'surv-camp-01:endless',
     ]);
 
-    // Second Campaign run reaching 900s in Endless caps continuation delta at +60 (60 + 60 = 120 total)
+    // Second Campaign run on crystal_cavern (1.55x): 93 base win + 93 endless delta = 186 total
     const secondCampWin = settleSurvivalMatch(endlessCont540.nextProfile, {
       matchId: 'surv-camp-02',
       mapId: 'crystal_cavern',
@@ -878,7 +1048,7 @@ describe('settleSurvivalMatch & survival profile migration', () => {
       elapsedSec: 360,
     });
     assert.equal(secondCampWin.ok, true);
-    assert.equal(secondCampWin.reward, 60);
+    assert.equal(secondCampWin.reward, 93);
     assert.equal(secondCampWin.nextProfile.gamesPlayed, 2);
     assert.equal(secondCampWin.nextProfile.gamesWon, 2);
     assert.equal(secondCampWin.nextProfile.survivalWins, 2);
@@ -892,8 +1062,11 @@ describe('settleSurvivalMatch & survival profile migration', () => {
       endlessContinuation: true,
     });
     assert.equal(endlessCont900.ok, true);
-    assert.equal(endlessCont900.reward, 60);
-    assert.equal(endlessCont900.nextProfile.cookies, DEFAULT_PROFILE.cookies + 90 + 120);
+    assert.equal(endlessCont900.reward, Math.round(120 * 1.55) - 93);
+    assert.equal(
+      endlessCont900.nextProfile.cookies,
+      DEFAULT_PROFILE.cookies + 90 + Math.round(120 * 1.55),
+    );
     assert.equal(endlessCont900.nextProfile.gamesPlayed, 2);
     assert.equal(endlessCont900.nextProfile.gamesWon, 2);
     assert.equal(endlessCont900.nextProfile.survivalWins, 2);

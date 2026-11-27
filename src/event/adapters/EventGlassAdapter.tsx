@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { CheckCircle2, ShieldAlert, Users } from 'lucide-react';
+import { getDefaultMapPackId } from '../../coop/maps/registry';
 import {
   GLASS_INPUT_INTERVAL_MS,
   type CoopSnapshotPayload,
@@ -29,6 +30,7 @@ interface GlassTeamProgressPayload {
 }
 
 const PARTNER_DISCONNECT_FALLBACK_MS = 5000;
+const EMPTY_HOST_UNLOCKS: Record<string, number> = {};
 
 function createInitialHud(): GlassHudSnapshot {
   const firstStage = GLASS_COURSE.stages[0];
@@ -353,6 +355,9 @@ export function EventGlassAdapter({
       connectionStatus: 'connected',
       phase: localPhase,
       selectedMap: 'glass_carry',
+      selectedMapPack: getDefaultMapPackId('glass_carry'),
+      selectedLevel: 1,
+      hostUnlockedByPack: EMPTY_HOST_UNLOCKS,
       roomCode,
       matchId: `${round.roundId}-${myPair.pairId}`,
       myPeerId,
@@ -373,6 +378,8 @@ export function EventGlassAdapter({
       updateMyProfile: () => {},
       toggleReady: () => {},
       selectMap: () => {},
+      selectStage: () => {},
+      syncHostUnlocks: () => {},
       startMatch: () => {},
       restartMatch: () => {},
       startNextMap: () => {},

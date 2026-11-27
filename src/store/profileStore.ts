@@ -8,7 +8,11 @@ import {
   toggleSlotAccessory,
   type ShopItem,
 } from '../scene3d/accessoryCatalog.ts';
-import type { CoopMapId, CoopMapRecord } from '../coop/maps/registry.ts';
+import type {
+  CoopLevelNumber,
+  CoopMapId,
+  CoopMapRecord,
+} from '../coop/maps/registry.ts';
 import type { SurvivalMapId } from '../survival/sim/types.ts';
 import { unwrapSignedProfile, wrapSignedProfile } from './profileIntegrity.ts';
 import {
@@ -266,6 +270,8 @@ export function useProfileStore() {
     (payload: {
       matchId: string;
       mapId: CoopMapId;
+      mapPackId?: string;
+      level?: CoopLevelNumber;
       elapsedSec: number;
       failures: number;
     }) => {
@@ -276,9 +282,13 @@ export function useProfileStore() {
       return {
         ok: settlement.ok,
         mapId: settlement.mapId,
+        mapPackId: settlement.mapPackId,
+        level: settlement.level,
+        stageKey: settlement.stageKey,
         reward: settlement.reward,
         stars: settlement.stars,
         isNewBest: settlement.isNewBest,
+        unlockedNextLevel: settlement.unlockedNextLevel,
       };
     },
     [],

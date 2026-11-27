@@ -13,7 +13,11 @@ import {
 } from 'lucide-react';
 import { playSfx } from '../audio/soundEngine';
 import { AnimalAvatar } from '../components/AnimalAvatar';
-import { MAX_COOP_STARS, countTotalCoopStars } from '../coop/maps/registry';
+import {
+  MAX_COOP_STARS,
+  TOTAL_PLAYABLE_COOP_LEVELS,
+  countTotalCoopLevelStars,
+} from '../coop/maps/registry';
 import { ANIMALS } from '../engine/types';
 import { formatEquippedSummary } from '../scene3d/accessoryCatalog';
 import { useProfileStore } from '../store/profileStore';
@@ -71,7 +75,7 @@ export function ModeSelectScreen({
     gamesWon,
     gamesPlayed,
     blockBlastBestScore,
-    coopRecords,
+    coopLevelRecords,
     survivalBestScore,
     selectedAnimal,
     equippedAccessory,
@@ -161,7 +165,7 @@ export function ModeSelectScreen({
     {
       id: 'glassCarry',
       title: 'PAWS Duo Co-op 3D',
-      genreBadge: 'Co-op 2 Người · 4 Map Hợp Tác',
+      genreBadge: '4 Kiểu Hợp Tác · Nhiều Màn',
       badgeIcon: <Users className="h-3.5 w-3.5 text-cyan-300" />,
       description:
         'Phối hợp cùng đồng đội Online qua 4 kiểu chơi khác hẳn nhau: Bê Kính Pha Lê, Chèo Phao Vượt Thác, Dây Thừng Buộc Chung & Xe Goòng Đường Ray!',
@@ -177,11 +181,14 @@ export function ModeSelectScreen({
       ctaClass: 'btn-tactile-cyan',
       ctaTextClass: 'text-[#06222c]',
       specs: [
-        { label: 'Chế độ', value: '4 Map · 2 Người Online' },
-        { label: 'Thử thách', value: '5 chặng · Checkpoint' },
+        { label: 'Hợp tác', value: '4 Kiểu · 2 Người Online' },
+        {
+          label: 'Màn chơi',
+          value: `${TOTAL_PLAYABLE_COOP_LEVELS} Màn · Dễ → Siêu Khó`,
+        },
         {
           label: 'Tổng sao',
-          value: `${countTotalCoopStars(coopRecords)} / ${MAX_COOP_STARS}★`,
+          value: `${countTotalCoopLevelStars(coopLevelRecords)} / ${MAX_COOP_STARS}★`,
         },
       ],
       onEnter: onSelectGlassCarry,
@@ -236,7 +243,8 @@ export function ModeSelectScreen({
                 Chọn <span className="font-bold text-amber-300">Đấu Bài</span> cân não,{' '}
                 <span className="font-bold text-sky-300">Hỗn Chiến</span> vật lý,{' '}
                 <span className="font-bold text-emerald-300">Xếp Khối 8×8</span>,{' '}
-                <span className="font-bold text-cyan-300">Duo Co-op 4 Map</span> hoặc{' '}
+                <span className="font-bold text-cyan-300">Duo Co-op 4 Kiểu</span>{' '}
+                hoặc{' '}
                 <span className="font-bold text-fuchsia-300">Sinh Tồn 2D</span> cùng thú bông PAWS.
               </p>
             </div>

@@ -21,13 +21,20 @@ function box(
   return { minX, maxX, minY, maxY, minZ, maxZ };
 }
 
-function shiftBox(source: Aabb3, axis: 'x' | 'z', offset: number): Aabb3 {
+function shiftBox(source: Aabb3, axis: 'x' | 'y' | 'z', offset: number): Aabb3 {
   if (offset === 0) return source;
   if (axis === 'x') {
     return {
       ...source,
       minX: source.minX + offset,
       maxX: source.maxX + offset,
+    };
+  }
+  if (axis === 'y') {
+    return {
+      ...source,
+      minY: source.minY + offset,
+      maxY: source.maxY + offset,
     };
   }
   return {
@@ -316,7 +323,11 @@ export function evaluateDynamicObstacles(
     surface: p.surface,
     box: p.box,
     vx: 0,
+    vy: 0,
     vz: 0,
+    conveyorVx: p.conveyorVx,
+    conveyorVz: p.conveyorVz,
+    fragile: p.fragile,
   }));
 
   for (const p of course.movingPlatforms) {
@@ -328,6 +339,7 @@ export function evaluateDynamicObstacles(
       surface: p.surface,
       box: shiftBox(p.baseBox, p.axis, offset),
       vx: p.axis === 'x' ? vel : 0,
+      vy: p.axis === 'y' ? vel : 0,
       vz: p.axis === 'z' ? vel : 0,
     });
   }

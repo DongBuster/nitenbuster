@@ -1,12 +1,14 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
   Check,
+  Clock,
   Compass,
   Copy,
   Crown,
   Globe,
   Link2,
+  Lock,
   Play,
   Sparkles,
   Star,
@@ -18,10 +20,21 @@ import { AnimalAvatar } from '../../components/AnimalAvatar';
 import {
   COOP_MAPS,
   MAX_COOP_STARS,
-  countTotalCoopStars,
+  buildUnlockedByPackMap,
+  countCoopActionStars,
+  countCoopPackStars,
+  countTotalCoopLevelStars,
+  getCoopLevelMeta,
   getCoopMapMeta,
+  getCoopMapPack,
+  getDefaultMapPackId,
+  isCoopLevelUnlocked,
+  type CoopLevelNumber,
+  type CoopMapId,
+  type CoopMapRecord,
 } from '../../coop/maps/registry';
 import { ANIMALS, type AnimalId } from '../../engine/types';
+import { buildRoomInviteUrl, copyTextSafe } from '../../online/inviteLink';
 import { normalizeRoomCode } from '../../online/sanitize';
 import { formatEquippedSummary } from '../../scene3d/accessoryCatalog';
 import { useProfileStore } from '../../store/profileStore';
@@ -166,15 +179,403 @@ function renderSlotCard(
 
       <div className="mt-4 border-t border-white/10 pt-2.5 text-[11px] font-bold text-slate-300/80">
         {isHostSlot
-          ? 'Vị trí P1 · Chọn Map & Điều hành phòng'
+          ? 'Vị trí P1 · Chọn Kiểu, Map & Màn chơi'
           : 'Vị trí P2 · Phối hợp ăn ý cùng đồng đội'}
       </div>
     </div>
   );
 }
 
+interface CoopStageSelectorProps {
+  mode: 'preview' | 'lobby';
+  isHost: boolean;
+  selectedActionId: CoopMapId;
+  selectedPackId: string;
+  selectedLevel: CoopLevelNumber;
+  coopLevelRecords: Readonly<Record<string, CoopMapRecord>>;
+  unlockedByPack: Readonly<Record<string, number>>;
+  onSelectAction: (actionId: CoopMapId) => void;
+  onSelectPack: (packId: string) => void;
+  onSelectLevel: (level: CoopLevelNumber) => void;
+}
+
+function CoopStageSelector({
+  mode,
+  isHost,
+  selectedActionId,
+  selectedPackId,
+  selectedLevel,
+  coopLevelRecords,
+  unlockedByPack,
+  onSelectAction,
+  onSelectPack,
+  onSelectLevel,
+}: CoopStageSelectorProps) {
+  const canInteract = mode === 'preview' || isHost;
+  const headingId = useId();
+  const activeAction = getCoopMapMeta(selectedActionId);
+  const activePack = getCoopMapPack(activeAction.id, selectedPackId);
+  const activeLevelMeta = getCoopLevelMeta(
+    activeAction.id,
+    activePack.id,
+    selectedLevel,
+  );
+
+  return (
+    <section
+      aria-labelledby={headingId}
+      className="space-y-4 rounded-3xl border border-cyan-400/25 bg-[#121d2d]/95 p-4 shadow-xl sm:p-5"
+    >
+      {/* Tier 1: 4 Co-op Actions */}
+      <div>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Compass aria-hidden="true" className="h-4 w-4 text-cyan-300" />
+            <h2
+              id={headingId}
+              className="text-xs font-black uppercase tracking-wider text-cyan-300"
+            >
+              4 KIỂU HÀNH ĐỘNG HỢP TÁC
+            </h2>
+          </div>
+
+          <span
+            className={`rounded-full border px-2.5 py-0.5 text-[11px] font-black ${
+              mode === 'preview'
+                ? 'border-cyan-400/35 bg-cyan-950/70 text-cyan-200'
+                : isHost
+                  ? 'border-amber-400/45 bg-amber-400/15 text-amber-200'
+                  : 'border-cyan-400/35 bg-cyan-950/70 text-cyan-200'
+            }`}
+          >
+            {mode === 'preview'
+              ? 'Xem trước · Bấm để duyệt từng Kiểu'
+              : isHost
+                ? 'Chủ phòng chọn Kiểu · Map · Màn'
+                : 'Chủ phòng đang chọn'}
+          </span>
+        </div>
+
+        <div className="mt-2.5 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          {COOP_MAPS.map((action) => {
+            const isSelected = activeAction.id === action.id;
+            const stars = countCoopActionStars(coopLevelRecords, action.id);
+            const cardClass = `flex h-full flex-col justify-between rounded-2xl border-2 p-3 text-left transition-all motion-reduce:transition-none ${
+              isSelected
+                ? 'border-cyan-300 bg-cyan-500/18 shadow-[0_0_20px_rgba(34,211,238,0.25)]'
+                : 'border-white/10 bg-[#0a1320]/90'
+            }`;
+
+            const body = (
+              <>
+                <div>
+                  <div className="flex items-center justify-between gap-1.5">
+                    <span
+                      className="rounded-lg border px-2 py-0.5 text-[10px] font-black uppercase"
+                      style={{
+                        borderColor: `${action.accentHex}66`,
+                        backgroundColor: `${action.accentHex}1f`,
+                        color: action.accentHex,
+                      }}
+                    >
+                      KIỂU {action.order}
+                    </span>
+
+                    <span className="inline-flex items-center gap-1 rounded-md bg-amber-400/10 px-1.5 py-0.5 text-[10px] font-black text-amber-200 tabular-nums">
+                      <Star
+                        aria-hidden="true"
+                        className="h-3 w-3 fill-amber-400 text-amber-300"
+                      />
+                      <span>
+                        {stars.earned} / {stars.max}★
+                      </span>
+                    </span>
+                  </div>
+
+                  <div className="mt-1.5 font-display text-sm font-black text-white">
+                    {action.title}
+                  </div>
+                  <div className="mt-0.5 text-[11px] font-bold text-cyan-200/85">
+                    {action.mechanicBadge}
+                  </div>
+                </div>
+
+                {isSelected && (
+                  <div className="mt-2 border-t border-white/10 pt-1.5 text-right">
+                    <span className="rounded-md bg-cyan-400/25 px-1.5 py-0.5 text-[10px] font-black text-cyan-200">
+                      Đang chọn
+                    </span>
+                  </div>
+                )}
+              </>
+            );
+
+            if (canInteract) {
+              return (
+                <button
+                  key={action.id}
+                  type="button"
+                  aria-pressed={isSelected}
+                  onClick={() => {
+                    playSfx('click');
+                    onSelectAction(action.id);
+                  }}
+                  className={`${cardClass} cursor-pointer hover:border-cyan-400/60 ${FOCUS_RING_CLASS}`}
+                >
+                  {body}
+                </button>
+              );
+            }
+
+            return (
+              <div
+                key={action.id}
+                aria-current={isSelected ? 'true' : undefined}
+                className={cardClass}
+              >
+                {body}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Tier 2: Map Packs inside Selected Action */}
+      <div className="border-t border-white/10 pt-3.5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-xs font-black uppercase tracking-wider text-amber-300">
+            CHỌN MAP · {activeAction.shortTitle}
+          </h3>
+          <span className="text-[11px] font-bold text-slate-300">
+            {activeAction.maps.length} bản đồ bối cảnh
+          </span>
+        </div>
+
+        <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
+          {activeAction.maps.map((pack) => {
+            const isPackSelected = activePack.id === pack.id;
+            const packStars = countCoopPackStars(
+              coopLevelRecords,
+              activeAction.id,
+              pack.id,
+            );
+            const packClass = `flex flex-col justify-between rounded-2xl border-2 p-3 text-left transition-all motion-reduce:transition-none ${
+              isPackSelected
+                ? 'border-amber-300 bg-amber-400/15 shadow-[0_0_16px_rgba(251,191,36,0.2)]'
+                : 'border-white/10 bg-[#0a1320]/90'
+            }`;
+
+            const packBody = (
+              <>
+                <div>
+                  <div className="flex items-center justify-between gap-1.5">
+                    <span
+                      className="rounded-lg border px-2 py-0.5 text-[10px] font-black uppercase"
+                      style={{
+                        borderColor: `${pack.accentHex}66`,
+                        backgroundColor: `${pack.accentHex}1f`,
+                        color: pack.accentHex,
+                      }}
+                    >
+                      Map {pack.order}
+                    </span>
+                    <span className="inline-flex items-center gap-1 text-[11px] font-black text-amber-200 tabular-nums">
+                      <Star
+                        aria-hidden="true"
+                        className="h-3 w-3 fill-amber-400 text-amber-300"
+                      />
+                      <span>
+                        {packStars.earned}/{packStars.max}★
+                      </span>
+                    </span>
+                  </div>
+
+                  <div className="mt-1.5 font-display text-sm font-black text-white">
+                    {pack.title}
+                  </div>
+                  <p className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-slate-300">
+                    {pack.tagline}
+                  </p>
+                </div>
+              </>
+            );
+
+            if (canInteract) {
+              return (
+                <button
+                  key={pack.id}
+                  type="button"
+                  aria-pressed={isPackSelected}
+                  onClick={() => {
+                    playSfx('click');
+                    onSelectPack(pack.id);
+                  }}
+                  className={`${packClass} cursor-pointer hover:border-amber-300/60 ${FOCUS_RING_CLASS}`}
+                >
+                  {packBody}
+                </button>
+              );
+            }
+
+            return (
+              <div
+                key={pack.id}
+                aria-current={isPackSelected ? 'true' : undefined}
+                className={packClass}
+              >
+                {packBody}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Tier 3: 5 Levels inside Selected Map Pack */}
+      <div className="border-t border-white/10 pt-3.5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-xs font-black uppercase tracking-wider text-emerald-300">
+            CHỌN MÀN (DỄ → SIÊU KHÓ)
+          </h3>
+          <span className="text-[11px] font-bold text-slate-300">
+            Mở khóa tuần tự theo tiến độ Chủ phòng
+          </span>
+        </div>
+
+        <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-5">
+          {activePack.levels.map((lvl) => {
+            const isLevelSelected = activeLevelMeta.level === lvl.level;
+            const comingSoon = Boolean(lvl.comingSoon);
+            const unlocked =
+              !comingSoon &&
+              isCoopLevelUnlocked(
+                coopLevelRecords,
+                activeAction.id,
+                activePack.id,
+                lvl.level,
+                unlockedByPack,
+              );
+            const rec = coopLevelRecords[lvl.key];
+            const bestStars = rec?.bestStars ?? 0;
+
+            const levelClass = `flex min-h-[7.25rem] flex-col justify-between rounded-2xl border-2 p-2.5 text-left transition-all motion-reduce:transition-none ${
+              comingSoon || !unlocked
+                ? 'border-white/10 bg-[#080f1a]/85 opacity-60'
+                : isLevelSelected
+                  ? 'border-cyan-300 bg-cyan-500/20 shadow-[0_0_18px_rgba(34,211,238,0.28)]'
+                  : 'border-white/15 bg-[#0a1320]/95'
+            }`;
+
+            const levelBody = (
+              <>
+                <div>
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="text-[11px] font-black text-white">
+                      Màn {lvl.level}
+                    </span>
+                    <span
+                      className="rounded-md border px-1.5 py-0.5 text-[9px] font-black"
+                      style={{
+                        borderColor: `${lvl.difficultyColorHex}66`,
+                        backgroundColor: `${lvl.difficultyColorHex}1f`,
+                        color: lvl.difficultyColorHex,
+                      }}
+                    >
+                      {lvl.difficultyLabel}
+                    </span>
+                  </div>
+
+                  <div className="mt-1 line-clamp-2 text-[11px] font-extrabold leading-tight text-slate-100">
+                    {lvl.title}
+                  </div>
+                </div>
+
+                {comingSoon ? (
+                  <div className="mt-2 inline-flex items-center gap-1 border-t border-white/10 pt-1.5 text-[10px] font-bold text-slate-400">
+                    <Clock aria-hidden="true" className="h-3 w-3 shrink-0" />
+                    <span>Sắp ra mắt</span>
+                  </div>
+                ) : !unlocked ? (
+                  <div className="mt-2 inline-flex items-center gap-1 border-t border-white/10 pt-1.5 text-[10px] font-bold text-amber-200/80">
+                    <Lock aria-hidden="true" className="h-3 w-3 shrink-0" />
+                    <span>Qua Màn {lvl.level - 1}</span>
+                  </div>
+                ) : (
+                  <div className="mt-2 flex items-center justify-between gap-1 border-t border-white/10 pt-1.5">
+                    <span className="inline-flex items-center gap-0.5">
+                      <span className="sr-only">{bestStars} trên 3 sao</span>
+                      {[1, 2, 3].map((idx) => (
+                        <Star
+                          key={idx}
+                          aria-hidden="true"
+                          className={`h-3 w-3 ${
+                            idx <= bestStars
+                              ? 'fill-amber-400 text-amber-300'
+                              : 'text-slate-600'
+                          }`}
+                        />
+                      ))}
+                    </span>
+                    {rec ? (
+                      <span className="inline-flex items-center gap-0.5 font-mono text-[10px] font-bold text-cyan-200 tabular-nums">
+                        <Timer
+                          aria-hidden="true"
+                          className="h-2.5 w-2.5 text-cyan-300"
+                        />
+                        <span>{formatBestTime(rec.bestTimeSec)}</span>
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-bold text-slate-400">
+                        Mở
+                      </span>
+                    )}
+                  </div>
+                )}
+              </>
+            );
+
+            if (canInteract) {
+              const disabled = comingSoon || !unlocked;
+              return (
+                <button
+                  key={lvl.key}
+                  type="button"
+                  disabled={disabled}
+                  aria-pressed={!disabled && isLevelSelected}
+                  onClick={() => {
+                    if (disabled) return;
+                    playSfx('click');
+                    onSelectLevel(lvl.level);
+                  }}
+                  className={`${levelClass} ${
+                    disabled
+                      ? 'cursor-not-allowed'
+                      : 'cursor-pointer hover:border-cyan-300/70'
+                  } ${FOCUS_RING_CLASS}`}
+                >
+                  {levelBody}
+                </button>
+              );
+            }
+
+            return (
+              <div
+                key={lvl.key}
+                aria-current={isLevelSelected ? 'true' : undefined}
+                className={levelClass}
+              >
+                {levelBody}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 /**
- * Create/Join lobby and 2-player waiting room for PAWS Duo Co-op 3D (4 maps).
+ * Create/Join lobby and 2-player waiting room for PAWS Duo Co-op 3D
+ * featuring a 3-level hierarchy selector (4 Actions -> Map Packs -> 5 Levels).
  */
 export function GlassLobby({
   room,
@@ -184,16 +585,30 @@ export function GlassLobby({
   const {
     selectedAnimal,
     equippedAccessory,
-    coopRecords,
+    coopLevelRecords,
     selectAnimal,
   } = useProfileStore();
-  const totalStars = countTotalCoopStars(coopRecords);
+  const totalStars = countTotalCoopLevelStars(coopLevelRecords);
+  const localUnlockedByPack = useMemo(
+    () => buildUnlockedByPackMap(coopLevelRecords),
+    [coopLevelRecords],
+  );
 
   const [displayName, setDisplayName] = useState<string>(() => loadSavedName());
   const [joinCodeInput, setJoinCodeInput] = useState<string>(() =>
     normalizeRoomCode(initialRoomCode),
   );
   const [copiedMode, setCopiedMode] = useState<'code' | 'link' | null>(null);
+
+  const [previewAction, setPreviewAction] = useState<CoopMapId>(
+    room.selectedMap,
+  );
+  const [previewPack, setPreviewPack] = useState<string>(
+    () => room.selectedMapPack || getDefaultMapPackId(room.selectedMap),
+  );
+  const [previewLevel, setPreviewLevel] = useState<CoopLevelNumber>(
+    room.selectedLevel,
+  );
 
   const nameInputId = useId();
   const joinInputId = useId();
@@ -246,6 +661,7 @@ export function GlassLobby({
       name: displayName.trim() || 'Chủ phòng',
       animal: selectedAnimal,
       accessory: myAccessory,
+      unlockedByPack: localUnlockedByPack,
     });
   };
 
@@ -257,18 +673,23 @@ export function GlassLobby({
       name: displayName.trim() || 'Người chơi',
       animal: selectedAnimal,
       accessory: myAccessory,
+      unlockedByPack: localUnlockedByPack,
     });
   };
 
   const handleCopy = async (mode: 'code' | 'link') => {
     if (!room.roomCode) return;
     playSfx('click');
+    const inviteUrl = buildRoomInviteUrl('glass', room.roomCode);
     const text =
-      mode === 'link' && typeof window !== 'undefined'
-        ? `${window.location.origin}${window.location.pathname}?coopRoom=${room.roomCode}`
+      mode === 'link'
+        ? inviteUrl ||
+          (typeof window !== 'undefined'
+            ? `${window.location.origin}${window.location.pathname}?coopRoom=${room.roomCode}`
+            : room.roomCode)
         : room.roomCode;
-    try {
-      await navigator.clipboard.writeText(text);
+    const ok = await copyTextSafe(text);
+    if (ok) {
       setCopiedMode(mode);
       if (copyTimerRef.current !== null) {
         window.clearTimeout(copyTimerRef.current);
@@ -277,8 +698,6 @@ export function GlassLobby({
         copyTimerRef.current = null;
         setCopiedMode(null);
       }, 1800);
-    } catch {
-      // Clipboard API unavailable
     }
   };
 
@@ -290,7 +709,7 @@ export function GlassLobby({
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="inline-flex items-center gap-1.5 rounded-full border border-cyan-400/35 bg-cyan-950/70 px-3 py-1 text-xs font-black text-cyan-200">
               <Globe aria-hidden="true" className="h-3.5 w-3.5 text-cyan-300" />
-              <span>PAWS Duo Co-op 3D · 4 Map Hợp Tác · 2 Người Online</span>
+              <span>PAWS Duo Co-op 3D · 4 Kiểu Hợp Tác · 2 Người Online</span>
             </span>
           </div>
 
@@ -349,7 +768,7 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
             <div>
               <div className="inline-flex items-center gap-1.5 rounded-full border border-cyan-400/35 bg-cyan-950/65 px-3.5 py-1 text-xs font-bold text-cyan-200">
                 <Users aria-hidden="true" className="h-3.5 w-3.5 text-cyan-300" />
-                <span>4 Map Hợp Tác · 2 Người Online</span>
+                <span>4 Kiểu Hợp Tác · Nhiều Màn · 2 Người Online</span>
               </div>
               <h1 className="mt-2 font-display text-2xl font-black text-white sm:text-3xl">
                 PAWS Duo Co-op 3D
@@ -381,88 +800,39 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
             </div>
           </header>
 
-          {/* 4-Map Preview Strip */}
-          <section
-            aria-label="Xem trước 4 Map Hợp Tác"
-            className="rounded-3xl border border-cyan-400/25 bg-[#121d2d]/90 p-4 shadow-xl"
-          >
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-cyan-300">
-                <Compass aria-hidden="true" className="h-4 w-4 text-cyan-300" />
-                <span>4 Map Hợp Tác Đặc Trưng</span>
-              </div>
-              <span className="text-[11px] font-bold text-slate-300">
-                Chủ phòng chọn Map sau khi tạo phòng
-              </span>
-            </div>
-
-            <div className="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
-              {COOP_MAPS.map((map) => {
-                const rec = coopRecords[map.id];
-                const bestStars = rec?.bestStars ?? 0;
-                return (
-                  <div
-                    key={map.id}
-                    className="flex flex-col justify-between rounded-2xl border border-white/10 bg-[#0a1320]/90 p-3"
-                  >
-                    <div>
-                      <div className="flex items-center justify-between gap-2">
-                        <span
-                          className="rounded-lg border px-2 py-0.5 text-[10px] font-black uppercase"
-                          style={{
-                            borderColor: `${map.accentHex}66`,
-                            backgroundColor: `${map.accentHex}1f`,
-                            color: map.accentHex,
-                          }}
-                        >
-                          Map {map.order}
-                        </span>
-                        <span className="inline-flex items-center gap-0.5">
-                          <span className="sr-only">{bestStars} trên 3 sao</span>
-                          {[1, 2, 3].map((idx) => (
-                            <Star
-                              key={idx}
-                              aria-hidden="true"
-                              className={`h-3.5 w-3.5 ${
-                                idx <= bestStars
-                                  ? 'fill-amber-400 text-amber-300'
-                                  : 'text-slate-600'
-                              }`}
-                            />
-                          ))}
-                        </span>
-                      </div>
-
-                      <h2 className="mt-2 font-display text-sm font-black text-white">
-                        {map.title}
-                      </h2>
-                      <p className="mt-0.5 text-[11px] font-bold text-cyan-200/85">
-                        {map.mechanicBadge}
-                      </p>
-                    </div>
-
-                    <div className="mt-2 flex items-center justify-between border-t border-white/10 pt-2 text-[11px] font-bold text-slate-400">
-                      <span>Kỷ lục</span>
-                      <span className="font-mono text-cyan-200 tabular-nums">
-                        {rec ? formatBestTime(rec.bestTimeSec) : 'Chưa phá đảo'}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-
-          {room.error && (
-            <div
-              role="alert"
-              className="rounded-2xl border border-rose-400/50 bg-rose-500/20 px-4 py-3 text-sm font-bold text-rose-100"
-            >
-              {room.error}
-            </div>
-          )}
-
+          {/* 3-Tier Interactive Preview */}
           <main className="space-y-5">
+            <CoopStageSelector
+              mode="preview"
+              isHost
+              selectedActionId={previewAction}
+              selectedPackId={previewPack}
+              selectedLevel={previewLevel}
+              coopLevelRecords={coopLevelRecords}
+              unlockedByPack={localUnlockedByPack}
+              onSelectAction={(actionId) => {
+                setPreviewAction(actionId);
+                setPreviewPack(getDefaultMapPackId(actionId));
+                setPreviewLevel(1);
+              }}
+              onSelectPack={(packId) => {
+                setPreviewPack(packId);
+                setPreviewLevel(1);
+              }}
+              onSelectLevel={(level) => {
+                setPreviewLevel(level);
+              }}
+            />
+
+            {room.error && (
+              <div
+                role="alert"
+                className="rounded-2xl border border-rose-400/50 bg-rose-500/20 px-4 py-3 text-sm font-bold text-rose-100"
+              >
+                {room.error}
+              </div>
+            )}
+
             {/* Profile & 8-Animal Picker */}
             <section className="rounded-3xl border-2 border-cyan-400/25 bg-[#121d2d] p-5 shadow-2xl">
               <h2 className="text-xs font-black uppercase tracking-wider text-cyan-300">
@@ -528,7 +898,7 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
                   </h2>
                   <p className="mt-1.5 text-xs leading-relaxed text-slate-300">
                     Tạo phòng riêng 2 người, nhận mã 6 ký tự hoặc link mời nhanh
-                    cho đồng đội cùng phối hợp qua 4 map hợp tác về đích.
+                    cho đồng đội cùng phối hợp qua 4 kiểu hợp tác và nhiều màn chơi.
                   </p>
                 </div>
                 <button
@@ -593,13 +963,24 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
   const bothPresent = room.members.length === 2;
   const bothReady = bothPresent && room.members.every((m) => m.ready);
   const canStart = room.isHost && bothReady;
-  const activeMapMeta = getCoopMapMeta(room.selectedMap);
+  const activeActionMeta = getCoopMapMeta(room.selectedMap);
+  const activePackMeta = getCoopMapPack(room.selectedMap, room.selectedMapPack);
+  const activeLevelMeta = getCoopLevelMeta(
+    room.selectedMap,
+    activePackMeta.id,
+    room.selectedLevel,
+  );
+  const activeUnlockedByPack = room.isHost
+    ? localUnlockedByPack
+    : room.hostUnlockedByPack;
+
+  const stageLabel = `${activeActionMeta.shortTitle} · ${activePackMeta.shortTitle} · Màn ${activeLevelMeta.level}`;
 
   const hostHintText = !bothPresent
     ? 'Đang chờ đủ 2 người chơi trong phòng...'
     : !bothReady
       ? 'Cả 2 người chơi cần bấm Sẵn Sàng để xuất phát!'
-      : `Cả đội đã sẵn sàng — bấm để bắt đầu ${activeMapMeta.shortTitle}!`;
+      : `Cả đội đã sẵn sàng — bấm để bắt đầu ${stageLabel}!`;
 
   return (
     <div className="min-h-dvh bg-[#0e1827] bg-[radial-gradient(circle_at_18%_0%,_rgba(56,189,248,0.18)_0%,_transparent_46%),radial-gradient(circle_at_84%_0%,_rgba(251,191,36,0.14)_0%,_transparent_46%),linear-gradient(180deg,_#121d2d_0%,_#0e1827_100%)] p-4 text-[#FFF9F0] sm:p-6 lg:p-8">
@@ -608,7 +989,9 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
           <div className="flex flex-wrap items-center gap-3">
             <div>
               <div className="flex flex-wrap items-center gap-2 text-[11px] font-black uppercase tracking-wider text-cyan-300">
-                <span>Sảnh Chờ PAWS Duo Co-op 3D</span>
+                <h1 className="font-display text-sm font-black uppercase tracking-wider text-cyan-300">
+                  Sảnh Chờ PAWS Duo Co-op 3D
+                </h1>
                 <span className="rounded-full border border-white/10 bg-[#0a1320] px-2 py-0.5 text-[10px] font-bold text-slate-300 normal-case">
                   {room.connectionStatus === 'connected'
                     ? 'Đã kết nối'
@@ -686,147 +1069,40 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
 
         <main className="space-y-5">
           {/* 2 Player Slots side-by-side */}
-          <section aria-label="Danh sách hai người chơi">
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              {renderSlotCard(
-                'p1',
-                room.p1Member,
-                room.myPeerId,
-                room.connectionStatus === 'connecting',
-              )}
-              {renderSlotCard(
-                'p2',
-                room.p2Member,
-                room.myPeerId,
-                room.connectionStatus === 'connecting',
-              )}
-            </div>
-          </section>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            {renderSlotCard(
+              'p1',
+              room.p1Member,
+              room.myPeerId,
+              room.connectionStatus === 'connecting',
+            )}
+            {renderSlotCard(
+              'p2',
+              room.p2Member,
+              room.myPeerId,
+              room.connectionStatus === 'connecting',
+            )}
+          </div>
 
-          {/* 4-Map Selector Grid */}
-          <section
-            aria-label="Chọn Map Hợp Tác"
-            className="rounded-3xl border border-cyan-400/25 bg-[#121d2d] p-5 shadow-xl"
-          >
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <Compass aria-hidden="true" className="h-4 w-4 text-cyan-300" />
-                <h2 className="text-xs font-black uppercase tracking-wider text-cyan-300">
-                  Chọn Map Hợp Tác (4 Map)
-                </h2>
-              </div>
-              <span
-                className={`rounded-full border px-2.5 py-0.5 text-[11px] font-black ${
-                  room.isHost
-                    ? 'border-amber-400/45 bg-amber-400/15 text-amber-200'
-                    : 'border-cyan-400/35 bg-cyan-950/70 text-cyan-200'
-                }`}
-              >
-                {room.isHost ? 'Chủ phòng chọn Map' : 'Chủ phòng đang chọn'}
-              </span>
-            </div>
-
-            <div className="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
-              {COOP_MAPS.map((map) => {
-                const isSelected = room.selectedMap === map.id;
-                const rec = coopRecords[map.id];
-                const bestStars = rec?.bestStars ?? 0;
-
-                const cardBody = (
-                  <>
-                    <div>
-                      <div className="flex items-center justify-between gap-1.5">
-                        <span
-                          className="rounded-lg border px-2 py-0.5 text-[10px] font-black uppercase"
-                          style={{
-                            borderColor: `${map.accentHex}66`,
-                            backgroundColor: `${map.accentHex}1f`,
-                            color: map.accentHex,
-                          }}
-                        >
-                          Map {map.order}
-                        </span>
-                        <span className="inline-flex items-center gap-0.5">
-                          <span className="sr-only">{bestStars} trên 3 sao</span>
-                          {[1, 2, 3].map((idx) => (
-                            <Star
-                              key={idx}
-                              aria-hidden="true"
-                              className={`h-3.5 w-3.5 ${
-                                idx <= bestStars
-                                  ? 'fill-amber-400 text-amber-300'
-                                  : 'text-slate-600'
-                              }`}
-                            />
-                          ))}
-                        </span>
-                      </div>
-
-                      <div className="mt-2 font-display text-sm font-black text-white">
-                        {map.title}
-                      </div>
-                      <div className="mt-0.5 text-[11px] font-bold text-cyan-200/85">
-                        {map.mechanicBadge}
-                      </div>
-                    </div>
-
-                    <div className="mt-3 flex items-center justify-between border-t border-white/10 pt-2 text-[11px] font-bold">
-                      {rec ? (
-                        <span className="inline-flex items-center gap-1 font-mono text-cyan-200 tabular-nums">
-                          <Timer
-                            aria-hidden="true"
-                            className="h-3 w-3 text-cyan-300"
-                          />
-                          <span>{formatBestTime(rec.bestTimeSec)}</span>
-                        </span>
-                      ) : (
-                        <span className="text-slate-400">Chưa có kỷ lục</span>
-                      )}
-
-                      {isSelected && (
-                        <span className="rounded-md bg-cyan-400/25 px-1.5 py-0.5 text-[10px] font-black text-cyan-200">
-                          Đang chọn
-                        </span>
-                      )}
-                    </div>
-                  </>
-                );
-
-                const cardClass = `flex h-full flex-col justify-between rounded-2xl border-2 p-3.5 text-left transition-all motion-reduce:transition-none ${
-                  isSelected
-                    ? 'border-cyan-300 bg-cyan-500/18 shadow-[0_0_22px_rgba(34,211,238,0.28)]'
-                    : 'border-white/10 bg-[#0a1320]/90'
-                }`;
-
-                if (room.isHost) {
-                  return (
-                    <button
-                      key={map.id}
-                      type="button"
-                      aria-pressed={isSelected}
-                      onClick={() => {
-                        playSfx('click');
-                        room.selectMap(map.id);
-                      }}
-                      className={`${cardClass} cursor-pointer hover:border-cyan-400/60 ${FOCUS_RING_CLASS}`}
-                    >
-                      {cardBody}
-                    </button>
-                  );
-                }
-
-                return (
-                  <div
-                    key={map.id}
-                    aria-current={isSelected ? 'true' : undefined}
-                    className={cardClass}
-                  >
-                    {cardBody}
-                  </div>
-                );
-              })}
-            </div>
-          </section>
+          {/* 3-Tier Action -> Map Pack -> Level Selector */}
+          <CoopStageSelector
+            mode="lobby"
+            isHost={room.isHost}
+            selectedActionId={room.selectedMap}
+            selectedPackId={activePackMeta.id}
+            selectedLevel={activeLevelMeta.level}
+            coopLevelRecords={coopLevelRecords}
+            unlockedByPack={activeUnlockedByPack}
+            onSelectAction={(actionId) => {
+              room.selectStage(actionId, getDefaultMapPackId(actionId), 1);
+            }}
+            onSelectPack={(packId) => {
+              room.selectStage(activeActionMeta.id, packId, 1);
+            }}
+            onSelectLevel={(level) => {
+              room.selectStage(activeActionMeta.id, activePackMeta.id, level);
+            }}
+          />
 
           {/* Animal Switcher & Ready / Start Actions */}
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-5">
@@ -889,8 +1165,8 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
                       }}
                       className={`btn-tactile-sky inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-2xl px-4 py-3.5 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-45 ${FOCUS_RING_CLASS}`}
                     >
-                      <Play aria-hidden="true" className="h-4 w-4" />
-                      <span>Bắt Đầu: {activeMapMeta.shortTitle}!</span>
+                      <Play aria-hidden="true" className="h-4 w-4 shrink-0" />
+                      <span>Bắt Đầu: {stageLabel}!</span>
                     </button>
                     <p className="text-center text-xs font-bold text-slate-300">
                       {hostHintText}
@@ -899,7 +1175,7 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
                 ) : (
                   <p className="rounded-2xl border border-cyan-500/20 bg-[#0a1320] px-3 py-2.5 text-center text-xs font-bold text-cyan-200/85">
                     {myMember?.ready
-                      ? `Bạn đã sẵn sàng! Chờ Chủ phòng bắt đầu ${activeMapMeta.shortTitle}...`
+                      ? `Bạn đã sẵn sàng! Chờ Chủ phòng bắt đầu ${stageLabel}...`
                       : 'Bấm Sẵn Sàng khi bạn đã chuẩn bị xong.'}
                   </p>
                 )}
@@ -910,10 +1186,10 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
           {/* Dynamic Keyboard Controls Strip */}
           <footer className="rounded-2xl border border-cyan-400/25 bg-[#0a1320]/90 px-4 py-3 text-center text-xs font-bold text-slate-200 shadow-lg">
             <span className="mr-2 font-black uppercase tracking-wider text-amber-300">
-              Hướng Dẫn Phím Tắt ({activeMapMeta.shortTitle}):
+              Hướng Dẫn Phím Tắt ({activeActionMeta.shortTitle}):
             </span>
             <span className="inline-flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
-              {activeMapMeta.controls.map((ctrl, idx) => (
+              {activeActionMeta.controls.map((ctrl, idx) => (
                 <span key={ctrl.keys} className="inline-flex items-center gap-1">
                   {idx > 0 && (
                     <span aria-hidden="true" className="text-slate-500">

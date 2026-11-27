@@ -66,6 +66,32 @@ export type SimEvent = {
 
 export type SurfaceKind = 'wood' | 'ice';
 
+export interface GlassMapTheme {
+  readonly id: 'cabin_bridge' | 'sky_scaffold' | 'candy_factory';
+  readonly skyHex: string;
+  readonly fogHex: string;
+  readonly abyssHex: string;
+  readonly deckPrimaryHex: string;
+  readonly deckStripeHex: string;
+  readonly curbHex: string;
+  readonly hazardPrimaryHex: string;
+  readonly hazardStripeHex: string;
+  readonly lanternCoolHex: string;
+  readonly lanternWarmHex: string;
+  readonly ambientLightHex: string;
+  readonly sunLightHex: string;
+}
+
+export interface FragilePlatformConfig {
+  readonly fallDelaySec: number;
+  readonly respawnDelaySec: number;
+}
+
+export interface FragilePlatformState {
+  state: 'solid' | 'shaking' | 'gone';
+  timer: number;
+}
+
 export type Aabb3 = {
   minX: number;
   maxX: number;
@@ -79,13 +105,16 @@ export type PlatformDef = {
   id: string;
   surface: SurfaceKind;
   box: Aabb3;
+  conveyorVx?: number;
+  conveyorVz?: number;
+  fragile?: FragilePlatformConfig;
 };
 
 export type MovingPlatformDef = {
   id: string;
   surface: SurfaceKind;
   baseBox: Aabb3;
-  axis: 'x' | 'z';
+  axis: 'x' | 'y' | 'z';
   amplitude: number;
   speed: number;
   phase: number;
@@ -99,7 +128,7 @@ export type BarrierDef = {
   box: Aabb3;
   damage: number;
   blocksPlayers: boolean;
-  moveAxis?: 'x' | 'z';
+  moveAxis?: 'x' | 'y' | 'z';
   moveAmplitude?: number;
   moveSpeed?: number;
   movePhase?: number;
@@ -152,6 +181,7 @@ export type CheckpointDef = {
 
 export type CourseDef = {
   finishZ: number;
+  theme?: GlassMapTheme;
   stages: readonly {
     number: number;
     name: string;
@@ -172,7 +202,11 @@ export type EvaluatedPlatform = {
   surface: SurfaceKind;
   box: Aabb3;
   vx: number;
+  vy?: number;
   vz: number;
+  conveyorVx?: number;
+  conveyorVz?: number;
+  fragile?: FragilePlatformConfig;
 };
 
 export type EvaluatedBarrier = {
@@ -235,6 +269,7 @@ export type GlassSimState = {
   p1: PlayerSimState;
   p2: PlayerSimState;
   glass: GlassState;
+  fragileStates: Record<string, FragilePlatformState>;
   nextEventId: number;
   events: SimEvent[];
 };
