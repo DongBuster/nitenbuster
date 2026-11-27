@@ -24,8 +24,8 @@ interface ScoredPlacement {
 }
 
 const SLOT_PRIMARY_WEIGHTS = [40, 26, 16, 10, 8] as const;
-const SLOT_VARIETY_WEIGHTS = [28, 22, 16, 12, 9, 6, 4, 3] as const;
 const ALL_CLEAR_WEIGHT_MULTIPLIER = 4;
+const TACTICAL_FIT_SCORE_THRESHOLD = 85;
 const ORTHOGONAL_DIRS: readonly (readonly [number, number])[] = [
   [-1, 0],
   [1, 0],
@@ -215,14 +215,62 @@ function commitCellsAndClearLines(
   return { placedCells, clearedCells, clearedRows, clearedCols };
 }
 
-function pickGroup(fillRatio: number, rand: number): PieceGroup {
-  if (fillRatio < 0.45) {
-    return rand < 0.35 ? 'small' : rand < 0.8 ? 'medium' : 'large';
+function pickTargetGroup(
+  fillRatio: number,
+  stage: number,
+  trayCounter: number,
+  slotIndex: number,
+  largeCount: number,
+  smallCount: number,
+  rand: number,
+): PieceGroup {
+  // Smoothly ramp puzzle challenge after ~100 moves so late runs stay tense rather than endless.
+  const lateShift =
+    trayCounter >= 35 ? Math.min(0.09, Math.floor((trayCounter - 20) / 15) * 0.03) : 0;
+  let smallProb: number;
+  let mediumProb: number;
+  let largeProb: number;
+
+  if (fillRatio < 0.25) {
+    smallProb = Math.max(0.22, (stage <= 1 ? 0.34 : stage >= 3 ? 0.28 : 0.31) - lateShift);
+    mediumProb = 0.48;
+    largeProb = 1 - smallProb - mediumProb;
+  } else if (fillRatio < 0.48) {
+    smallProb = Math.max(0.26, 0.38 - lateShift);
+    mediumProb = stage >= 3 ? 0.50 : 0.48;
+    largeProb = 1 - smallProb - mediumProb;
+  } else if (fillRatio < 0.68) {
+    smallProb = Math.max(0.36, 0.48 - lateShift);
+    mediumProb = 0.45;
+    largeProb = Math.max(0.05, 1 - smallProb - mediumProb);
+  } else {
+    smallProb = Math.max(0.46, 0.60 - lateShift);
+    mediumProb = 1 - smallProb;
+    largeProb = 0;
   }
-  if (fillRatio <= 0.7) {
-    return rand < 0.5 ? 'small' : rand < 0.88 ? 'medium' : 'large';
+
+  // Cap at 1 large piece per tray early on; late game may allow 2 large pieces on sparse boards.
+  const maxLargePerTray = trayCounter >= 35 && fillRatio < 0.28 ? 2 : 1;
+  if (largeCount >= maxLargePerTray || (slotIndex === 2 && fillRatio >= 0.30)) {
+    mediumProb += largeProb * 0.7;
+    smallProb += largeProb * 0.3;
+    largeProb = 0;
   }
-  return rand < 0.68 ? 'small' : rand < 0.95 ? 'medium' : 'large';
+
+  // Keep slot 2 balanced: avoid all-small trays and lightly nudge toward small if tray had none.
+  if (slotIndex === 2) {
+    if (smallCount === 0 && fillRatio >= 0.35) {
+      smallProb = Math.max(smallProb, 0.52 - lateShift);
+      mediumProb = Math.max(0, 1 - smallProb - largeProb);
+    } else if (smallCount >= 2) {
+      mediumProb += smallProb;
+      smallProb = 0;
+    }
+  }
+
+  if (rand < smallProb) return 'small';
+  if (rand < smallProb + mediumProb) return 'medium';
+  return 'large';
 }
 
 /** Picks a deterministic block color restricted to the current stage palette. */
@@ -418,13 +466,19 @@ function scorePlacementFit(
     isGridEmptyAfterClear(grid, defPiece, row, col, clearedRowMask, clearedColMask);
   const allClearBonus = isAllClear ? 220 : 0;
 
+  const largeCrowdingPenalty =
+    clearCount === 0 && defPiece.group === 'large' && occupiedBefore >= 12
+      ? 24
+      : 0;
+
   // Favor line clears & block adjacency over unanchored wall/size scores so tight pockets win.
   const score =
     clearCount * 140 +
     blockNeighbors * 12 +
     wallNeighbors * 2 +
-    defPiece.cells.length * 3 -
-    newlyIsolated * 14 +
+    defPiece.cells.length -
+    newlyIsolated * 14 -
+    largeCrowdingPenalty +
     allClearBonus;
   return { score, isAllClear };
 }
@@ -489,10 +543,57 @@ function pickWeightedCandidate(
   return { chosen: candidates[candidates.length - 1], nextPrng: roll.nextState };
 }
 
+function countValidPlacementsUpTo(
+  grid: Grid,
+  defPiece: PieceDef,
+  limit: number,
+): number {
+  let count = 0;
+  for (let r = 0; r <= BOARD_SIZE - defPiece.height; r++) {
+    for (let c = 0; c <= BOARD_SIZE - defPiece.width; c++) {
+      if (canPlaceCells(grid, defPiece.cells, r, c)) {
+        count++;
+        if (count >= limit) return count;
+      }
+    }
+  }
+  return count;
+}
+
+function isLargePieceSafeOnGrid(
+  baseGrid: Grid,
+  defPiece: PieceDef,
+  baseFillRatio: number,
+  trayCounter: number,
+  baseRowEmpty: readonly number[],
+  baseColEmpty: readonly number[],
+): boolean {
+  if (defPiece.group !== 'large') return true;
+  if (baseFillRatio < 0.30) return true;
+  const minFits = trayCounter < 35 ? 2 : defPiece.id === 'square_3' ? 2 : 1;
+  if (baseFillRatio < 0.54) {
+    return countValidPlacementsUpTo(baseGrid, defPiece, minFits) >= minFits;
+  }
+  for (let r = 0; r <= BOARD_SIZE - defPiece.height; r++) {
+    for (let c = 0; c <= BOARD_SIZE - defPiece.width; c++) {
+      if (!canPlaceCells(baseGrid, defPiece.cells, r, c)) continue;
+      if (countClearedLineMasks(defPiece, r, c, baseRowEmpty, baseColEmpty).clearCount > 0) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 function pickSmartPieceForSlot(
   simGrid: Grid,
+  baseGrid: Grid,
   prngState: number,
   slotIndex: number,
+  trayCounter: number,
+  stage: number,
+  largeCount: number,
+  smallCount: number,
   usedIds: ReadonlySet<string>,
 ): {
   defPiece: PieceDef;
@@ -504,11 +605,20 @@ function pickSmartPieceForSlot(
   const fillRatio = occupied / (BOARD_SIZE * BOARD_SIZE);
   const { rowEmpty, colEmpty } = buildLineEmptyCounts(simGrid);
 
+  const groupRoll = nextRandom(rng);
+  rng = groupRoll.nextState;
+  const targetGroup = pickTargetGroup(
+    fillRatio,
+    stage,
+    trayCounter,
+    slotIndex,
+    largeCount,
+    smallCount,
+    groupRoll.value,
+  );
+
   if (occupied === 0) {
-    const groupRoll = nextRandom(rng);
-    rng = groupRoll.nextState;
-    const group = pickGroup(fillRatio, groupRoll.value);
-    const inGroup = BLOCK_PIECES.filter((p) => p.group === group);
+    const inGroup = BLOCK_PIECES.filter((p) => p.group === targetGroup);
     const uniqueInGroup = inGroup.filter((p) => !usedIds.has(p.id));
     const pool = uniqueInGroup.length > 0 ? uniqueInGroup : inGroup;
     const fittingPool = pool
@@ -562,26 +672,73 @@ function pickSmartPieceForSlot(
     return { defPiece, placement: null, nextPrng: roll.nextState };
   }
 
-  const unique = fitting.filter((c) => !usedIds.has(c.defPiece.id));
-  const pool = unique.length > 0 ? unique : fitting;
+  const baseFillRatio = getBoardFillRatio(baseGrid);
+  const { rowEmpty: baseRowEmpty, colEmpty: baseColEmpty } = buildLineEmptyCounts(baseGrid);
+  const maxLargePerTray = trayCounter >= 35 && baseFillRatio < 0.28 ? 2 : 1;
+  const safeFitting = fitting.filter((c) => {
+    if (c.defPiece.group === 'large') {
+      if (largeCount >= maxLargePerTray && !c.isAllClear) return false;
+      return isLargePieceSafeOnGrid(
+        baseGrid,
+        c.defPiece,
+        baseFillRatio,
+        trayCounter,
+        baseRowEmpty,
+        baseColEmpty,
+      );
+    }
+    // On crowded boards, avoid speculative medium/small pieces that only fit after an assumed simGrid clear.
+    if (baseFillRatio >= 0.48 && !c.isAllClear && !canShapeFitAnywhere(baseGrid, c.defPiece)) {
+      return false;
+    }
+    return true;
+  });
+  const candidatePool = safeFitting.length > 0 ? safeFitting : fitting;
+
+  const unique = candidatePool.filter((c) => !usedIds.has(c.defPiece.id));
+  const pool = unique.length > 0 ? unique : candidatePool;
   pool.sort((a, b) => b.score - a.score);
 
-  const isVarietySlot = slotIndex >= 2;
-  const baseWeights = isVarietySlot ? SLOT_VARIETY_WEIGHTS : SLOT_PRIMARY_WEIGHTS;
-  const top = pool.slice(0, baseWeights.length);
-  const weights = top.map((item, idx) => {
-    const base = baseWeights[idx];
-    if (item.isAllClear) return base * ALL_CLEAR_WEIGHT_MULTIPLIER;
-    // Reward snug pocket fits & line clears on primary slots so exact-fitting blocks appear reliably
-    if (idx === 0 && !isVarietySlot && item.score >= 75) {
-      return base * 2;
+  const allClearPool = pool.filter((c) => c.isAllClear);
+  if (allClearPool.length > 0) {
+    const top = allClearPool.slice(0, SLOT_PRIMARY_WEIGHTS.length);
+    const weights = top.map((_, idx) => SLOT_PRIMARY_WEIGHTS[idx] * ALL_CLEAR_WEIGHT_MULTIPLIER);
+    const picked = pickWeightedCandidate(top, weights, rng);
+    return {
+      defPiece: picked.chosen.defPiece,
+      placement: picked.chosen.placement,
+      nextPrng: picked.nextPrng,
+    };
+  }
+
+  // Only slot 0 runs cross-group tactical gap/clear rescue so slots 1 & 2 preserve shape variety and real tension.
+  const tacticalPool = pool.filter((c) => c.score >= TACTICAL_FIT_SCORE_THRESHOLD);
+  if (slotIndex === 0 && tacticalPool.length > 0) {
+    const tacticalInGroup = tacticalPool.filter((c) => c.defPiece.group === targetGroup);
+    if (tacticalInGroup.length > 0 || targetGroup !== 'large') {
+      const source = tacticalInGroup.length > 0 ? tacticalInGroup : tacticalPool;
+      const top = source.slice(0, SLOT_PRIMARY_WEIGHTS.length);
+      const weights = top.map((item, idx) => {
+        const base = SLOT_PRIMARY_WEIGHTS[idx];
+        return idx === 0 && item.score >= 75 ? base * 2 : base;
+      });
+      const picked = pickWeightedCandidate(top, weights, rng);
+      return {
+        defPiece: picked.chosen.defPiece,
+        placement: picked.chosen.placement,
+        nextPrng: picked.nextPrng,
+      };
     }
-    if (isVarietySlot && item.defPiece.group !== 'small') {
-      return Math.round(base * 1.5);
-    }
-    return base;
+  }
+
+  const inGroup = pool.filter((c) => c.defPiece.group === targetGroup);
+  const diversePool = inGroup.length > 0 ? inGroup : pool;
+  // Gentle weights across the whole group keep all 29 shapes rotating; slight nudge for line clears within group.
+  const weights = diversePool.map((item, idx) => {
+    const base = Math.max(6, 15 - idx);
+    return item.score >= TACTICAL_FIT_SCORE_THRESHOLD ? Math.round(base * 1.4) : base;
   });
-  const picked = pickWeightedCandidate(top, weights, rng);
+  const picked = pickWeightedCandidate(diversePool, weights, rng);
   return {
     defPiece: picked.chosen.defPiece,
     placement: picked.chosen.placement,
@@ -598,16 +755,31 @@ export function spawnSmartTray(
 ): { tray: TrayPiece[]; nextPrng: number; nextTrayCounter: number } {
   let rng = prngState;
   let simGrid = cloneGrid(grid);
+  const stage = getStageNumber(allClears);
   const tray: TrayPiece[] = [];
   const usedIds = new Set<string>();
+  let largeCount = 0;
+  let smallCount = 0;
 
   for (let i = 0; i < 3; i++) {
     const colorPick = pickStageColor(allClears, rng);
     rng = colorPick.nextState;
 
-    const picked = pickSmartPieceForSlot(simGrid, rng, i, usedIds);
+    const picked = pickSmartPieceForSlot(
+      simGrid,
+      grid,
+      rng,
+      i,
+      trayCounter,
+      stage,
+      largeCount,
+      smallCount,
+      usedIds,
+    );
     rng = picked.nextPrng;
     usedIds.add(picked.defPiece.id);
+    if (picked.defPiece.group === 'large') largeCount++;
+    if (picked.defPiece.group === 'small') smallCount++;
     tray.push(
       createTrayPieceFromDef(
         picked.defPiece,

@@ -719,4 +719,41 @@ describe('blockblast board-aware smart spawner & stage progression', () => {
       }
     }
   });
+
+  it('maintains healthy group balance, max-1 early large cap, and broad 29-shape variety', () => {
+    const empty = createEmptyGrid();
+    const mid = createEmptyGrid();
+    for (let r = 0; r < 4; r++) {
+      for (let c = 0; c < 6; c++) {
+        mid[r][c] = { color: 'amber' };
+      }
+    }
+
+    const pieceCounts = new Map<string, number>();
+    const groupCounts = { small: 0, medium: 0, large: 0 };
+
+    for (const board of [empty, mid]) {
+      for (let seed = 100; seed < 200; seed++) {
+        const { tray } = spawnSmartTray(board, seed, 1, seed % 4);
+        let largeInTray = 0;
+        for (const piece of tray) {
+          const def = getPieceDefById(piece.defId);
+          assert.ok(def);
+          if (def.group === 'large') largeInTray++;
+          groupCounts[def.group]++;
+          pieceCounts.set(def.id, (pieceCounts.get(def.id) ?? 0) + 1);
+        }
+        assert.ok(largeInTray <= 1, `early tray for seed ${seed} spawned ${largeInTray} large pieces`);
+      }
+    }
+
+    const totalPieces = groupCounts.small + groupCounts.medium + groupCounts.large;
+    assert.ok(groupCounts.small / totalPieces >= 0.2, 'small ratio too low');
+    assert.ok(groupCounts.medium / totalPieces >= 0.35, 'medium ratio too low');
+    assert.ok(groupCounts.large / totalPieces <= 0.3, 'large ratio too high');
+    assert.ok(pieceCounts.size >= 26, `expected broad shape rotation, only saw ${pieceCounts.size}/29`);
+    for (const [id, count] of pieceCounts) {
+      assert.ok(count / totalPieces <= 0.12, `piece ${id} monopolized ${count}/${totalPieces} spawns`);
+    }
+  });
 });
