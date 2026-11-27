@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { memo, useRef, useState } from 'react';
 import { Html } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
 import { ITEM_META } from '../sim/combat';
@@ -11,22 +11,47 @@ import type {
 import { ItemModel3D } from './ItemModel3D';
 import type { BrawlWorldRuntime } from './worldRuntime';
 
-export function ItemPickups({ runtime }: { runtime: BrawlWorldRuntime }) {
+export const ItemPickups = memo(function ItemPickups({
+  runtime,
+}: {
+  runtime: BrawlWorldRuntime;
+}) {
   const [items, setItems] = useState<WorldItem[]>([]);
   const [projectiles, setProjectiles] = useState<Projectile[]>([]);
   const [effects, setEffects] = useState<HitEffect[]>([]);
   const [popups, setPopups] = useState<KnockoutPopup[]>([]);
   const lastSyncRef = useRef<number>(0);
+  const prevCountsRef = useRef({ items: 0, projectiles: 0, effects: 0, popups: 0 });
 
   useFrame(({ clock }) => {
     // Sync every ~2 frames (30Hz) for crisp projectile & parachute positions
     if (clock.elapsedTime - lastSyncRef.current < 0.03) return;
     lastSyncRef.current = clock.elapsedTime;
 
-    setItems(runtime.items.map((item) => ({ ...item })));
-    setProjectiles(runtime.projectiles.map((p) => ({ ...p })));
-    setEffects([...runtime.hitEffects]);
-    setPopups([...runtime.koPopups]);
+    const prev = prevCountsRef.current;
+    const nItems = runtime.items.length;
+    const nProjectiles = runtime.projectiles.length;
+    const nEffects = runtime.hitEffects.length;
+    const nPopups = runtime.koPopups.length;
+
+    if (nItems > 0 || prev.items > 0) {
+      prev.items = nItems;
+      setItems(nItems > 0 ? runtime.items.map((item) => ({ ...item })) : []);
+    }
+    if (nProjectiles > 0 || prev.projectiles > 0) {
+      prev.projectiles = nProjectiles;
+      setProjectiles(
+        nProjectiles > 0 ? runtime.projectiles.map((p) => ({ ...p })) : [],
+      );
+    }
+    if (nEffects > 0 || prev.effects > 0) {
+      prev.effects = nEffects;
+      setEffects(nEffects > 0 ? [...runtime.hitEffects] : []);
+    }
+    if (nPopups > 0 || prev.popups > 0) {
+      prev.popups = nPopups;
+      setPopups(nPopups > 0 ? [...runtime.koPopups] : []);
+    }
   });
 
   return (
@@ -180,4 +205,4 @@ export function ItemPickups({ runtime }: { runtime: BrawlWorldRuntime }) {
       ))}
     </group>
   );
-}
+});

@@ -7,6 +7,7 @@ import {
   type BrawlInputPayload,
   type BrawlSnapshotPayload,
 } from '../../brawl/online/protocol';
+import { createBrawlInputSender } from '../../brawl/online/inputSync';
 import { BrawlSnapshotInterpolator } from '../../brawl/online/snapshotInterpolation';
 import { ArenaScene, type BrawlArenaOnlineConfig } from '../../brawl/render/ArenaScene';
 import type { BrawlWorldRuntime } from '../../brawl/render/worldRuntime';
@@ -128,7 +129,7 @@ export function EventBrawlAdapter({
   const remoteInputsRef = useRef<
     Record<string, { input: FighterInput; seq: number; receivedAtMs: number }>
   >({});
-  const inputSeqRef = useRef<number>(0);
+  const inputSenderRef = useRef(createBrawlInputSender());
   const aliveIdsRef = useRef<string[]>(roster.map((m) => m.peerId));
   const eliminationOrderRef = useRef<string[][]>([]);
   const subScoresRef = useRef<Record<string, number>>(subScores);
@@ -151,9 +152,11 @@ export function EventBrawlAdapter({
   const { consumeInput, pressedSkills, triggerSkill, setVirtualHold } =
     useKeyboardMouse(controlsEnabled);
 
-  // Clear pending sub-round advance timeout on unmount
+  // Clear pending sub-round advance timeout & input timer on unmount
   useEffect(() => {
+    const sender = inputSenderRef.current;
     return () => {
+      sender.reset();
       if (roundAdvanceTimerRef.current !== null) {
         window.clearTimeout(roundAdvanceTimerRef.current);
         roundAdvanceTimerRef.current = null;
@@ -209,6 +212,7 @@ export function EventBrawlAdapter({
       if (!evt || typeof evt.subRound !== 'number') return;
       if (evt.subRound !== subRoundRef.current) {
         interpolatorRef.current.reset();
+        inputSenderRef.current.reset();
       }
       setSubRound(evt.subRound);
       setPhase(evt.phase);
@@ -454,14 +458,20 @@ export function EventBrawlAdapter({
         : undefined,
       onSendClientInput: !isHost
         ? (input) => {
-            inputSeqRef.current += 1;
-            const payload: BrawlInputPayload = {
+            inputSenderRef.current.send(
               roundKey,
-              peerId: myPeerId,
-              seq: inputSeqRef.current,
               input,
-            };
-            sendGameEvent('brawl_input', payload);
+              performance.now(),
+              (seq, payloadInput, activeRoundKey) => {
+                const payload: BrawlInputPayload = {
+                  roundKey: activeRoundKey,
+                  peerId: myPeerId,
+                  seq,
+                  input: payloadInput,
+                };
+                sendGameEvent('brawl_input', payload);
+              },
+            );
           }
         : undefined,
       interpolatorRef,

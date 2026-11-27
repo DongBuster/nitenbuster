@@ -13,7 +13,7 @@ import {
   type SurvivalSnapshotPayload,
 } from './protocol.ts';
 
-const MAX_BUFFER_SIZE = 4;
+const MAX_BUFFER_SIZE = 8;
 
 interface SnapshotEntry {
   snapshot: SurvivalSnapshotPayload;

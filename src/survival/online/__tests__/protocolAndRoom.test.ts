@@ -8,6 +8,7 @@ import type {
 } from '../../sim/types.ts';
 import {
   SURVIVAL_INPUT_INTERVAL_MS,
+  SURVIVAL_INPUT_STALE_MS,
   SURVIVAL_MAX_SNAPSHOT_ENEMIES,
   SURVIVAL_MAX_SNAPSHOT_GEMS,
   SURVIVAL_MAX_SNAPSHOT_PROJECTILES,
@@ -26,6 +27,7 @@ import {
 } from '../protocol.ts';
 import {
   clampBotCount,
+  consumeRemoteSurvivalInputs,
   extractHostRoomState,
   normalizeLobbyHostFlags,
   parsePresenceMembers,
@@ -587,6 +589,26 @@ describe('validateSurvivalSnapshotPayload & compact wire snapshot codec', () => 
       ),
       null,
     );
+
+    const allBossKinds = [
+      'boss_slime_king',
+      'boss_frost_bear',
+      'boss_snow_dragon',
+      'boss_jelly_king',
+      'boss_candy_scorpion',
+      'boss_sugar_pharaoh',
+      'boss_quartz_lord',
+      'boss_crystal_golem',
+      'boss_void_dragon',
+    ] as const;
+    for (const bossKind of allBossKinds) {
+      const validated = validateSurvivalSnapshotPayload(
+        { ...packed, bossWarningKind: bossKind },
+        'match-val-1',
+      );
+      assert.ok(validated, `Expected ${bossKind} bossWarningKind to be valid`);
+      assert.equal(validated.bossWarningKind, bossKind);
+    }
   });
 
   it('round-trips rich snapshots faithfully through encodeSnapshotWire / decodeSnapshotWire', () => {
@@ -996,5 +1018,47 @@ describe('roomHelpers Presence parsing & Ghost-Host protection', () => {
     assert.equal(clampBotCount(5, 2), 2);
     assert.equal(clampBotCount(-1, 1), 0);
     assert.equal(clampBotCount(3, 4), 0);
+  });
+
+  it('expires stale guest movement after SURVIVAL_INPUT_STALE_MS and consumes one-shot dashPressed once', () => {
+    const store = {
+      'guest-active': {
+        input: {
+          moveX: 1,
+          moveY: -0.5,
+          aimX: 250,
+          aimY: 300,
+          manualAim: true,
+          dashPressed: true,
+        },
+        receivedAtMs: 1000,
+      },
+      'guest-stale': {
+        input: {
+          moveX: -1,
+          moveY: 1,
+          aimX: 100,
+          aimY: 100,
+          manualAim: true,
+          dashPressed: true,
+        },
+        receivedAtMs: 1000,
+      },
+    };
+
+    const nowMs = 1000 + SURVIVAL_INPUT_STALE_MS + 1;
+    store['guest-active'].receivedAtMs = nowMs - 40;
+
+    const firstFrame = consumeRemoteSurvivalInputs(store, nowMs);
+    assert.equal(firstFrame['guest-active'].moveX, 1);
+    assert.equal(firstFrame['guest-active'].dashPressed, true);
+    // Stale guest input resets movement & dash to neutral
+    assert.equal(firstFrame['guest-stale'].moveX, 0);
+    assert.equal(firstFrame['guest-stale'].moveY, 0);
+    assert.equal(firstFrame['guest-stale'].dashPressed, false);
+
+    // Subsequent frame does NOT re-trigger dashPressed without a fresh packet
+    const secondFrame = consumeRemoteSurvivalInputs(store, nowMs + 16);
+    assert.equal(secondFrame['guest-active'].dashPressed, false);
   });
 });

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { playSfx, setAudioPreferences } from '../../audio/soundEngine';
 import { useProfileStore } from '../../store/profileStore';
 import { useKeyboardMouse } from '../input/useKeyboardMouse';
+import { buildBrawlRoundKey } from '../online/protocol';
 import { useBrawlRoom } from '../online/useBrawlRoom';
 import { ArenaScene, type BrawlArenaOnlineConfig } from '../render/ArenaScene';
 import { getHumanFinalRank } from '../sim/matchStore';
@@ -173,8 +174,8 @@ export function BrawlOnlineContainer({
   }, [match, room.phase]);
 
   const roundKey = match
-    ? `brawl_online_${room.roomCode}_m${room.matchNonce}_r${match.round}`
-    : `brawl_online_idle`;
+    ? buildBrawlRoundKey(room.roomCode, room.matchNonce, match.round)
+    : 'brawl_online_idle';
 
   const handleEliminateBatch = useCallback(
     (ids: string[]) => {

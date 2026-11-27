@@ -5,7 +5,7 @@ import {
   type PackedPlayerState,
 } from './protocol.ts';
 
-const MAX_BUFFER_SIZE = 4;
+const MAX_BUFFER_SIZE = 8;
 
 type SnapshotEntry = {
   snapshot: GlassSnapshotPayload;

@@ -10,7 +10,6 @@ import {
 } from 'react';
 import { playSfx, type SfxType } from '../../audio/soundEngine.ts';
 import {
-  SURVIVAL_INPUT_INTERVAL_MS,
   SURVIVAL_SNAPSHOT_INTERVAL_MS,
   packSurvivalSnapshot,
   type PackedPlayer,
@@ -432,7 +431,6 @@ export const SurvivalCanvas = forwardRef<SurvivalCanvasHandle, SurvivalCanvasPro
     const endedNotifiedRef = useRef<boolean>(false);
     const lastHudSentAtRef = useRef<number>(0);
     const lastSnapshotSentAtRef = useRef<number>(0);
-    const lastInputSentAtRef = useRef<number>(0);
     const sfxCooldownMapRef = useRef<Map<string, number>>(new Map());
 
     const [showTouchControls, setShowTouchControls] = useState<boolean>(() => {
@@ -807,7 +805,6 @@ export const SurvivalCanvas = forwardRef<SurvivalCanvasHandle, SurvivalCanvasPro
       endedNotifiedRef.current = false;
       lastHudSentAtRef.current = 0;
       lastSnapshotSentAtRef.current = 0;
-      lastInputSentAtRef.current = 0;
       lastClientSnapshotRef.current = null;
 
       if (isClient) {
@@ -847,7 +844,6 @@ export const SurvivalCanvas = forwardRef<SurvivalCanvasHandle, SurvivalCanvasPro
       let prevClientTeamXp = 0;
 
       const buildLocalInput = (
-        fallbackAnchor: { x: number; y: number; aimAngle: number },
         consumeDash: boolean,
       ): { input: SurvivalInput; aimCursorWorld: { x: number; y: number } | null; manualAim: boolean } => {
         if (pausedRef.current || inputDisabledRef.current) {
@@ -899,12 +895,8 @@ export const SurvivalCanvas = forwardRef<SurvivalCanvasHandle, SurvivalCanvasPro
           aimCursorWorld !== null &&
           joystickPointerIdRef.current === null;
 
-        const aimX = aimCursorWorld
-          ? aimCursorWorld.x
-          : fallbackAnchor.x + Math.cos(fallbackAnchor.aimAngle) * 160;
-        const aimY = aimCursorWorld
-          ? aimCursorWorld.y
-          : fallbackAnchor.y + Math.sin(fallbackAnchor.aimAngle) * 160;
+        const aimX = manualAim && aimCursorWorld ? aimCursorWorld.x : 0;
+        const aimY = manualAim && aimCursorWorld ? aimCursorWorld.y : 0;
 
         const dashPressed = dashPressedRef.current;
         if (consumeDash) {
@@ -950,7 +942,6 @@ export const SurvivalCanvas = forwardRef<SurvivalCanvasHandle, SurvivalCanvasPro
           const activeSnap = sampled ?? lastClientSnapshotRef.current;
 
           let view: SurvivalRenderView | null = null;
-          let fallbackAnchor = { x: cameraRef.current.x, y: cameraRef.current.y, aimAngle: 0 };
           let localClientPlayer: SurvivalSnapshotPayload['players'][number] | undefined;
 
           if (activeSnap && layout) {
@@ -959,13 +950,9 @@ export const SurvivalCanvas = forwardRef<SurvivalCanvasHandle, SurvivalCanvasPro
               layout,
               clientZonesScratchRef.current,
             );
-            const lp =
+            localClientPlayer =
               activeSnap.players.find((p) => p.id === activeLocalId) ??
               activeSnap.players[0];
-            localClientPlayer = lp;
-            if (lp) {
-              fallbackAnchor = { x: lp.x, y: lp.y, aimAngle: lp.aimAngle };
-            }
 
             stepCameraToward(
               cameraRef.current,
@@ -1035,19 +1022,12 @@ export const SurvivalCanvas = forwardRef<SurvivalCanvasHandle, SurvivalCanvasPro
             view = createPlaceholderClientView(configRef.current, layout);
           }
 
-          const { input, aimCursorWorld, manualAim } = buildLocalInput(
-            fallbackAnchor,
-            false,
-          );
+          const { input, aimCursorWorld, manualAim } = buildLocalInput(false);
 
           const isPlaying = !activeSnap || activeSnap.phase === 'playing';
           if (!isPlaying || pausedRef.current || inputDisabledRef.current) {
             dashPressedRef.current = false;
-          } else if (
-            activeOnline?.onSendClientInput &&
-            (input.dashPressed ||
-              nowMs - lastInputSentAtRef.current >= SURVIVAL_INPUT_INTERVAL_MS)
-          ) {
+          } else if (activeOnline?.onSendClientInput) {
             if (
               input.dashPressed &&
               localClientPlayer &&
@@ -1057,7 +1037,6 @@ export const SurvivalCanvas = forwardRef<SurvivalCanvasHandle, SurvivalCanvasPro
               playThrottledSfx('client_dash', 'roll', 150, nowMs);
             }
             dashPressedRef.current = false;
-            lastInputSentAtRef.current = nowMs;
             activeOnline.onSendClientInput(input);
           }
 
@@ -1080,14 +1059,7 @@ export const SurvivalCanvas = forwardRef<SurvivalCanvasHandle, SurvivalCanvasPro
           // Host / Offline authoritative loop
           const world = worldRef.current;
           if (world) {
-            const localPlayer =
-              world.players.find((p) => p.id === activeLocalId) ?? world.players[0];
-            const fallbackAnchor = localPlayer
-              ? { x: localPlayer.x, y: localPlayer.y, aimAngle: localPlayer.aimAngle }
-              : { x: WORLD_SIZE * 0.5, y: WORLD_SIZE * 0.5, aimAngle: 0 };
-
             const { input, aimCursorWorld, manualAim } = buildLocalInput(
-              fallbackAnchor,
               !pausedRef.current && !inputDisabledRef.current,
             );
 

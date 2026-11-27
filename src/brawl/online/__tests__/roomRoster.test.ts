@@ -5,7 +5,11 @@ import {
   canStartBrawlRoom,
   electBrawlHost,
 } from '../roomRoster.ts';
-import type { BrawlRoomMember, BrawlRoomSettings } from '../protocol.ts';
+import {
+  buildBrawlRoundKey,
+  type BrawlRoomMember,
+  type BrawlRoomSettings,
+} from '../protocol.ts';
 
 function makeMember(
   peerId: string,
@@ -116,6 +120,29 @@ describe('brawl online room roster & host election', () => {
         difficulty: 'medium',
       }),
       true,
+    );
+  });
+
+  it('prioritizes explicit isHost flag over client clock skew in joinedAt', () => {
+    const members = [
+      makeMember('guest-skew', 50, { isHost: false }),
+      makeMember('creator-host', 1000, { isHost: true }),
+    ];
+    assert.equal(electBrawlHost(members), 'creator-host');
+
+    const roster = buildOnlineBrawlRoster(members, {
+      fillWithBots: false,
+      targetPlayers: 2,
+      difficulty: 'medium',
+    });
+    assert.equal(roster[0].id, 'creator-host');
+    assert.equal(roster[1].id, 'guest-skew');
+  });
+
+  it('builds consistent Brawl round keys from room code, match nonce, and round', () => {
+    assert.equal(
+      buildBrawlRoundKey('ROOM1', 2, 3),
+      'brawl_online_ROOM1_m2_r3',
     );
   });
 });

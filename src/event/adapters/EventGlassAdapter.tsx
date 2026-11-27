@@ -2,8 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { CheckCircle2, ShieldAlert, Users } from 'lucide-react';
 import { getDefaultMapPackId } from '../../coop/maps/registry';
+import { createGlassInputSender } from '../../glass/online/inputSync';
 import {
-  GLASS_INPUT_INTERVAL_MS,
   type CoopSnapshotPayload,
   type GlassEmotePayload,
   type GlassInputPayload,
@@ -119,8 +119,7 @@ export function EventGlassAdapter({
   const guestInputListenerRef = useRef<
     ((input: GlassInputPayload) => void) | null
   >(null);
-  const inputSeqRef = useRef<number>(0);
-  const lastInputSentAtRef = useRef<number>(0);
+  const inputSenderRef = useRef(createGlassInputSender());
   const lastReportAtRef = useRef<number>(0);
   const teamProgressRef = useRef(teamProgress);
   teamProgressRef.current = teamProgress;
@@ -128,6 +127,8 @@ export function EventGlassAdapter({
   const partnerAbsentSinceRef = useRef<number | null>(null);
 
   const effectiveIsHost = fallbackSolo || isPairHostInitially;
+  const isHostRef = useRef<boolean>(effectiveIsHost);
+  isHostRef.current = effectiveIsHost;
 
   useEffect(() => {
     onStatusTextChange?.(
@@ -176,11 +177,11 @@ export function EventGlassAdapter({
 
     channel
       .on('broadcast', { event: 'glass_input' }, ({ payload }) => {
-        if (!payload) return;
+        if (!payload || !isHostRef.current) return;
         guestInputListenerRef.current?.(payload as GlassInputPayload);
       })
       .on('broadcast', { event: 'glass_snapshot' }, ({ payload }) => {
-        if (!payload) return;
+        if (!payload || isHostRef.current) return;
         snapshotListenerRef.current?.(payload as CoopSnapshotPayload);
       })
       .on('broadcast', { event: 'glass_pair_finish' }, () => {
@@ -191,7 +192,9 @@ export function EventGlassAdapter({
       subSubscribedRef.current = status === 'SUBSCRIBED';
     });
 
+    const sender = inputSenderRef.current;
     return () => {
+      sender.reset();
       subSubscribedRef.current = false;
       subChannelRef.current = null;
       void client.removeChannel(channel);
@@ -386,27 +389,31 @@ export function EventGlassAdapter({
       returnToLobby: () => {},
       sendEmote: () => {},
       sendGuestInput: (input: PlayerInput) => {
-        if (effectiveIsHost) return;
-        const ch = subChannelRef.current;
-        if (!ch || !subSubscribedRef.current) return;
-        const now = performance.now();
-        if (now - lastInputSentAtRef.current < GLASS_INPUT_INTERVAL_MS) return;
-        lastInputSentAtRef.current = now;
-        inputSeqRef.current += 1;
-        const payload: GlassInputPayload = {
-          matchId: `${round.roundId}-${myPair.pairId}`,
-          peerId: myPeerId,
-          seq: inputSeqRef.current,
-          moveX: input.moveX,
-          moveZ: input.moveZ,
-          jump: input.jump,
-          lift: input.lift,
-        };
-        void ch.send({
-          type: 'broadcast',
-          event: 'glass_input',
-          payload,
-        });
+        if (isHostRef.current) return;
+        const activeMatchId = `${round.roundId}-${myPair.pairId}`;
+        inputSenderRef.current.send(
+          activeMatchId,
+          input,
+          performance.now(),
+          (seq, payloadInput, matchKey) => {
+            const ch = subChannelRef.current;
+            if (!ch || !subSubscribedRef.current || isHostRef.current) return;
+            const payload: GlassInputPayload = {
+              matchId: matchKey,
+              peerId: myPeerId,
+              seq,
+              moveX: payloadInput.moveX,
+              moveZ: payloadInput.moveZ,
+              jump: payloadInput.jump,
+              lift: payloadInput.lift,
+            };
+            void ch.send({
+              type: 'broadcast',
+              event: 'glass_input',
+              payload,
+            });
+          },
+        );
       },
       broadcastSnapshot: (snapshot: CoopSnapshotPayload) => {
         const ch = subChannelRef.current;

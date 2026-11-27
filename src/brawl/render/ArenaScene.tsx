@@ -1,9 +1,8 @@
-import { useEffect, useMemo, useRef, type MutableRefObject } from 'react';
+import { memo, useEffect, useMemo, useRef, type MutableRefObject } from 'react';
 import { Environment, Lightformer } from '@react-three/drei';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { Physics } from '@react-three/rapier';
 import {
-  BRAWL_INPUT_INTERVAL_MS,
   BRAWL_SNAPSHOT_INTERVAL_MS,
   type BrawlSnapshotPayload,
 } from '../online/protocol';
@@ -61,13 +60,11 @@ function ArenaSimulationDriver({
 }: DriverProps) {
   const hudAccumRef = useRef<number>(0);
   const lastBroadcastMsRef = useRef<number>(0);
-  const lastInputSendMsRef = useRef<number>(0);
   const tickRef = useRef<number>(0);
 
   useEffect(() => {
     tickRef.current = 0;
     lastBroadcastMsRef.current = 0;
-    lastInputSendMsRef.current = 0;
   }, [roundKey]);
 
   useFrame((_, dt) => {
@@ -77,14 +74,9 @@ function ArenaSimulationDriver({
 
     if (onlineConfig?.role === 'client') {
       const nowMs = performance.now();
-      if (
-        phase === 'fighting' &&
-        onlineConfig.onSendClientInput &&
-        nowMs - lastInputSendMsRef.current >= BRAWL_INPUT_INTERVAL_MS
-      ) {
-        lastInputSendMsRef.current = nowMs;
+      if (phase === 'fighting' && onlineConfig.onSendClientInput) {
         onlineConfig.onSendClientInput(consumeInput());
-      } else if (phase !== 'fighting') {
+      } else {
         consumeInput();
       }
 
@@ -144,7 +136,7 @@ export interface ArenaSceneProps {
   onlineConfig?: BrawlArenaOnlineConfig;
 }
 
-export function ArenaScene({
+export const ArenaScene = memo(function ArenaScene({
   roundKey,
   fighters,
   difficulty,
@@ -224,9 +216,25 @@ export function ArenaScene({
         shadow-bias={-0.0005}
       />
 
+      <ArenaSimulationDriver
+        roundKey={roundKey}
+        runtime={runtime}
+        phase={phase}
+        paused={paused}
+        consumeInput={consumeInput}
+        onEliminateBatch={onEliminateBatch}
+        onHudSnapshot={onHudSnapshot}
+        onlineConfig={onlineConfig}
+      />
+
       <BrawlCamera runtime={runtime} />
 
-      <Physics key={roundKey} gravity={[0, GRAVITY, 0]} timeStep={1 / 60} paused={paused}>
+      <Physics
+        key={roundKey}
+        gravity={[0, GRAVITY, 0]}
+        timeStep={isRemoteClient ? 'vary' : 1 / 60}
+        paused={paused}
+      >
         <ArenaFloor tiles={tiles} runtime={runtime} />
 
         {fighters.map((cfg) => (
@@ -244,17 +252,6 @@ export function ArenaScene({
       </Physics>
 
       <ItemPickups runtime={runtime} />
-
-      <ArenaSimulationDriver
-        roundKey={roundKey}
-        runtime={runtime}
-        phase={phase}
-        paused={paused}
-        consumeInput={consumeInput}
-        onEliminateBatch={onEliminateBatch}
-        onHudSnapshot={onHudSnapshot}
-        onlineConfig={onlineConfig}
-      />
     </Canvas>
   );
-}
+});

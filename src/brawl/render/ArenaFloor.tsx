@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { memo, useMemo, useRef, useState } from 'react';
 import { Sparkles } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
 import { CylinderCollider, RigidBody } from '@react-three/rapier';
@@ -9,7 +9,7 @@ import type { BrawlWorldRuntime } from './worldRuntime';
 
 const RING_BASE_COLORS = ['#8D5B3E', '#7A4E36', '#694430', '#5A3A2A', '#4B3124'];
 
-function HexTile({
+const HexTile = memo(function HexTile({
   tile,
   runtime,
 }: {
@@ -89,7 +89,7 @@ function HexTile({
       </group>
     </RigidBody>
   );
-}
+});
 
 const OBSTACLE_POSITIONS: [number, number, number][] = [
   [3.6, 0.7, 1.8],
@@ -97,7 +97,7 @@ const OBSTACLE_POSITIONS: [number, number, number][] = [
   [0.2, 0.7, -4.1],
 ];
 
-export function ArenaFloor({
+export const ArenaFloor = memo(function ArenaFloor({
   tiles,
   runtime,
 }: {
@@ -176,4 +176,4 @@ export function ArenaFloor({
       />
     </group>
   );
-}
+});

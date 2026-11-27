@@ -18,6 +18,10 @@ import {
 } from 'lucide-react';
 import { playSfx, setAudioPreferences } from '../audio/soundEngine.ts';
 import { ANIMALS, type AnimalId } from '../engine/types.ts';
+import {
+  consumeRemoteSurvivalInputs,
+  type RemoteSurvivalInputRecord,
+} from '../survival/online/roomHelpers.ts';
 import { SurvivalSnapshotInterpolator } from '../survival/online/snapshotInterpolation.ts';
 import { useSurvivalRoom } from '../survival/online/useSurvivalRoom.ts';
 import {
@@ -31,7 +35,6 @@ import { getSurvivalMapMeta } from '../survival/sim/maps.ts';
 import type {
   GearId,
   SurvivalHudSnapshot,
-  SurvivalInput,
   SurvivalMapId,
   SurvivalMatchSummary,
   SurvivalMode,
@@ -425,7 +428,7 @@ export function SurvivalScreen({
   const interpolatorRef = useRef<SurvivalSnapshotInterpolator>(interpolator);
   interpolatorRef.current = interpolator;
 
-  const remoteInputsRef = useRef<Record<string, SurvivalInput>>({});
+  const remoteInputsRef = useRef<Record<string, RemoteSurvivalInputRecord>>({});
   const settledMatchIdsRef = useRef<Set<string>>(new Set());
   const matchNonceRef = useRef<number>(1);
   const hostLeftTitleId = useId();
@@ -493,7 +496,10 @@ export function SurvivalScreen({
       setSnapshotListener(null);
       setGuestInputListener((payload) => {
         if (payload.matchId !== matchId) return;
-        remoteInputsRef.current[payload.peerId] = payload.input;
+        remoteInputsRef.current[payload.peerId] = {
+          input: payload.input,
+          receivedAtMs: performance.now(),
+        };
       });
     } else {
       setGuestInputListener(null);
@@ -532,7 +538,8 @@ export function SurvivalScreen({
       localPlayerId: room.myPeerId,
       onBroadcastSnapshot: broadcastSnapshot,
       onSendClientInput: sendGuestInput,
-      getRemoteInputs: () => remoteInputsRef.current,
+      getRemoteInputs: () =>
+        consumeRemoteSurvivalInputs(remoteInputsRef.current, performance.now()),
       getDisconnectedGuestIds,
       interpolatorRef,
       onRegisterSkillAction: setSkillActionListener,

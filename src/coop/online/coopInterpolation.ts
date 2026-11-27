@@ -12,7 +12,7 @@ export type CoopInterpolatableSnapshot =
   | RopeSnapshotPayload
   | MinecartSnapshotPayload;
 
-const MAX_BUFFER_SIZE = 4;
+const MAX_BUFFER_SIZE = 8;
 
 type SnapshotEntry<T extends CoopInterpolatableSnapshot> = {
   snapshot: T;

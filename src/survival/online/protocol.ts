@@ -26,8 +26,9 @@ import type {
 
 export const SURVIVAL_MAX_PLAYERS = 4;
 export const SURVIVAL_INPUT_INTERVAL_MS = 72;
+export const SURVIVAL_INPUT_STALE_MS = 500;
 export const SURVIVAL_SNAPSHOT_INTERVAL_MS = 75;
-export const SURVIVAL_INTERPOLATION_DELAY_MS = 80;
+export const SURVIVAL_INTERPOLATION_DELAY_MS = 125;
 export const SURVIVAL_DISCONNECT_BOT_MS = 6000;
 export const SURVIVAL_MAX_SNAPSHOT_ENEMIES = 160;
 export const SURVIVAL_MAX_SNAPSHOT_PROJECTILES = 120;
@@ -603,11 +604,7 @@ function decodeColor(raw: unknown): string | null {
 }
 
 function isBossKind(val: unknown): val is BossKind {
-  return (
-    val === 'boss_slime_king' ||
-    val === 'boss_frost_bear' ||
-    val === 'boss_snow_dragon'
-  );
+  return typeof val === 'string' && BOSS_KINDS.includes(val as BossKind);
 }
 
 function isSurvivalPhase(val: unknown): val is SurvivalPhase {

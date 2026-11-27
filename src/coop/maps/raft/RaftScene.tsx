@@ -21,10 +21,13 @@ import { useGlassInput } from '../../../glass/input/useGlassInput';
 import {
   GLASS_EMOTES,
   GLASS_INPUT_STALE_MS,
-  GLASS_SNAPSHOT_INTERVAL_MS,
   type GlassEmotePayload,
   type GlassRoomMember,
 } from '../../../glass/online/protocol';
+import {
+  CoopSnapshotPacer,
+  isCriticalCoopEvent,
+} from '../../online/snapshotCadence';
 import type { GlassRoomController } from '../../../glass/online/useGlassRoom';
 import type { GlassHudSnapshot } from '../../../glass/render/renderTypes';
 import { FIXED_DT } from '../../../glass/sim/constants';
@@ -215,7 +218,7 @@ function RaftWorldDriver({
 }: RaftWorldDriverProps) {
   const simRef = useRef<RaftSimState>(createInitialRaftSimState());
   const accumulatorRef = useRef<number>(0);
-  const lastSnapshotSentMsRef = useRef<number>(0);
+  const snapshotPacerRef = useRef(new CoopSnapshotPacer<RaftSimEvent>());
   const finishNotifiedRef = useRef<boolean>(false);
   const guestInputRef = useRef<{ input: PlayerInput; receivedAtMs: number }>({
     input: { ...NEUTRAL_INPUT },
@@ -251,7 +254,7 @@ function RaftWorldDriver({
       const initialSim = createInitialRaftSimState();
       simRef.current = initialSim;
       accumulatorRef.current = 0;
-      lastSnapshotSentMsRef.current = 0;
+      snapshotPacerRef.current.reset();
       finishNotifiedRef.current = false;
       guestInputRef.current = {
         input: { ...NEUTRAL_INPUT },
@@ -415,21 +418,23 @@ function RaftWorldDriver({
 
         const justFinished =
           simRef.current.phase === 'finished' && !finishNotifiedRef.current;
-        const shouldBroadcast =
-          justFinished ||
-          frameEvents.length > 0 ||
-          nowMs - lastSnapshotSentMsRef.current >= GLASS_SNAPSHOT_INTERVAL_MS;
+        const { shouldBroadcast, events: pacedEvents } =
+          snapshotPacerRef.current.step(
+            nowMs,
+            frameEvents,
+            justFinished,
+            isCriticalCoopEvent,
+          );
 
         if (shouldBroadcast && roomMatchIdRef.current) {
           const packed = packRaftSnapshot(
             roomMatchIdRef.current,
             simRef.current,
           );
-          if (frameEvents.length > 0) {
-            packed.events = frameEvents.map((e) => ({ ...e }));
+          if (pacedEvents.length > 0) {
+            packed.events = pacedEvents;
           }
           room.broadcastSnapshot(packed);
-          lastSnapshotSentMsRef.current = nowMs;
         }
 
         if (justFinished) {
@@ -1312,7 +1317,11 @@ const RaftCourseMesh = memo(function RaftCourseMesh({
   );
 });
 
-export function RaftScene({ room, paused, onHudSnapshot }: CoopMapSceneProps) {
+export const RaftScene = memo(function RaftScene({
+  room,
+  paused,
+  onHudSnapshot,
+}: CoopMapSceneProps) {
   const renderRef = useRef<RaftRenderState>(createInitialRaftRenderState());
 
   const { sendEmote } = room;
@@ -1409,4 +1418,4 @@ export function RaftScene({ room, paused, onHudSnapshot }: CoopMapSceneProps) {
       />
     </Canvas>
   );
-}
+});

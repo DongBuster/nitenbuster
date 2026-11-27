@@ -9,13 +9,21 @@ import type {
   MatchState,
 } from '../sim/types.ts';
 
-export const BRAWL_SNAPSHOT_INTERVAL_MS = 50; // 20Hz
-export const BRAWL_INPUT_INTERVAL_MS = 50; // 20Hz
-export const BRAWL_INPUT_STALE_MS = 350;
-export const BRAWL_INTERPOLATION_DELAY_MS = 70;
+export const BRAWL_SNAPSHOT_INTERVAL_MS = 60; // ~16.7Hz
+export const BRAWL_INPUT_INTERVAL_MS = 60; // ~16.7Hz
+export const BRAWL_INPUT_STALE_MS = 450;
+export const BRAWL_INTERPOLATION_DELAY_MS = 110;
 export const BRAWL_MAX_ROOM_PLAYERS = 8;
 
 export type BrawlRoomPhase = 'idle' | 'lobby' | 'playing';
+
+export function buildBrawlRoundKey(
+  roomCode: string,
+  matchNonce: number,
+  round: number,
+): string {
+  return `brawl_online_${roomCode}_m${matchNonce}_r${round}`;
+}
 
 export interface BrawlRoomMember {
   peerId: string;
@@ -24,6 +32,7 @@ export interface BrawlRoomMember {
   accessory: string[];
   ready: boolean;
   joinedAt: number;
+  isHost?: boolean;
 }
 
 export interface BrawlRoomSettings {

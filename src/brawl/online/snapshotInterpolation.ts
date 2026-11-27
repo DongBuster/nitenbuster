@@ -9,7 +9,7 @@ interface TimedBrawlSnapshot {
   receivedAtMs: number;
 }
 
-const MAX_BUFFER_ENTRIES = 5;
+const MAX_BUFFER_ENTRIES = 8;
 
 export function lerpBrawlAngle(a: number, b: number, t: number): number {
   let delta = (b - a) % (Math.PI * 2);
@@ -40,7 +40,9 @@ function interpolateFighter(
     speedNorm: lerp(a.speedNorm, b.speedNorm, t),
     walkPhase: lerp(a.walkPhase, b.walkPhase, t),
     balance: lerp(a.balance, b.balance, t),
-    actionProgress: lerp(a.actionProgress, b.actionProgress, t),
+    // Don't interpolate progress backwards across an action state transition.
+    actionProgress:
+      a.action === b.action ? lerp(a.actionProgress, b.actionProgress, t) : b.actionProgress,
   };
 }
 
@@ -49,10 +51,16 @@ export class BrawlSnapshotInterpolator {
 
   push(snapshot: BrawlSnapshotPayload, receivedAtMs: number): void {
     const last = this.buffer[this.buffer.length - 1];
-    if (last && snapshot.tick <= last.snapshot.tick) {
+    if (last && last.snapshot.roundKey !== snapshot.roundKey) {
+      this.buffer = [];
+    } else if (last && snapshot.tick <= last.snapshot.tick) {
       return;
     }
-    this.buffer.push({ snapshot, receivedAtMs });
+    const latestAfterReset = this.buffer[this.buffer.length - 1];
+    const monotonicReceivedAt = latestAfterReset
+      ? Math.max(receivedAtMs, latestAfterReset.receivedAtMs)
+      : receivedAtMs;
+    this.buffer.push({ snapshot, receivedAtMs: monotonicReceivedAt });
     if (this.buffer.length > MAX_BUFFER_ENTRIES) {
       this.buffer.splice(0, this.buffer.length - MAX_BUFFER_ENTRIES);
     }

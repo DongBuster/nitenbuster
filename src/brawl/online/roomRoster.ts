@@ -17,6 +17,9 @@ export function sortRoomMembers(
   members: readonly BrawlRoomMember[],
 ): BrawlRoomMember[] {
   return [...members].sort((a, b) => {
+    const aHost = Boolean(a.isHost);
+    const bHost = Boolean(b.isHost);
+    if (aHost !== bHost) return aHost ? -1 : 1;
     if (a.joinedAt !== b.joinedAt) return a.joinedAt - b.joinedAt;
     return a.peerId.localeCompare(b.peerId);
   });

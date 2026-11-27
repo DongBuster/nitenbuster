@@ -2,6 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { totalCardsInState } from '../../engine/deck.ts';
 import { dealOnlineGame, playCard } from '../../engine/game.ts';
+import { SUPABASE_REALTIME_EVENTS_PER_SECOND } from '../supabaseClient.ts';
 import {
   generateRoomCode,
   normalizeRoomCode,
@@ -152,5 +153,9 @@ describe('PAWS Online Sanitize & Deal Suite', () => {
     assert.equal(generateRoomCode(6).length, 6);
     assert.equal(normalizeRoomCode(' ab-c 23 '), 'ABC23');
     assert.equal(normalizeRoomCode('paws-9999'), 'PAWS99');
+  });
+
+  it('5. configures Supabase Realtime headroom >= 30 events/sec for multi-player real-time modes', () => {
+    assert.ok(SUPABASE_REALTIME_EVENTS_PER_SECOND >= 30);
   });
 });

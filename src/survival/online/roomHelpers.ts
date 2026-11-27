@@ -5,6 +5,7 @@ import type {
   WeaponId,
 } from '../sim/types.ts';
 import {
+  SURVIVAL_INPUT_STALE_MS,
   SURVIVAL_MAX_PLAYERS,
   isSafeId,
   sanitizeAnimal,
@@ -166,4 +167,42 @@ export function inputsEqual(a: SurvivalInput, b: SurvivalInput): boolean {
     a.manualAim === b.manualAim &&
     a.dashPressed === b.dashPressed
   );
+}
+
+export interface RemoteSurvivalInputRecord {
+  input: SurvivalInput;
+  receivedAtMs: number;
+}
+
+/**
+ * Reads buffered remote Guest inputs on the Host: expires stale movement/dash
+ * after `SURVIVAL_INPUT_STALE_MS` (before full botTakeover kicks in) and clears
+ * one-shot `dashPressed` impulses after they are read once so lost packets never
+ * cause repeated unintended dashes.
+ */
+export function consumeRemoteSurvivalInputs(
+  remoteStore: Record<string, RemoteSurvivalInputRecord>,
+  nowMs: number,
+): Record<string, SurvivalInput> {
+  const out: Record<string, SurvivalInput> = {};
+  for (const [peerId, rec] of Object.entries(remoteStore)) {
+    if (!rec) continue;
+    if (nowMs - rec.receivedAtMs > SURVIVAL_INPUT_STALE_MS) {
+      out[peerId] = {
+        ...rec.input,
+        moveX: 0,
+        moveY: 0,
+        dashPressed: false,
+      };
+      if (rec.input.dashPressed) {
+        rec.input = { ...rec.input, dashPressed: false };
+      }
+    } else {
+      out[peerId] = rec.input;
+      if (rec.input.dashPressed) {
+        rec.input = { ...rec.input, dashPressed: false };
+      }
+    }
+  }
+  return out;
 }

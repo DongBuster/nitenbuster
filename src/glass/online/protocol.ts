@@ -17,8 +17,8 @@ export const GLASS_DISCONNECT_GRACE_MS = 8000;
 export const GLASS_COUNTDOWN_MS = 2800;
 export const GLASS_SNAPSHOT_INTERVAL_MS = 67;
 export const GLASS_INPUT_INTERVAL_MS = 67;
-export const GLASS_INPUT_STALE_MS = 400;
-export const GLASS_INTERPOLATION_DELAY_MS = 75;
+export const GLASS_INPUT_STALE_MS = 500;
+export const GLASS_INTERPOLATION_DELAY_MS = 120;
 
 export const GLASS_EMOTES = [
   { id: 1, icon: '🐢', text: 'Chậm thôi!' },
@@ -47,11 +47,24 @@ export type GlassRoomMember = {
   accessory: string[];
   ready: boolean;
   joinedAt: number;
+  isHost?: boolean;
   selectedMap?: CoopMapId;
   selectedMapPack?: string;
   selectedLevel?: CoopLevelNumber;
   unlockedByPack?: Record<string, number>;
 };
+
+export function sortGlassRoomMembers(
+  members: readonly GlassRoomMember[],
+): GlassRoomMember[] {
+  return [...members].sort((a, b) => {
+    const aHost = Boolean(a.isHost);
+    const bHost = Boolean(b.isHost);
+    if (aHost !== bHost) return aHost ? -1 : 1;
+    if (a.joinedAt !== b.joinedAt) return a.joinedAt - b.joinedAt;
+    return a.peerId.localeCompare(b.peerId);
+  });
+}
 
 export type PackedFragileState = {
   s: 0 | 1 | 2;

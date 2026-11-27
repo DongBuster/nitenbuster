@@ -5,6 +5,8 @@ import type { GlassSimState } from '../../sim/types.ts';
 import {
   GLASS_INTERPOLATION_DELAY_MS,
   packSimSnapshot,
+  sortGlassRoomMembers,
+  type GlassRoomMember,
   type GlassSnapshotPayload,
 } from '../protocol.ts';
 import { SnapshotInterpolator, lerpAngle } from '../snapshotInterpolation.ts';
@@ -237,8 +239,8 @@ describe('SnapshotInterpolator', () => {
     assert.deepEqual(interp.sample(1500), s1);
   });
 
-  it('interpolates midpoint smoothly at now - 75ms including shortest-arc yaw and upper discrete fields', () => {
-    assert.equal(GLASS_INTERPOLATION_DELAY_MS, 75);
+  it('interpolates midpoint smoothly at now - 120ms including shortest-arc yaw and upper discrete fields', () => {
+    assert.equal(GLASS_INTERPOLATION_DELAY_MS, 120);
 
     const interp = new SnapshotInterpolator();
     const s1 = makeSnapshot(10, 1.0, {
@@ -338,8 +340,8 @@ describe('SnapshotInterpolator', () => {
     // Before earliest snapshot -> exact s1
     assert.deepEqual(interp.sample(1050), s1);
 
-    // Midpoint: renderTime = 1125 - 75 = 1050 -> t = 0.5 between 1000 and 1100
-    const mid = interp.sample(1125);
+    // Midpoint: renderTime = 1170 - 120 = 1050 -> t = 0.5 between 1000 and 1100
+    const mid = interp.sample(1170);
     assert.ok(mid);
     assertClose(mid.matchTime, 1.05);
     assertClose(mid.p1.x, -1.5);
@@ -377,11 +379,11 @@ describe('SnapshotInterpolator', () => {
     assert.equal(mid.glass.shatterReason, 'stretch');
     assert.deepEqual(mid.events, s2.events);
 
-    // After latest snapshot -> exact s2
-    assert.deepEqual(interp.sample(1200), s2);
+    // After latest snapshot -> exact s2 (renderTime = 1130 >= 1100)
+    assert.deepEqual(interp.sample(1250), s2);
   });
 
-  it('drops out-of-order/duplicate ticks, caps buffer to 4 entries, and clears on reset()', () => {
+  it('drops out-of-order/duplicate ticks, caps buffer to 8 entries, and clears on reset()', () => {
     const interp = new SnapshotInterpolator();
     interp.push(makeSnapshot(10, 1.0, { p1: { z: 10 } }), 1000);
     interp.push(makeSnapshot(9, 0.9, { p1: { z: 99 } }), 1050); // out-of-order dropped
@@ -389,14 +391,16 @@ describe('SnapshotInterpolator', () => {
 
     assert.equal(interp.sample(1200)?.p1.z, 10);
 
-    // Push 4 newer ticks (total 5 valid pushes -> oldest tick 10 should be evicted)
-    interp.push(makeSnapshot(20, 2.0, { p1: { z: 20 } }), 1100);
-    interp.push(makeSnapshot(30, 3.0, { p1: { z: 30 } }), 1200);
-    interp.push(makeSnapshot(40, 4.0, { p1: { z: 40 } }), 1300);
-    interp.push(makeSnapshot(50, 5.0, { p1: { z: 50 } }), 1400);
+    // Push 8 newer ticks (total 9 valid pushes -> oldest tick 10 should be evicted)
+    for (let tick = 20; tick <= 90; tick += 10) {
+      interp.push(
+        makeSnapshot(tick, tick / 10, { p1: { z: tick } }),
+        1000 + (tick - 10) * 10,
+      );
+    }
 
     // Buffer now starts at tick 20 (receivedAt 1100), so renderTime = 1050 clamps to z = 20
-    assert.equal(interp.sample(1125)?.p1.z, 20);
+    assert.equal(interp.sample(1170)?.p1.z, 20);
 
     // Reset clears buffer and allows low tick numbers again
     interp.reset();
@@ -404,5 +408,34 @@ describe('SnapshotInterpolator', () => {
 
     interp.push(makeSnapshot(1, 0.1, { p1: { z: 1.5 } }), 2000);
     assert.equal(interp.sample(2100)?.p1.z, 1.5);
+  });
+
+  it('sorts glass room members with explicit isHost priority ahead of clock-skewed joinedAt', () => {
+    const makeMember = (
+      peerId: string,
+      joinedAt: number,
+      isHost?: boolean,
+    ): GlassRoomMember => ({
+      peerId,
+      name: peerId,
+      animal: 'dog',
+      accessory: [],
+      ready: true,
+      joinedAt,
+      ...(isHost !== undefined ? { isHost } : {}),
+    });
+
+    const sorted = sortGlassRoomMembers([
+      makeMember('guest-skew', 50, false),
+      makeMember('host-creator', 500, true),
+    ]);
+    assert.equal(sorted[0].peerId, 'host-creator');
+    assert.equal(sorted[1].peerId, 'guest-skew');
+
+    const fallbackSorted = sortGlassRoomMembers([
+      makeMember('b', 100),
+      makeMember('a', 100),
+    ]);
+    assert.equal(fallbackSorted[0].peerId, 'a');
   });
 });

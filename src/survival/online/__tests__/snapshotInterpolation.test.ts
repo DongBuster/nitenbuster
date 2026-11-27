@@ -561,7 +561,7 @@ describe('SurvivalSnapshotInterpolator', () => {
   });
 
   it('interpolates players (position + shortest-arc angles), enemies, projectiles, gems, and elapsedSec at midpoint', () => {
-    assert.equal(SURVIVAL_INTERPOLATION_DELAY_MS, 80);
+    assert.equal(SURVIVAL_INTERPOLATION_DELAY_MS, 125);
 
     const interp = new SurvivalSnapshotInterpolator();
 
@@ -689,8 +689,8 @@ describe('SurvivalSnapshotInterpolator', () => {
     interp.push(s1, 1000);
     interp.push(s2, 1100);
 
-    // targetTime = 1130 - 80 = 1050 -> t = 0.5 between 1000 and 1100
-    const mid = interp.sample(1130);
+    // targetTime = 1175 - 125 = 1050 -> t = 0.5 between 1000 and 1100
+    const mid = interp.sample(1175);
     assert.ok(mid);
     assertClose(mid.elapsedSec, 11.0);
     assertClose(mid.players[0].x, 120);
@@ -721,7 +721,7 @@ describe('SurvivalSnapshotInterpolator', () => {
     assert.equal(future.players[0].y, 280);
   });
 
-  it('ignores out-of-order and duplicate ticks, caps buffer to 4, and resets on matchId change', () => {
+  it('ignores out-of-order and duplicate ticks, caps buffer to 8, and resets on matchId change', () => {
     const interp = new SurvivalSnapshotInterpolator();
 
     interp.push(makeSnapshot(10, 1.0, { score: 100 }), 1000);
@@ -730,14 +730,16 @@ describe('SurvivalSnapshotInterpolator', () => {
 
     assert.equal(interp.sample(1200)?.score, 100);
 
-    // Push 4 newer ticks -> oldest (tick 10) evicted, buffer holds [20, 30, 40, 50]
-    interp.push(makeSnapshot(20, 2.0, { score: 200 }), 1100);
-    interp.push(makeSnapshot(30, 3.0, { score: 300 }), 1200);
-    interp.push(makeSnapshot(40, 4.0, { score: 400 }), 1300);
-    interp.push(makeSnapshot(50, 5.0, { score: 500 }), 1400);
+    // Push 8 newer ticks -> oldest (tick 10) evicted, buffer holds [20..90]
+    for (let tick = 20; tick <= 90; tick += 10) {
+      interp.push(
+        makeSnapshot(tick, tick / 10, { score: tick * 10 }),
+        1000 + (tick - 10) * 10,
+      );
+    }
 
-    // targetTime = 1130 - 80 = 1050 <= earliest (1100) -> clamps to tick 20
-    assert.equal(interp.sample(1130)?.tick, 20);
+    // targetTime = 1175 - 125 = 1050 <= earliest (1100) -> clamps to tick 20
+    assert.equal(interp.sample(1175)?.tick, 20);
 
     // Match ID change resets buffer and accepts tick 1 again
     interp.push(makeSnapshot(1, 0.1, { matchId: 'surv-match-2', score: 12 }), 1500);
@@ -789,7 +791,7 @@ describe('SurvivalSnapshotInterpolator', () => {
     interp.push(s1, 1000);
     interp.push(s2, 1100);
 
-    const frameA = interp.sample(1130); // targetTime 1050 -> t=0.5
+    const frameA = interp.sample(1175); // targetTime 1050 -> t=0.5
     assert.ok(frameA);
     assertClose(frameA.projectiles[0].angle ?? 0, -Math.PI + 0.1, 1e-5);
 
@@ -797,7 +799,7 @@ describe('SurvivalSnapshotInterpolator', () => {
     frameA.players[0].x = -9999;
     frameA.projectiles[0].x = -9999;
 
-    const frameB = interp.sample(1130);
+    const frameB = interp.sample(1175);
     assert.ok(frameB);
     assertClose(frameB.players[0].x, 1000);
     assertClose(frameB.projectiles[0].x, 150);

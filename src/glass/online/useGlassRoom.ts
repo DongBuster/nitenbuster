@@ -27,12 +27,13 @@ import {
   type AccessorySelection,
 } from '../../scene3d/accessoryCatalog.ts';
 import type { PlayerInput, PlayerSlot } from '../sim/types.ts';
+import { createGlassInputSender } from './inputSync.ts';
 import {
   GLASS_COUNTDOWN_MS,
   GLASS_DISCONNECT_GRACE_MS,
   GLASS_EMOTES,
-  GLASS_INPUT_INTERVAL_MS,
   GLASS_MAX_PLAYERS,
+  sortGlassRoomMembers,
   type CoopSelectMapPayload,
   type CoopSnapshotPayload,
   type GlassConnectionStatus,
@@ -184,6 +185,7 @@ function parsePresenceMembers(
         accessory: normalizeAccessories(m.accessory as AccessorySelection),
         ready: Boolean(m.ready),
         joinedAt: typeof m.joinedAt === 'number' ? m.joinedAt : Date.now(),
+        ...(typeof m.isHost === 'boolean' ? { isHost: m.isHost } : {}),
         ...(isCoopMapId(m.selectedMap) ? { selectedMap: m.selectedMap } : {}),
         ...(selectedMapPack ? { selectedMapPack } : {}),
         ...(isCoopLevelNumber(m.selectedLevel)
@@ -196,19 +198,7 @@ function parsePresenceMembers(
       }
     }
   }
-  return Array.from(byPeer.values()).sort((a, b) => {
-    if (a.joinedAt !== b.joinedAt) return a.joinedAt - b.joinedAt;
-    return a.peerId.localeCompare(b.peerId);
-  });
-}
-
-function inputsEqual(a: PlayerInput, b: PlayerInput): boolean {
-  return (
-    a.moveX === b.moveX &&
-    a.moveZ === b.moveZ &&
-    a.jump === b.jump &&
-    a.lift === b.lift
-  );
+  return sortGlassRoomMembers(Array.from(byPeer.values()));
 }
 
 function getSnapshotFailures(snapshot: CoopSnapshotPayload): number {
@@ -324,12 +314,8 @@ export function useGlassRoom(): GlassRoomController {
     [],
   );
 
-  const inputSeqRef = useRef<number>(0);
   const lastGuestSeqRef = useRef<number>(0);
-  const lastInputSentAtRef = useRef<number>(0);
-  const lastSentInputRef = useRef<PlayerInput | null>(null);
-  const pendingInputRef = useRef<PlayerInput | null>(null);
-  const inputThrottleTimerRef = useRef<number | null>(null);
+  const inputSenderRef = useRef(createGlassInputSender());
 
   const resolvePendingConnect = useCallback(() => {
     const resolve = connectResolveRef.current;
@@ -353,14 +339,6 @@ export function useGlassRoom(): GlassRoomController {
     lastDisconnectedSecRef.current = null;
   }, []);
 
-  const clearInputThrottle = useCallback(() => {
-    if (inputThrottleTimerRef.current !== null) {
-      window.clearTimeout(inputThrottleTimerRef.current);
-      inputThrottleTimerRef.current = null;
-    }
-    pendingInputRef.current = null;
-  }, []);
-
   const clearEmoteTimers = useCallback(() => {
     for (const slot of ['p1', 'p2'] as const) {
       const timerId = emoteTimersRef.current[slot];
@@ -375,7 +353,7 @@ export function useGlassRoom(): GlassRoomController {
     resolvePendingConnect();
     clearCountdownTimer();
     clearDisconnectTimer();
-    clearInputThrottle();
+    inputSenderRef.current.reset();
     clearEmoteTimers();
     const client = getSupabaseClient();
     const ch = channelRef.current;
@@ -389,7 +367,6 @@ export function useGlassRoom(): GlassRoomController {
     clearCountdownTimer,
     clearDisconnectTimer,
     clearEmoteTimers,
-    clearInputThrottle,
     resolvePendingConnect,
   ]);
 
@@ -452,7 +429,7 @@ export function useGlassRoom(): GlassRoomController {
     (nextPhase: GlassRoomPhase) => {
       clearCountdownTimer();
       clearDisconnectTimer();
-      clearInputThrottle();
+      inputSenderRef.current.reset();
       clearEmoteTimers();
 
       matchIdRef.current = '';
@@ -461,10 +438,7 @@ export function useGlassRoom(): GlassRoomController {
       lastSnapshotRef.current = null;
       finalResultRef.current = null;
       partnerLeftPermanentlyRef.current = false;
-      inputSeqRef.current = 0;
       lastGuestSeqRef.current = 0;
-      lastInputSentAtRef.current = 0;
-      lastSentInputRef.current = null;
       phaseRef.current = nextPhase;
 
       setMatchId('');
@@ -492,7 +466,6 @@ export function useGlassRoom(): GlassRoomController {
       clearCountdownTimer,
       clearDisconnectTimer,
       clearEmoteTimers,
-      clearInputThrottle,
       syncRoleStates,
     ],
   );
@@ -632,7 +605,7 @@ export function useGlassRoom(): GlassRoomController {
       if (!finishedMatchId || finishedMatchId !== matchIdRef.current) return;
       clearCountdownTimer();
       clearDisconnectTimer();
-      clearInputThrottle();
+      inputSenderRef.current.reset();
 
       const resolvedMapId = isCoopMapId(mapId) ? mapId : selectedMapRef.current;
       const resolvedPackId = getCoopMapPack(
@@ -667,7 +640,7 @@ export function useGlassRoom(): GlassRoomController {
       setPartnerDisconnectedSec(null);
       setPhase('finished');
     },
-    [clearCountdownTimer, clearDisconnectTimer, clearInputThrottle],
+    [clearCountdownTimer, clearDisconnectTimer],
   );
 
   const startCountdownOrPlay = useCallback(
@@ -720,7 +693,7 @@ export function useGlassRoom(): GlassRoomController {
 
       clearCountdownTimer();
       clearDisconnectTimer();
-      clearInputThrottle();
+      inputSenderRef.current.reset();
 
       const nextMap: CoopMapId = isCoopMapId(evt.mapId)
         ? evt.mapId
@@ -752,10 +725,7 @@ export function useGlassRoom(): GlassRoomController {
       lastSnapshotRef.current = null;
       finalResultRef.current = null;
       partnerLeftPermanentlyRef.current = false;
-      inputSeqRef.current = 0;
       lastGuestSeqRef.current = 0;
-      lastInputSentAtRef.current = 0;
-      lastSentInputRef.current = null;
 
       setMatchId(evt.matchId);
       setPartnerDisconnectedSec(null);
@@ -774,7 +744,6 @@ export function useGlassRoom(): GlassRoomController {
     [
       clearCountdownTimer,
       clearDisconnectTimer,
-      clearInputThrottle,
       startCountdownOrPlay,
       syncRoleStates,
       updateSelectedStage,
@@ -812,10 +781,8 @@ export function useGlassRoom(): GlassRoomController {
       partnerLeftPermanentlyRef.current = false;
 
       if (!isSameMatch) {
-        inputSeqRef.current = 0;
+        inputSenderRef.current.reset();
         lastGuestSeqRef.current = 0;
-        lastInputSentAtRef.current = 0;
-        lastSentInputRef.current = null;
       }
 
       clearDisconnectTimer();
@@ -977,6 +944,7 @@ export function useGlassRoom(): GlassRoomController {
         accessory: normalizeAccessories(profile.accessory),
         ready: asHost,
         joinedAt: Date.now(),
+        isHost: asHost,
         ...(asHost
           ? {
               selectedMap: DEFAULT_COOP_MAP_ID,
@@ -1607,103 +1575,50 @@ export function useGlassRoom(): GlassRoomController {
     [applyEmote, myPeerId],
   );
 
-  const flushGuestInput = useCallback(
-    (input: PlayerInput, nowMs: number) => {
-      const channel = channelRef.current;
-      const currentMatchId = matchIdRef.current;
-      if (
-        !channel ||
-        !currentMatchId ||
-        phaseRef.current !== 'playing' ||
-        isHostRef.current
-      ) {
-        return;
-      }
-
-      const seq = ++inputSeqRef.current;
-      const payload: GlassInputPayload = {
-        matchId: currentMatchId,
-        peerId: myPeerId,
-        seq,
-        moveX: input.moveX,
-        moveZ: input.moveZ,
-        jump: input.jump,
-        lift: input.lift,
-      };
-
-      lastInputSentAtRef.current = nowMs;
-      lastSentInputRef.current = { ...input };
-
-      void channel.send({
-        type: 'broadcast',
-        event: 'glass:input',
-        payload,
-      });
-    },
-    [myPeerId],
-  );
-
   const sendGuestInput = useCallback(
     (input: PlayerInput) => {
+      const currentMatchId = matchIdRef.current;
       if (
         isHostRef.current ||
         phaseRef.current !== 'playing' ||
-        !matchIdRef.current ||
+        !currentMatchId ||
         !channelRef.current
       ) {
         return;
       }
 
-      const now = Date.now();
-      const elapsed = now - lastInputSentAtRef.current;
-      const latchedJump = Boolean(pendingInputRef.current?.jump || input.jump);
-      const latchedLift =
-        input.lift !== 0 ? input.lift : (pendingInputRef.current?.lift ?? 0);
-      const mergedInput: PlayerInput =
-        latchedJump === input.jump && latchedLift === input.lift
-          ? input
-          : { ...input, jump: latchedJump, lift: latchedLift };
-      const changed =
-        !lastSentInputRef.current ||
-        !inputsEqual(mergedInput, lastSentInputRef.current);
-
-      if (
-        elapsed >= GLASS_INPUT_INTERVAL_MS &&
-        (changed || elapsed >= GLASS_INPUT_INTERVAL_MS * 2)
-      ) {
-        clearInputThrottle();
-        flushGuestInput(mergedInput, now);
-        return;
-      }
-
-      pendingInputRef.current = {
-        moveX: mergedInput.moveX,
-        moveZ: mergedInput.moveZ,
-        jump: latchedJump,
-        lift: latchedLift,
-      };
-
-      const targetInterval = changed
-        ? GLASS_INPUT_INTERVAL_MS
-        : GLASS_INPUT_INTERVAL_MS * 2;
-      const waitMs = Math.max(1, targetInterval - elapsed);
-
-      if (changed && inputThrottleTimerRef.current !== null) {
-        window.clearTimeout(inputThrottleTimerRef.current);
-        inputThrottleTimerRef.current = null;
-      }
-
-      if (inputThrottleTimerRef.current === null) {
-        inputThrottleTimerRef.current = window.setTimeout(() => {
-          inputThrottleTimerRef.current = null;
-          const pending = pendingInputRef.current;
-          pendingInputRef.current = null;
-          if (!pending) return;
-          flushGuestInput(pending, Date.now());
-        }, waitMs);
-      }
+      inputSenderRef.current.send(
+        currentMatchId,
+        input,
+        Date.now(),
+        (seq, payloadInput, activeMatchId) => {
+          const channel = channelRef.current;
+          if (
+            !channel ||
+            phaseRef.current !== 'playing' ||
+            isHostRef.current ||
+            matchIdRef.current !== activeMatchId
+          ) {
+            return;
+          }
+          const payload: GlassInputPayload = {
+            matchId: activeMatchId,
+            peerId: myPeerId,
+            seq,
+            moveX: payloadInput.moveX,
+            moveZ: payloadInput.moveZ,
+            jump: payloadInput.jump,
+            lift: payloadInput.lift,
+          };
+          void channel.send({
+            type: 'broadcast',
+            event: 'glass:input',
+            payload,
+          });
+        },
+      );
     },
-    [clearInputThrottle, flushGuestInput],
+    [myPeerId],
   );
 
   const broadcastSnapshot = useCallback(

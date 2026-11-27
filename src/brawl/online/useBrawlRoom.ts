@@ -18,6 +18,7 @@ import type { FighterInput, MatchState } from '../sim/types';
 import {
   BRAWL_INPUT_STALE_MS,
   BRAWL_MAX_ROOM_PLAYERS,
+  buildBrawlRoundKey,
   type BrawlInputPayload,
   type BrawlMatchSyncPayload,
   type BrawlRoomConfigPayload,
@@ -26,6 +27,7 @@ import {
   type BrawlRoomSettings,
   type BrawlSnapshotPayload,
 } from './protocol';
+import { createBrawlInputSender } from './inputSync';
 import {
   buildOnlineBrawlRoster,
   canStartBrawlRoom,
@@ -87,6 +89,7 @@ function parsePresenceMembers(
         accessory: normalizeAccessories(m.accessory as AccessorySelection),
         ready: Boolean(m.ready),
         joinedAt: typeof m.joinedAt === 'number' ? m.joinedAt : Date.now(),
+        ...(typeof m.isHost === 'boolean' ? { isHost: m.isHost } : {}),
       };
       const existing = byPeer.get(m.peerId);
       if (!existing || candidate.joinedAt <= existing.joinedAt) {
@@ -111,9 +114,12 @@ export function useBrawlRoom() {
   );
   const [match, setMatch] = useState<MatchState | null>(null);
   const [matchNonce, setMatchNonce] = useState<number>(0);
+  const [lockedHostPeerId, setLockedHostPeerId] = useState<string | null>(null);
 
   const channelRef = useRef<RealtimeChannel | null>(null);
   const myProfileRef = useRef<BrawlRoomMember | null>(null);
+  const roomCodeRef = useRef<string>(roomCode);
+  roomCodeRef.current = roomCode;
   const settingsRef = useRef<BrawlRoomSettings>(settings);
   settingsRef.current = settings;
   const phaseRef = useRef<BrawlRoomPhase>(phase);
@@ -132,9 +138,15 @@ export function useBrawlRoom() {
   const remoteInputsRef = useRef<
     Record<string, { input: FighterInput; seq: number; receivedAtMs: number }>
   >({});
-  const inputSeqRef = useRef<number>(0);
+  const inputSenderRef = useRef(createBrawlInputSender());
 
-  const hostPeerId = useMemo(() => electBrawlHost(members), [members]);
+  const hostPeerId = useMemo(
+    () =>
+      phase === 'playing' && lockedHostPeerId
+        ? lockedHostPeerId
+        : electBrawlHost(members),
+    [lockedHostPeerId, members, phase],
+  );
   const isHost = hostPeerId !== null && hostPeerId === myPeerId;
   isHostRef.current = isHost;
 
@@ -166,7 +178,7 @@ export function useBrawlRoom() {
     }
     remoteInputsRef.current = {};
     interpolatorRef.current.reset();
-    inputSeqRef.current = 0;
+    inputSenderRef.current.reset();
   }, []);
 
   useEffect(() => {
@@ -181,6 +193,7 @@ export function useBrawlRoom() {
       playerName: string,
       animal: AnimalId,
       accessory: AccessorySelection,
+      asHost = false,
     ) => {
       if (!configured) {
         setErrorMessage(
@@ -204,6 +217,11 @@ export function useBrawlRoom() {
       }
 
       cleanupChannel();
+      roomCodeRef.current = cleanCode;
+      phaseRef.current = 'lobby';
+      matchRef.current = null;
+      matchNonceRef.current = 0;
+      setLockedHostPeerId(null);
       setErrorMessage(null);
       setStatus('connecting');
       setRoomCode(cleanCode);
@@ -218,6 +236,7 @@ export function useBrawlRoom() {
         accessory: normalizeAccessories(accessory),
         ready: false,
         joinedAt: Date.now(),
+        isHost: asHost,
       };
       myProfileRef.current = profile;
 
@@ -253,6 +272,15 @@ export function useBrawlRoom() {
           data.phase !== phaseRef.current
         ) {
           interpolatorRef.current.reset();
+          inputSenderRef.current.reset();
+        }
+        matchNonceRef.current = data.matchNonce;
+        phaseRef.current = data.phase;
+        matchRef.current = data.match;
+        if (data.phase === 'playing' && data.hostPeerId) {
+          setLockedHostPeerId(data.hostPeerId);
+        } else if (data.phase === 'lobby') {
+          setLockedHostPeerId(null);
         }
         setMatchNonce(data.matchNonce);
         setPhase(data.phase);
@@ -263,6 +291,21 @@ export function useBrawlRoom() {
         if (isHostRef.current) return;
         const snap = payload as BrawlSnapshotPayload;
         if (!snap || typeof snap.tick !== 'number') return;
+        const currentMatch = matchRef.current;
+        const expectedRoundKey = currentMatch
+          ? buildBrawlRoundKey(
+              roomCodeRef.current,
+              matchNonceRef.current,
+              currentMatch.round,
+            )
+          : '';
+        if (
+          phaseRef.current !== 'playing' ||
+          !expectedRoundKey ||
+          snap.roundKey !== expectedRoundKey
+        ) {
+          return;
+        }
         interpolatorRef.current.push(snap, performance.now());
       });
 
@@ -308,8 +351,9 @@ export function useBrawlRoom() {
             return;
           }
           setStatus('connected');
-          void channel.track(profile);
-          broadcast('brawl_sync_request', { peerId: myPeerId });
+          void channel.track(profile).then(() => {
+            broadcast('brawl_sync_request', { peerId: myPeerId });
+          });
         } else if (subStatus === 'CHANNEL_ERROR' || subStatus === 'TIMED_OUT') {
           setStatus('error');
           setErrorMessage('Mất kết nối tới phòng đấu. Vui lòng thử lại.');
@@ -322,7 +366,7 @@ export function useBrawlRoom() {
   const createRoom = useCallback(
     (playerName: string, animal: AnimalId, accessory: AccessorySelection) => {
       const code = generateRoomCode();
-      connectToRoom(code, playerName, animal, accessory);
+      connectToRoom(code, playerName, animal, accessory, true);
     },
     [connectToRoom],
   );
@@ -334,7 +378,7 @@ export function useBrawlRoom() {
       animal: AnimalId,
       accessory: AccessorySelection,
     ) => {
-      connectToRoom(code, playerName, animal, accessory);
+      connectToRoom(code, playerName, animal, accessory, false);
     },
     [connectToRoom],
   );
@@ -342,6 +386,8 @@ export function useBrawlRoom() {
   const leaveRoom = useCallback(() => {
     cleanupChannel();
     myProfileRef.current = null;
+    roomCodeRef.current = '';
+    setLockedHostPeerId(null);
     setStatus('disconnected');
     setErrorMessage(null);
     setRoomCode('');
@@ -403,8 +449,12 @@ export function useBrawlRoom() {
       if (!isHostRef.current) return;
       const resolvedNonce = nextNonce ?? matchNonceRef.current;
       if (nextNonce !== undefined) {
+        matchNonceRef.current = nextNonce;
         setMatchNonce(nextNonce);
       }
+      matchRef.current = nextMatch;
+      phaseRef.current = 'playing';
+      setLockedHostPeerId(myPeerId);
       setMatch(nextMatch);
       setPhase('playing');
       broadcast('brawl_match_state', {
@@ -467,6 +517,10 @@ export function useBrawlRoom() {
     if (!isHostRef.current) return;
     remoteInputsRef.current = {};
     interpolatorRef.current.reset();
+    inputSenderRef.current.reset();
+    phaseRef.current = 'lobby';
+    matchRef.current = null;
+    setLockedHostPeerId(null);
     setPhase('lobby');
     setMatch(null);
     broadcast('brawl_match_state', {
@@ -488,13 +542,19 @@ export function useBrawlRoom() {
   const sendClientInput = useCallback(
     (roundKey: string, input: FighterInput) => {
       if (isHostRef.current) return;
-      inputSeqRef.current += 1;
-      broadcast('brawl_input', {
+      inputSenderRef.current.send(
         roundKey,
-        peerId: myPeerId,
-        seq: inputSeqRef.current,
         input,
-      } satisfies BrawlInputPayload);
+        performance.now(),
+        (seq, payloadInput, activeRoundKey) => {
+          broadcast('brawl_input', {
+            roundKey: activeRoundKey,
+            peerId: myPeerId,
+            seq,
+            input: payloadInput,
+          } satisfies BrawlInputPayload);
+        },
+      );
     },
     [broadcast, myPeerId],
   );

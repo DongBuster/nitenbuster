@@ -1,13 +1,23 @@
-import { useCallback, useEffect, useMemo, useRef, type RefObject } from 'react';
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  type RefObject,
+} from 'react';
 import { Environment, Lightformer } from '@react-three/drei';
 import { Canvas, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { playSfx } from '../../audio/soundEngine';
+import {
+  CoopSnapshotPacer,
+  isCriticalCoopEvent,
+} from '../../coop/online/snapshotCadence';
 import { useGlassInput } from '../input/useGlassInput';
 import {
   GLASS_EMOTES,
   GLASS_INPUT_STALE_MS,
-  GLASS_SNAPSHOT_INTERVAL_MS,
   packSimSnapshot,
   type GlassRoomMember,
   type GlassSnapshotPayload,
@@ -282,7 +292,7 @@ function GlassWorldDriver({
 }: GlassWorldDriverProps) {
   const simRef = useRef<GlassSimState>(createInitialSimState(course));
   const accumulatorRef = useRef<number>(0);
-  const lastSnapshotSentMsRef = useRef<number>(0);
+  const snapshotPacerRef = useRef(new CoopSnapshotPacer<SimEvent>());
   const finishNotifiedRef = useRef<boolean>(false);
   const guestInputRef = useRef<{ input: PlayerInput; receivedAtMs: number }>({
     input: { ...NEUTRAL_INPUT },
@@ -407,7 +417,7 @@ function GlassWorldDriver({
       const initialSim = createInitialSimState(courseRef.current);
       simRef.current = initialSim;
       accumulatorRef.current = 0;
-      lastSnapshotSentMsRef.current = 0;
+      snapshotPacerRef.current.reset();
       finishNotifiedRef.current = false;
       guestInputRef.current = {
         input: { ...NEUTRAL_INPUT },
@@ -631,21 +641,23 @@ function GlassWorldDriver({
 
         const justFinished =
           simRef.current.phase === 'finished' && !finishNotifiedRef.current;
-        const shouldBroadcast =
-          justFinished ||
-          frameEvents.length > 0 ||
-          nowMs - lastSnapshotSentMsRef.current >= GLASS_SNAPSHOT_INTERVAL_MS;
+        const { shouldBroadcast, events: pacedEvents } =
+          snapshotPacerRef.current.step(
+            nowMs,
+            frameEvents,
+            justFinished,
+            isCriticalCoopEvent,
+          );
 
         if (shouldBroadcast && roomMatchIdRef.current) {
           const packed = packSimSnapshot(
             roomMatchIdRef.current,
             simRef.current,
           );
-          if (frameEvents.length > 0) {
-            packed.events = frameEvents.map((e) => ({ ...e }));
+          if (pacedEvents.length > 0) {
+            packed.events = pacedEvents;
           }
           room.broadcastSnapshot(packed);
-          lastSnapshotSentMsRef.current = nowMs;
         }
 
         if (justFinished) {
@@ -706,7 +718,7 @@ function GlassWorldDriver({
   return null;
 }
 
-export function GlassScene({
+export const GlassScene = memo(function GlassScene({
   room,
   paused,
   onHudSnapshot,
@@ -835,4 +847,4 @@ export function GlassScene({
       <GlassPaneMesh renderRef={renderRef} />
     </Canvas>
   );
-}
+});

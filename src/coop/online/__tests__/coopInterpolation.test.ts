@@ -169,12 +169,12 @@ describe('CoopSnapshotInterpolator', () => {
 
     const s2 = makeRaftSnapshot(5, 0.4, { raft: { z: 10 } });
     interp.push(s2, 1100);
-    assert.deepEqual(interp.sample(1050), s1); // renderTime = 975 <= 1000
-    assert.deepEqual(interp.sample(1200), s2); // renderTime = 1125 >= 1100
+    assert.deepEqual(interp.sample(1050), s1); // renderTime = 930 <= 1000
+    assert.deepEqual(interp.sample(1250), s2); // renderTime = 1130 >= 1100
   });
 
   it('interpolates raft_rapids continuous fields, shortest-arc yaw, and takes discrete fields from upper snapshot', () => {
-    assert.equal(GLASS_INTERPOLATION_DELAY_MS, 75);
+    assert.equal(GLASS_INTERPOLATION_DELAY_MS, 120);
     const interp = new CoopSnapshotInterpolator<RaftSnapshotPayload>();
 
     const s1 = makeRaftSnapshot(10, 2.0, {
@@ -230,8 +230,8 @@ describe('CoopSnapshotInterpolator', () => {
     interp.push(s1, 1000);
     interp.push(s2, 1100);
 
-    // renderTime = 1125 - 75 = 1050 -> t = 0.5
-    const mid = interp.sample(1125);
+    // renderTime = 1170 - 120 = 1050 -> t = 0.5
+    const mid = interp.sample(1170);
     assert.ok(mid);
     assert.equal(mid.mapId, 'raft_rapids');
     assertClose(mid.matchTime, 2.1);
@@ -335,7 +335,7 @@ describe('CoopSnapshotInterpolator', () => {
     interp.push(s1, 2000);
     interp.push(s2, 2100);
 
-    const mid = interp.sample(2125); // renderTime = 2050 -> t = 0.5
+    const mid = interp.sample(2170); // renderTime = 2050 -> t = 0.5
     assert.ok(mid);
     assert.equal(mid.mapId, 'rope_tether');
     assertClose(mid.matchTime, 4.2);
@@ -424,7 +424,7 @@ describe('CoopSnapshotInterpolator', () => {
     interp.push(s1, 3000);
     interp.push(s2, 3100);
 
-    const mid = interp.sample(3125); // renderTime = 3050 -> t = 0.5
+    const mid = interp.sample(3170); // renderTime = 3050 -> t = 0.5
     assert.ok(mid);
     assert.equal(mid.mapId, 'minecart_rails');
     assertClose(mid.matchTime, 5.1);
@@ -450,7 +450,7 @@ describe('CoopSnapshotInterpolator', () => {
     assert.deepEqual(mid.events, s2.events);
   });
 
-  it('drops out-of-order ticks, caps buffer at 4, and auto-resets on matchId or mapId switch', () => {
+  it('drops out-of-order ticks, caps buffer at 8, and auto-resets on matchId or mapId switch', () => {
     const interp = new CoopSnapshotInterpolator();
 
     interp.push(makeRaftSnapshot(10, 1.0, { raft: { z: 10 } }), 1000);
@@ -462,12 +462,14 @@ describe('CoopSnapshotInterpolator', () => {
       assert.equal(afterDrop.raft.z, 10);
     }
 
-    // Cap buffer at 4 entries
-    interp.push(makeRaftSnapshot(20, 2.0, { raft: { z: 20 } }), 1100);
-    interp.push(makeRaftSnapshot(30, 3.0, { raft: { z: 30 } }), 1200);
-    interp.push(makeRaftSnapshot(40, 4.0, { raft: { z: 40 } }), 1300);
-    interp.push(makeRaftSnapshot(50, 5.0, { raft: { z: 50 } }), 1400);
-    const oldestRemaining = interp.sample(1125); // renderTime = 1050 <= 1100 -> tick 20
+    // Cap buffer at 8 entries
+    for (let tick = 20; tick <= 90; tick += 10) {
+      interp.push(
+        makeRaftSnapshot(tick, tick / 10, { raft: { z: tick } }),
+        1000 + (tick - 10) * 10,
+      );
+    }
+    const oldestRemaining = interp.sample(1170); // renderTime = 1050 <= 1100 -> tick 20
     if (oldestRemaining?.mapId === 'raft_rapids') {
       assert.equal(oldestRemaining.raft.z, 20);
     }

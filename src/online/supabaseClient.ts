@@ -1,5 +1,11 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
+/**
+ * Shared client-side Supabase Realtime publish budget (events/sec).
+ * Keeps headroom above peak multi-player real-time modes while local mode relays throttle below it.
+ */
+export const SUPABASE_REALTIME_EVENTS_PER_SECOND = 30;
+
 let cachedClient: SupabaseClient | null | undefined;
 
 function readEnv(key: string): string | undefined {
@@ -37,7 +43,7 @@ export function getSupabaseClient(): SupabaseClient | null {
     },
     realtime: {
       params: {
-        eventsPerSecond: 15,
+        eventsPerSecond: SUPABASE_REALTIME_EVENTS_PER_SECOND,
       },
     },
   });

@@ -38,6 +38,7 @@ export function FighterActor({
 }) {
   const showAsLocal = isLocalPlayer ?? !config.isBot;
   const bodyRef = useRef<RapierRigidBody | null>(null);
+  const remoteRootRef = useRef<THREE.Group | null>(null);
   const visualRef = useRef<THREE.Group | null>(null);
   const weaponRef = useRef<THREE.Group | null>(null);
   const spinSlashRef = useRef<THREE.Mesh | null>(null);
@@ -62,26 +63,22 @@ export function FighterActor({
   useEffect(() => {
     const entry = runtime.fighters.get(config.id);
     if (entry) {
-      entry.body = bodyRef.current;
+      entry.body = isRemoteClient ? null : bodyRef.current;
     }
     return () => {
       const current = runtime.fighters.get(config.id);
       if (current) current.body = null;
     };
-  }, [config.id, runtime]);
+  }, [config.id, isRemoteClient, runtime]);
 
   useFrame(({ clock }) => {
     const entry = runtime.fighters.get(config.id);
     if (!entry) return;
-    if (bodyRef.current && entry.body !== bodyRef.current) {
+    if (!isRemoteClient && bodyRef.current && entry.body !== bodyRef.current) {
       entry.body = bodyRef.current;
     }
-    if (isRemoteClient && bodyRef.current) {
-      bodyRef.current.setNextKinematicTranslation({
-        x: entry.pos.x,
-        y: entry.pos.y,
-        z: entry.pos.z,
-      });
+    if (isRemoteClient && remoteRootRef.current) {
+      remoteRootRef.current.position.set(entry.pos.x, entry.pos.y, entry.pos.z);
     }
     partyMotionRef.current = entry.partyMotion;
 
@@ -208,24 +205,8 @@ export function FighterActor({
     }
   });
 
-  return (
-    <RigidBody
-      ref={bodyRef}
-      type={isRemoteClient ? 'kinematicPosition' : 'dynamic'}
-      position={[spawn.x, spawn.y, spawn.z]}
-      colliders={false}
-      enabledRotations={[false, false, false]}
-      linearDamping={0.85}
-      angularDamping={1.8}
-      mass={1.4}
-    >
-      <CapsuleCollider
-        args={[0.28, 0.44]}
-        position={[0, 0.72, 0]}
-        friction={0.45}
-        restitution={0.18}
-      />
-
+  const fighterContent = (
+    <>
       {/* Character visual root */}
       <group ref={visualRef} scale={0.72}>
         <BrawlMotionContext.Provider value={partyMotionRef}>
@@ -339,6 +320,35 @@ export function FighterActor({
           </div>
         </Html>
       )}
+    </>
+  );
+
+  if (isRemoteClient) {
+    return (
+      <group ref={remoteRootRef} position={[spawn.x, spawn.y, spawn.z]}>
+        {fighterContent}
+      </group>
+    );
+  }
+
+  return (
+    <RigidBody
+      ref={bodyRef}
+      type="dynamic"
+      position={[spawn.x, spawn.y, spawn.z]}
+      colliders={false}
+      enabledRotations={[false, false, false]}
+      linearDamping={0.85}
+      angularDamping={1.8}
+      mass={1.4}
+    >
+      <CapsuleCollider
+        args={[0.28, 0.44]}
+        position={[0, 0.72, 0]}
+        friction={0.45}
+        restitution={0.18}
+      />
+      {fighterContent}
     </RigidBody>
   );
 }

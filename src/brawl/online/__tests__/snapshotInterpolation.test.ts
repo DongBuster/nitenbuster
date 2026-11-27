@@ -60,7 +60,7 @@ describe('lerpBrawlAngle', () => {
 
 describe('BrawlSnapshotInterpolator', () => {
   it('interpolates fighter coordinates and yaw smoothly at now - delay', () => {
-    assert.equal(BRAWL_INTERPOLATION_DELAY_MS, 70);
+    assert.equal(BRAWL_INTERPOLATION_DELAY_MS, 110);
     const interp = new BrawlSnapshotInterpolator();
 
     const s1 = makeSnapshot(10, 1.0, {
@@ -119,8 +119,8 @@ describe('BrawlSnapshotInterpolator', () => {
     interp.push(s1, 1000);
     interp.push(s2, 1100);
 
-    // renderTime = 1120 - 70 = 1050 -> t = 0.5
-    const mid = interp.sample(1120);
+    // renderTime = 1160 - 110 = 1050 -> t = 0.5
+    const mid = interp.sample(1160);
     assert.ok(mid);
     assert.equal(mid.fighters.length, 1);
     assert.ok(Math.abs(mid.fighters[0].x - 0) < 1e-6);
@@ -139,5 +139,84 @@ describe('BrawlSnapshotInterpolator', () => {
 
     interp.reset();
     assert.equal(interp.sample(1200), null);
+  });
+
+  it('auto-resets on roundKey switch even when tick resets, caps buffer at 8, and avoids backward actionProgress lerp', () => {
+    const interp = new BrawlSnapshotInterpolator();
+
+    // Round 1 late tick 500 -> switches to Round 2 tick 2 (must NOT stay stuck on tick 500)
+    interp.push(
+      makeSnapshot(500, 25, {
+        roundKey: 'brawl_online_ROOM_m1_r1',
+        fighters: [
+          {
+            ...makeSnapshot(500, 25).fighters[0],
+            action: 'idle',
+            actionProgress: 0.9,
+            x: -5,
+          },
+        ],
+      }),
+      1000,
+    );
+    interp.push(
+      makeSnapshot(2, 0.1, {
+        roundKey: 'brawl_online_ROOM_m1_r2',
+        fighters: [
+          {
+            ...makeSnapshot(2, 0.1).fighters[0],
+            action: 'punch_right',
+            actionProgress: 0.15,
+            x: 3,
+          },
+        ],
+      }),
+      1060,
+    );
+
+    const switched = interp.sample(1200);
+    assert.ok(switched);
+    assert.equal(switched.roundKey, 'brawl_online_ROOM_m1_r2');
+    assert.equal(switched.tick, 2);
+
+    // When fighter action changes between bracket A and B, actionProgress comes from B rather than lerping backwards
+    const actionInterp = new BrawlSnapshotInterpolator();
+    actionInterp.push(
+      makeSnapshot(10, 1.0, {
+        fighters: [
+          {
+            ...makeSnapshot(10, 1.0).fighters[0],
+            action: 'idle',
+            actionProgress: 0.9,
+          },
+        ],
+      }),
+      1000,
+    );
+    actionInterp.push(
+      makeSnapshot(11, 1.1, {
+        fighters: [
+          {
+            ...makeSnapshot(11, 1.1).fighters[0],
+            action: 'punch_right',
+            actionProgress: 0.2,
+          },
+        ],
+      }),
+      1100,
+    );
+    const actionMid = actionInterp.sample(1160); // renderTime = 1050 -> t = 0.5
+    assert.ok(actionMid);
+    assert.equal(actionMid.fighters[0].action, 'punch_right');
+    assert.equal(actionMid.fighters[0].actionProgress, 0.2);
+
+    // Buffer capacity is 8 entries: pushing 9 ticks evicts tick 1 and retains tick 2..9
+    const capInterp = new BrawlSnapshotInterpolator();
+    for (let i = 1; i <= 9; i++) {
+      capInterp.push(makeSnapshot(i * 10, i, { fighters: [{ ...makeSnapshot(i, i).fighters[0], x: i * 10 }] }), 1000 + (i - 1) * 100);
+    }
+    const oldest = capInterp.sample(1000 + BRAWL_INTERPOLATION_DELAY_MS);
+    assert.ok(oldest);
+    assert.equal(oldest.tick, 20);
   });
 });
