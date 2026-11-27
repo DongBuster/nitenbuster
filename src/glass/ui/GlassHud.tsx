@@ -233,7 +233,7 @@ export function GlassHud({
     room.partnerDisconnectedSec !== null || room.partnerLeftPermanently;
 
   return (
-    <div className="pointer-events-none fixed inset-0 z-20 flex flex-col justify-between p-3 sm:p-4">
+    <div className="safe-hud-inset pointer-events-none fixed inset-0 z-20 flex flex-col justify-between sm:p-4">
       {/* TOP HUD */}
       <header className="grid grid-cols-2 items-start gap-2 lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
         {/* Top-left: Adaptive Map Status Card */}

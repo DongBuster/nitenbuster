@@ -208,7 +208,7 @@ export function GlassCarryScreen({
   };
 
   return (
-    <div className="relative h-screen w-screen overflow-hidden bg-[#0d1b2e] select-none">
+    <div className="relative h-dvh w-full overflow-hidden bg-[#0d1b2e] select-none">
       {renderActiveScene()}
 
       {room.phase !== 'finished' && (

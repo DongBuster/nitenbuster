@@ -181,7 +181,7 @@ export function OnlineLobbyScreen({
   // 1. Supabase Not Configured Setup Card
   if (!room.configured) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#1c120c] bg-[radial-gradient(circle_at_50%_0%,_#382419_0%,_#1a0f0a_70%)] p-4 text-white">
+      <div className="flex min-h-dvh items-center justify-center bg-[#1c120c] bg-[radial-gradient(circle_at_50%_0%,_#382419_0%,_#1a0f0a_70%)] p-4 text-white">
         <div className="w-full max-w-xl rounded-3xl border-2 border-amber-900/40 bg-[#29170f] p-6 shadow-2xl sm:p-8">
           <div className="flex items-center justify-between">
             <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-400/30 bg-sky-950/70 px-3 py-1 text-xs font-black tracking-wide text-sky-300">
@@ -239,7 +239,7 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
 
   if (room.phase === 'idle') {
     return (
-      <div className="min-h-screen bg-[#1c120c] bg-[radial-gradient(circle_at_50%_0%,_#382419_0%,_#1a0f0a_70%)] p-4 text-white sm:p-6 lg:p-8">
+      <div className="min-h-dvh bg-[#1c120c] bg-[radial-gradient(circle_at_50%_0%,_#382419_0%,_#1a0f0a_70%)] p-4 text-white sm:p-6 lg:p-8">
         <div className="mx-auto max-w-4xl">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -416,7 +416,7 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
         : { label: 'Mất kết nối', cls: 'border-rose-400/40 bg-rose-500/20 text-rose-200' };
 
   return (
-    <div className="min-h-screen bg-[#1c120c] bg-[radial-gradient(circle_at_50%_0%,_#382419_0%,_#1a0f0a_70%)] p-4 text-white sm:p-6">
+    <div className="min-h-dvh bg-[#1c120c] bg-[radial-gradient(circle_at_50%_0%,_#382419_0%,_#1a0f0a_70%)] p-4 text-white sm:p-6">
       <div className="mx-auto max-w-5xl">
         {/* Lobby Header */}
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-3xl border-2 border-amber-900/40 bg-[#29170f] p-4 shadow-xl">
@@ -708,7 +708,7 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-8 gap-1">
+                  <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-8 sm:gap-1">
                     {[0, 1, 2, 3, 4, 5, 6, 7].map((cnt) => {
                       const disabled = cnt > maxBotsAllowed;
                       const active = effectiveBotCount === cnt;
@@ -724,7 +724,7 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
                               fillWithBots: cnt > 0,
                             });
                           }}
-                          className={`cursor-pointer rounded-lg py-1 text-xs font-black transition disabled:cursor-not-allowed disabled:opacity-30 ${
+                          className={`min-h-[40px] cursor-pointer rounded-lg py-1 text-xs font-black transition disabled:cursor-not-allowed disabled:opacity-30 sm:min-h-[32px] ${
                             active
                               ? 'bg-amber-400 text-slate-950'
                               : 'bg-white/10 text-slate-200 hover:bg-white/20'

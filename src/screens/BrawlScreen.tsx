@@ -175,7 +175,7 @@ export function BrawlScreen({ onBackToModeSelect }: BrawlScreenProps) {
   const roundKey = `brawl_m${matchNonce}_r${match.round}`;
 
   return (
-    <div className="relative h-screen w-screen overflow-hidden bg-[#14243A] select-none">
+    <div className="relative h-dvh w-full overflow-hidden bg-[#14243A] select-none">
       <ArenaScene
         roundKey={roundKey}
         fighters={match.fighters}

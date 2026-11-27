@@ -58,7 +58,7 @@ export function EventFinalPodium({
   );
 
   return (
-    <div className="min-h-screen bg-[#160d09] bg-[radial-gradient(circle_at_50%_0%,_#4d2b15_0%,_transparent_54%),linear-gradient(180deg,_#1e120c_0%,_#0d0806_100%)] px-4 py-8 text-[#FFF9F0]">
+    <div className="min-h-dvh bg-[#160d09] bg-[radial-gradient(circle_at_50%_0%,_#4d2b15_0%,_transparent_54%),linear-gradient(180deg,_#1e120c_0%,_#0d0806_100%)] px-4 py-8 text-[#FFF9F0]">
       <div className="mx-auto max-w-5xl space-y-6">
         {/* Title Banner */}
         <header className="text-center">
@@ -128,11 +128,17 @@ export function EventFinalPodium({
         </section>
 
         {/* Full Breakdown Table */}
-        <section className="overflow-x-auto rounded-3xl border border-white/15 bg-[#22130c]/95 p-5 shadow-xl">
+        <section className="rounded-3xl border border-white/15 bg-[#22130c]/95 p-5 shadow-xl">
           <h3 className="mb-3 font-display text-lg font-black text-amber-200">
             Bảng Điểm Chi Tiết Từng Vòng
           </h3>
-          <table className="w-full min-w-[520px] border-collapse text-left text-xs">
+          <div
+            className="overflow-x-auto focus-visible:outline-2 focus-visible:outline-amber-300"
+            tabIndex={0}
+            role="region"
+            aria-label="Bảng điểm chi tiết từng vòng"
+          >
+            <table className="w-full min-w-[520px] border-collapse text-left text-xs">
             <thead>
               <tr className="border-b border-white/10 text-amber-200/70">
                 <th className="py-2 pr-3 font-black">Hạng</th>
@@ -170,6 +176,7 @@ export function EventFinalPodium({
               ))}
             </tbody>
           </table>
+          </div>
         </section>
 
         {/* Footer Actions */}

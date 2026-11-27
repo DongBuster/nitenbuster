@@ -88,6 +88,7 @@ export function OnlineGame3DScreen({
   );
   const [showRules, setShowRules] = useState<boolean>(false);
   const [showTutorial, setShowTutorial] = useState<boolean>(false);
+  const [showMobileEmotes, setShowMobileEmotes] = useState<boolean>(false);
   const [cookiesEarned, setCookiesEarned] = useState<number>(0);
 
   const recordedWinnerRef = useRef<string | null>(null);
@@ -285,7 +286,7 @@ export function OnlineGame3DScreen({
 
   return (
     <div
-      className={`relative h-screen w-screen overflow-hidden bg-[#261810] text-white select-none ${
+      className={`relative h-dvh w-full overflow-hidden bg-[#261810] text-white select-none ${
         settings.colorblindMode ? 'grayscale' : ''
       }`}
     >
@@ -303,8 +304,9 @@ export function OnlineGame3DScreen({
         onCatchPaws={handleCatchPaws}
       />
 
-      {/* Top HUD */}
-      <header className="pointer-events-none fixed inset-x-0 top-0 z-20 flex flex-wrap items-start justify-between gap-2 p-3 sm:p-4">
+      {/* Top HUD + In-Flow Center Status Banners (never overlap wrapped mobile header) */}
+      <header className="safe-top-bar pointer-events-none fixed inset-x-0 top-0 z-20 flex flex-col gap-2 sm:p-4">
+        <div className="flex flex-wrap items-start justify-between gap-2">
         {/* Left: Leave + Room Code + Timer + Active Color + Direction */}
         <div className={`pointer-events-auto flex flex-wrap items-center gap-2 ${embeddedEvent ? 'mt-11' : ''}`}>
           {!embeddedEvent && (
@@ -379,7 +381,8 @@ export function OnlineGame3DScreen({
               updateSettings({ sfxEnabled: !settings.sfxEnabled });
             }}
             title={settings.sfxEnabled ? 'Tắt hiệu ứng âm thanh' : 'Bật hiệu ứng âm thanh'}
-            className="btn-tactile-wood cursor-pointer rounded-xl border border-white/20 p-2 text-white shadow-md transition"
+            aria-label={settings.sfxEnabled ? 'Tắt hiệu ứng âm thanh' : 'Bật hiệu ứng âm thanh'}
+            className="btn-tactile-wood touch-target inline-flex cursor-pointer items-center justify-center rounded-xl border border-white/20 p-2 text-white shadow-md transition"
           >
             {settings.sfxEnabled ? (
               <Volume2 className="h-4 w-4 text-amber-300" />
@@ -395,7 +398,8 @@ export function OnlineGame3DScreen({
               updateSettings({ bgmEnabled: !settings.bgmEnabled });
             }}
             title={settings.bgmEnabled ? 'Tắt nhạc nền' : 'Bật nhạc nền'}
-            className={`btn-tactile-wood cursor-pointer rounded-xl border p-2 shadow-md transition ${
+            aria-label={settings.bgmEnabled ? 'Tắt nhạc nền' : 'Bật nhạc nền'}
+            className={`btn-tactile-wood touch-target inline-flex cursor-pointer items-center justify-center rounded-xl border p-2 shadow-md transition ${
               settings.bgmEnabled
                 ? 'border-emerald-400/50 bg-emerald-950/80 text-emerald-300'
                 : 'border-white/20 text-white/50'
@@ -428,10 +432,10 @@ export function OnlineGame3DScreen({
             <span>Hướng Dẫn</span>
           </button>
         </div>
-      </header>
+        </div>
 
-      {/* Center Status Banners (Turn Timer, Pending Shovel, Bomb, Emote) */}
-      <div className="pointer-events-none fixed inset-x-0 top-14 z-20 flex flex-col items-center gap-1.5 px-4 sm:top-16">
+        {/* Center Status Banners (Turn Timer, Pending Shovel, Bomb, Emote) */}
+        <div className="pointer-events-none flex flex-col items-center gap-1.5 px-1">
         {gameState.winnerId === null && (() => {
           const totalSec = Math.max(1, room.roomSettings.turnTimeSec);
           const pct = Math.max(0, Math.min(100, (room.turnSecondsLeft / totalSec) * 100));
@@ -524,7 +528,8 @@ export function OnlineGame3DScreen({
             {room.lastEmote.text}
           </div>
         )}
-      </div>
+        </div>
+      </header>
 
       {/* Penalty Reason Toast (when local player receives extra/penalty cards) */}
       {penaltyNotice && (
@@ -541,7 +546,7 @@ export function OnlineGame3DScreen({
       )}
 
       {/* Bottom Compact HUD */}
-      <footer className="pointer-events-none fixed inset-x-0 bottom-0 z-20 flex flex-wrap items-end justify-between gap-2 p-3 sm:p-4">
+      <footer className="safe-bottom-bar pointer-events-none fixed inset-x-0 bottom-0 z-20 flex flex-wrap items-end justify-between gap-2 sm:p-4">
         {/* Human Player Pill */}
         <div className="pointer-events-auto flex items-center gap-2.5 rounded-2xl border border-white/20 bg-slate-900/90 px-3 py-1.5 shadow-xl backdrop-blur-md">
           <AnimalAvatar animal={humanAnimalMeta.id} size="md" />
@@ -567,22 +572,59 @@ export function OnlineGame3DScreen({
           </div>
         </div>
 
-        {/* Quick Emoji Reaction Bar */}
-        <div className="pointer-events-auto flex items-center gap-1 rounded-2xl border border-white/15 bg-slate-900/85 px-2 py-1.5 shadow-xl backdrop-blur-md">
-          {ONLINE_EMOTES.map((item) => (
-            <button
-              key={item.emote}
-              type="button"
-              title={item.text}
-              onClick={() => {
-                playSfx('click');
-                room.sendEmote(item.emote, item.text);
-              }}
-              className="cursor-pointer rounded-xl px-2 py-1 text-base transition hover:scale-125 hover:bg-white/15"
-            >
-              {item.emote}
-            </button>
-          ))}
+        {/* Quick Emoji Reaction Bar (inline on sm+, compact popover toggle on mobile) */}
+        <div className="pointer-events-auto relative">
+          <button
+            type="button"
+            onClick={() => {
+              playSfx('click');
+              setShowMobileEmotes((v) => !v);
+            }}
+            aria-expanded={showMobileEmotes}
+            aria-label="Biểu cảm nhanh"
+            className="touch-target inline-flex cursor-pointer items-center justify-center rounded-2xl border border-white/20 bg-slate-900/90 px-3 py-2 text-base shadow-xl backdrop-blur-md sm:hidden"
+          >
+            {ONLINE_EMOTES[0]?.emote ?? '😄'}
+          </button>
+
+          {showMobileEmotes && (
+            <div className="absolute bottom-full left-1/2 z-30 mb-2 flex -translate-x-1/2 items-center gap-1 rounded-2xl border border-white/20 bg-slate-900/95 px-2 py-1.5 shadow-2xl backdrop-blur-md sm:hidden">
+              {ONLINE_EMOTES.map((item) => (
+                <button
+                  key={item.emote}
+                  type="button"
+                  title={item.text}
+                  aria-label={item.text}
+                  onClick={() => {
+                    playSfx('click');
+                    room.sendEmote(item.emote, item.text);
+                    setShowMobileEmotes(false);
+                  }}
+                  className="touch-target inline-flex cursor-pointer items-center justify-center rounded-xl text-base transition hover:bg-white/15"
+                >
+                  {item.emote}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <div className="hidden items-center gap-1 rounded-2xl border border-white/15 bg-slate-900/85 px-2 py-1.5 shadow-xl backdrop-blur-md sm:flex">
+            {ONLINE_EMOTES.map((item) => (
+              <button
+                key={item.emote}
+                type="button"
+                title={item.text}
+                aria-label={item.text}
+                onClick={() => {
+                  playSfx('click');
+                  room.sendEmote(item.emote, item.text);
+                }}
+                className="cursor-pointer rounded-xl px-2 py-1 text-base transition hover:scale-125 hover:bg-white/15"
+              >
+                {item.emote}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* PAWS & Draw Actions */}

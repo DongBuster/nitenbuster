@@ -481,7 +481,7 @@ export function Game3DScreen({ onBackToMenu }: Game3DScreenProps) {
   }, [gameState.winnerId, humanId, recordMatchResult]);
 
   return (
-    <div className="relative h-screen w-screen overflow-hidden bg-[#1D120C] text-[#FFF9F0] select-none">
+    <div className="relative h-dvh w-full overflow-hidden bg-[#1D120C] text-[#FFF9F0] select-none">
       {/* Full-bleed 3D Game Table Scene (including 3D playable CardFan3D hand!) */}
       <div
         className={`h-full w-full transition-[filter] duration-300 ${
@@ -503,7 +503,7 @@ export function Game3DScreen({ onBackToMenu }: Game3DScreenProps) {
       </div>
 
       {/* ================= TOP HUD BAR ================= */}
-      <header className="pointer-events-none fixed inset-x-0 top-0 z-30 flex flex-col gap-2 p-3 sm:p-4">
+      <header className="safe-top-bar pointer-events-none fixed inset-x-0 top-0 z-30 flex flex-col gap-2 sm:p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           {/* Left: Back + Active Color + Direction */}
           <div className="pointer-events-auto flex flex-wrap items-center gap-2">
@@ -600,7 +600,7 @@ export function Game3DScreen({ onBackToMenu }: Game3DScreenProps) {
               }}
               aria-label={settings.sfxEnabled ? 'Tắt âm thanh' : 'Bật âm thanh'}
               title={settings.sfxEnabled ? 'Tắt SFX' : 'Bật SFX'}
-              className="btn-tactile-wood cursor-pointer rounded-xl border border-amber-900/40 p-2 text-amber-100 shadow-md transition-colors focus-visible:outline-2 focus-visible:outline-amber-300"
+              className="btn-tactile-wood touch-target inline-flex cursor-pointer items-center justify-center rounded-xl border border-amber-900/40 p-2 text-amber-100 shadow-md transition-colors focus-visible:outline-2 focus-visible:outline-amber-300"
             >
               {settings.sfxEnabled ? (
                 <Volume2 className="h-4 w-4 text-amber-300" />
@@ -618,7 +618,7 @@ export function Game3DScreen({ onBackToMenu }: Game3DScreenProps) {
               aria-pressed={settings.bgmEnabled}
               aria-label={settings.bgmEnabled ? 'Tắt nhạc nền' : 'Bật nhạc nền'}
               title={settings.bgmEnabled ? 'Tắt nhạc nền' : 'Bật nhạc nền'}
-              className={`btn-tactile-wood cursor-pointer rounded-xl border p-2 shadow-md transition-colors focus-visible:outline-2 focus-visible:outline-amber-300 ${
+              className={`btn-tactile-wood touch-target inline-flex cursor-pointer items-center justify-center rounded-xl border p-2 shadow-md transition-colors focus-visible:outline-2 focus-visible:outline-amber-300 ${
                 settings.bgmEnabled
                   ? 'border-emerald-400/50 bg-emerald-950/80 text-emerald-300'
                   : 'border-amber-900/40 text-white/50'
@@ -794,7 +794,7 @@ export function Game3DScreen({ onBackToMenu }: Game3DScreenProps) {
       )}
 
       {/* ================= COMPACT NON-BLOCKING BOTTOM HUD BAR ================= */}
-      <div className="pointer-events-none fixed inset-x-0 bottom-3 z-30 flex justify-center px-3 sm:px-6">
+      <div className="safe-bottom-bar pointer-events-none fixed inset-x-0 bottom-0 z-30 flex justify-center sm:px-6 sm:pb-3">
         <div className="pointer-events-auto flex w-full max-w-3xl flex-wrap items-center justify-between gap-2.5 rounded-2xl border-2 border-amber-900/40 bg-[#24160f]/90 px-4 py-2.5 shadow-2xl backdrop-blur-md">
           {/* Human Player Animal Badge + Card Count */}
           <div className="flex items-center gap-2.5">

@@ -477,7 +477,7 @@ export function EventCardsAdapter({ room, round }: EventAdapterProps) {
 
   if (!gameState) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#1a100b] text-amber-200">
+      <div className="flex min-h-dvh items-center justify-center bg-[#1a100b] text-amber-200">
         <div className="text-sm font-black">Đang chia bài PAWS Cards (0 Bot)...</div>
       </div>
     );

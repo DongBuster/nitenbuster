@@ -82,7 +82,7 @@ class ModeErrorBoundary extends Component<ModeBoundaryProps, ModeBoundaryState> 
     if (this.state.hasError) {
       return (
         <div
-          className={`flex min-h-screen flex-col items-center justify-center p-6 text-center text-white ${this.props.bgClass ?? 'bg-[#0F1B2D]'}`}
+          className={`flex min-h-dvh flex-col items-center justify-center p-6 text-center text-white ${this.props.bgClass ?? 'bg-[#0F1B2D]'}`}
         >
           <div className="max-w-md rounded-3xl border border-rose-300/40 bg-slate-900 p-6 shadow-2xl">
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-500/20 text-rose-300">
@@ -129,7 +129,7 @@ function ModeLoadingFallback({
 }) {
   return (
     <div
-      className={`flex min-h-screen flex-col items-center justify-center gap-3 text-white ${bgClass}`}
+      className={`flex min-h-dvh flex-col items-center justify-center gap-3 text-white ${bgClass}`}
     >
       <div
         className={`h-10 w-10 animate-spin rounded-full border-4 border-t-transparent ${spinnerClass}`}
@@ -202,12 +202,12 @@ export function App() {
   ]);
 
   return (
-    <div className="relative min-h-screen">
+    <div className="relative min-h-dvh">
       {/* Compact top-right navigation switcher on 3D Studio only */}
       {screen === 'studio3d' && (
         <nav
           aria-label="Điều hướng ứng dụng"
-          className="fixed right-4 top-4 z-50 inline-flex items-center gap-1 rounded-full border border-amber-400/30 bg-[#2C1B11]/90 p-1 shadow-xl backdrop-blur-md"
+          className="fixed right-3 top-3 z-50 inline-flex items-center gap-1 rounded-full border border-amber-400/30 bg-[#2C1B11]/90 p-1 shadow-xl backdrop-blur-md sm:right-4 sm:top-4"
         >
           <button
             type="button"

@@ -52,8 +52,8 @@ export function BrawlSetupPanel({
   const equippedSummary = formatEquippedSummary(equippedAccessory[selectedAnimal]);
 
   return (
-    <div className="min-h-screen bg-[#0e1724] bg-[radial-gradient(circle_at_50%_0%,_#1e3650_0%,_#0a101a_70%)] text-[#F8FAFC] selection:bg-amber-300 selection:text-[#1B110B]">
-      <div className="mx-auto flex min-h-screen max-w-6xl flex-col justify-between px-4 py-8 sm:px-6 lg:px-8">
+    <div className="min-h-dvh bg-[#0e1724] bg-[radial-gradient(circle_at_50%_0%,_#1e3650_0%,_#0a101a_70%)] text-[#F8FAFC] selection:bg-amber-300 selection:text-[#1B110B]">
+      <div className="mx-auto flex min-h-dvh max-w-6xl flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
         {/* Header */}
         <header className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">

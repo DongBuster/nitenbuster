@@ -122,7 +122,7 @@ export function BlockBlastRoomLobby({
 
   if (!room.configured) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#1a100b] bg-[radial-gradient(circle_at_50%_0%,_#382419_0%,_#120b08_75%)] p-4 text-[#FFF9F0]">
+      <div className="flex min-h-dvh items-center justify-center bg-[#1a100b] bg-[radial-gradient(circle_at_50%_0%,_#382419_0%,_#120b08_75%)] p-4 text-[#FFF9F0]">
         <div className="w-full max-w-xl rounded-3xl border-2 border-amber-500/30 bg-[#24150e] p-6 shadow-2xl sm:p-8">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/35 bg-emerald-950/75 px-3 py-1 text-xs font-black text-emerald-200">
@@ -188,7 +188,7 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
     const canJoin = normalizeRoomCode(joinCodeInput).length >= 4;
 
     return (
-      <div className="min-h-screen bg-[#1a100b] bg-[radial-gradient(circle_at_18%_0%,_#3a2114_0%,_transparent_46%),radial-gradient(circle_at_82%_0%,_#112c24_0%,_transparent_46%),linear-gradient(180deg,_#1c110c_0%,_#120b08_100%)] p-4 text-[#FFF9F0] sm:p-6 lg:p-8">
+      <div className="min-h-dvh bg-[#1a100b] bg-[radial-gradient(circle_at_18%_0%,_#3a2114_0%,_transparent_46%),radial-gradient(circle_at_82%_0%,_#112c24_0%,_transparent_46%),linear-gradient(180deg,_#1c110c_0%,_#120b08_100%)] p-4 text-[#FFF9F0] sm:p-6 lg:p-8">
         <div className="mx-auto max-w-4xl">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -356,7 +356,7 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
   ).length;
 
   return (
-    <div className="min-h-screen bg-[#1a100b] bg-[radial-gradient(circle_at_18%_0%,_#3a2114_0%,_transparent_46%),radial-gradient(circle_at_82%_0%,_#112c24_0%,_transparent_46%),linear-gradient(180deg,_#1c110c_0%,_#120b08_100%)] p-4 text-[#FFF9F0] sm:p-6 lg:p-8">
+    <div className="min-h-dvh bg-[#1a100b] bg-[radial-gradient(circle_at_18%_0%,_#3a2114_0%,_transparent_46%),radial-gradient(circle_at_82%_0%,_#112c24_0%,_transparent_46%),linear-gradient(180deg,_#1c110c_0%,_#120b08_100%)] p-4 text-[#FFF9F0] sm:p-6 lg:p-8">
       <div className="mx-auto max-w-4xl space-y-5">
         <header className="flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-amber-500/25 bg-[#24150e]/95 px-5 py-4 shadow-xl">
           <div className="flex flex-wrap items-center gap-3">

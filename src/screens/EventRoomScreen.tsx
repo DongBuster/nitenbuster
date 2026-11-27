@@ -78,7 +78,7 @@ export function EventRoomScreen({
   ) {
     const meta = EVENT_GAME_META[room.currentRound.gameId];
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#160d09] p-4 text-[#FFF9F0]">
+      <div className="flex min-h-dvh items-center justify-center bg-[#160d09] p-4 text-[#FFF9F0]">
         <div className="w-full max-w-lg rounded-3xl border border-amber-400/35 bg-[#24140d]/95 p-6 shadow-2xl">
           <div className="inline-flex items-center gap-2 rounded-full border border-sky-400/40 bg-sky-500/15 px-3 py-1 text-xs font-black text-sky-200">
             <Eye className="h-3.5 w-3.5" />
@@ -145,7 +145,7 @@ export function EventRoomScreen({
   if (room.phase === 'playing' && room.currentRound) {
     const round = room.currentRound;
     return (
-      <div className="relative min-h-screen">
+      <div className="relative min-h-dvh">
         <EventTimerHud
           round={round}
           secondsLeft={room.roundSecondsLeft}

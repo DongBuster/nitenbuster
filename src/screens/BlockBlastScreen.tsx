@@ -1650,13 +1650,13 @@ export default function BlockBlastScreen({
     cookies >= CANDY_BOMB_COST;
 
   return (
-    <div className="min-h-screen overflow-x-clip bg-[#1a100b] bg-[radial-gradient(circle_at_18%_0%,_#3a2114_0%,_transparent_46%),radial-gradient(circle_at_82%_0%,_#2c1810_0%,_transparent_46%),linear-gradient(180deg,_#1c110c_0%,_#120b08_100%)] text-[#FFF9F0] selection:bg-amber-300 selection:text-[#2C1B11]">
+    <div className="min-h-dvh overflow-x-clip bg-[#1a100b] bg-[radial-gradient(circle_at_18%_0%,_#3a2114_0%,_transparent_46%),radial-gradient(circle_at_82%_0%,_#2c1810_0%,_transparent_46%),linear-gradient(180deg,_#1c110c_0%,_#120b08_100%)] text-[#FFF9F0] selection:bg-amber-300 selection:text-[#2C1B11]">
       {/* Screen-reader polite announcer */}
       <div className="sr-only" aria-live="polite" aria-atomic="true">
         {liveAnnouncement}
       </div>
 
-      <div className="mx-auto flex min-h-screen max-w-6xl flex-col gap-2 px-2.5 py-2.5 sm:gap-4 sm:px-6 sm:py-4 lg:px-8">
+      <div className="mx-auto flex min-h-dvh max-w-6xl flex-col gap-2 px-2.5 py-2.5 sm:gap-4 sm:px-6 sm:py-4 lg:px-8">
         {/* Top Bar */}
         <header className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-amber-500/25 bg-[#24150e]/95 px-2.5 py-2 shadow-lg sm:rounded-3xl sm:px-4 sm:py-3">
           <div className="flex flex-wrap items-center gap-2 sm:gap-3">
@@ -1717,7 +1717,7 @@ export default function BlockBlastScreen({
               onClick={toggleSfx}
               aria-pressed={settings.sfxEnabled}
               aria-label={settings.sfxEnabled ? 'Tắt âm thanh hiệu ứng' : 'Bật âm thanh hiệu ứng'}
-              className={`inline-flex min-h-[36px] min-w-[36px] cursor-pointer items-center justify-center rounded-xl border px-1.5 text-xs font-bold transition-colors sm:px-2 ${FOCUS_RING_CLASS} ${
+              className={`inline-flex touch-target cursor-pointer items-center justify-center rounded-xl border px-1.5 text-xs font-bold transition-colors sm:px-2 ${FOCUS_RING_CLASS} ${
                 settings.sfxEnabled
                   ? 'border-emerald-400/45 bg-emerald-500/20 text-emerald-200'
                   : 'border-amber-900/50 bg-[#170d08] text-amber-200/55'
@@ -1735,7 +1735,7 @@ export default function BlockBlastScreen({
               onClick={toggleBgm}
               aria-pressed={settings.bgmEnabled}
               aria-label={settings.bgmEnabled ? 'Tắt nhạc nền cabin' : 'Bật nhạc nền cabin'}
-              className={`inline-flex min-h-[36px] min-w-[36px] cursor-pointer items-center justify-center rounded-xl border px-1.5 text-xs font-bold transition-colors sm:px-2 ${FOCUS_RING_CLASS} ${
+              className={`inline-flex touch-target cursor-pointer items-center justify-center rounded-xl border px-1.5 text-xs font-bold transition-colors sm:px-2 ${FOCUS_RING_CLASS} ${
                 settings.bgmEnabled
                   ? 'border-emerald-400/45 bg-emerald-500/20 text-emerald-200'
                   : 'border-amber-900/50 bg-[#170d08] text-amber-200/55'
@@ -1753,7 +1753,7 @@ export default function BlockBlastScreen({
                   ? 'Tắt ký hiệu hỗ trợ mù màu'
                   : 'Bật ký hiệu hỗ trợ mù màu'
               }
-              className={`inline-flex min-h-[36px] min-w-[36px] cursor-pointer items-center justify-center rounded-xl border px-1.5 text-xs font-bold transition-colors sm:px-2 ${FOCUS_RING_CLASS} ${
+              className={`inline-flex touch-target cursor-pointer items-center justify-center rounded-xl border px-1.5 text-xs font-bold transition-colors sm:px-2 ${FOCUS_RING_CLASS} ${
                 settings.colorblindMode
                   ? 'border-sky-400/50 bg-sky-500/20 text-sky-200'
                   : 'border-amber-900/50 bg-[#170d08] text-amber-200/65'
@@ -1773,7 +1773,7 @@ export default function BlockBlastScreen({
                 setShowHelp(true);
               }}
               aria-label="Hướng dẫn luật chơi Block Blast"
-              className={`inline-flex min-h-[36px] min-w-[36px] cursor-pointer items-center justify-center rounded-xl border border-amber-700/50 bg-[#1c100a] px-1.5 text-amber-200 transition-colors hover:border-amber-400/60 hover:text-amber-50 sm:px-2 ${FOCUS_RING_CLASS}`}
+              className={`inline-flex touch-target cursor-pointer items-center justify-center rounded-xl border border-amber-700/50 bg-[#1c100a] px-1.5 text-amber-200 transition-colors hover:border-amber-400/60 hover:text-amber-50 sm:px-2 ${FOCUS_RING_CLASS}`}
             >
               <HelpCircle aria-hidden="true" className="h-4 w-4" />
             </button>
@@ -1798,7 +1798,7 @@ export default function BlockBlastScreen({
                 type="button"
                 onClick={handleRestartRequest}
                 aria-label="Chơi lại ván mới"
-                className={`btn-tactile-wood inline-flex min-h-[36px] min-w-[36px] cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-amber-800/60 px-2 py-1 text-xs font-extrabold text-amber-100 sm:px-3 ${FOCUS_RING_CLASS}`}
+                className={`btn-tactile-wood inline-flex touch-target cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-amber-800/60 px-2 py-1 text-xs font-extrabold text-amber-100 sm:px-3 ${FOCUS_RING_CLASS}`}
               >
                 <RotateCcw aria-hidden="true" className="h-3.5 w-3.5 text-amber-300" />
                 <span className="hidden sm:inline">Chơi Lại</span>

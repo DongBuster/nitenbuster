@@ -78,8 +78,8 @@ export function BlockBlastSpectatorView({ room }: BlockBlastSpectatorViewProps) 
   };
 
   return (
-    <div className="min-h-screen bg-[#1a100b] bg-[radial-gradient(circle_at_18%_0%,_#3a2114_0%,_transparent_46%),radial-gradient(circle_at_82%_0%,_#11233a_0%,_transparent_46%),linear-gradient(180deg,_#1c110c_0%,_#120b08_100%)] text-[#FFF9F0]">
-      <div className="mx-auto flex min-h-screen max-w-6xl flex-col gap-3 px-3 py-3 sm:gap-4 sm:px-6 sm:py-4 lg:px-8">
+    <div className="min-h-dvh bg-[#1a100b] bg-[radial-gradient(circle_at_18%_0%,_#3a2114_0%,_transparent_46%),radial-gradient(circle_at_82%_0%,_#11233a_0%,_transparent_46%),linear-gradient(180deg,_#1c110c_0%,_#120b08_100%)] text-[#FFF9F0]">
+      <div className="mx-auto flex min-h-dvh max-w-6xl flex-col gap-3 px-3 py-3 sm:gap-4 sm:px-6 sm:py-4 lg:px-8">
         {/* Header */}
         <header className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-sky-400/30 bg-[#24150e]/95 px-3.5 py-2.5 shadow-lg sm:rounded-3xl sm:px-5 sm:py-3">
           <div className="flex flex-wrap items-center gap-2.5">

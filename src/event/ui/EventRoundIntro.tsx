@@ -25,7 +25,7 @@ export function EventRoundIntro({
   const memberById = new Map(roster.map((m) => [m.peerId, m]));
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#160d09] bg-[radial-gradient(circle_at_50%_15%,_#3f2314_0%,_transparent_58%),linear-gradient(180deg,_#1b100b_0%,_#0e0906_100%)] p-4 text-[#FFF9F0]">
+    <div className="flex min-h-dvh items-center justify-center bg-[#160d09] bg-[radial-gradient(circle_at_50%_15%,_#3f2314_0%,_transparent_58%),linear-gradient(180deg,_#1b100b_0%,_#0e0906_100%)] p-4 text-[#FFF9F0]">
       <div className="w-full max-w-2xl overflow-hidden rounded-3xl border-2 border-amber-400/40 bg-[#24140d]/95 shadow-[0_24px_64px_rgba(0,0,0,0.65)]">
         {/* Banner Header */}
         <div className="relative">

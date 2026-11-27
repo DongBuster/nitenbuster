@@ -268,7 +268,7 @@ export function Showcase3D() {
 
   return (
     <div
-      className="relative h-screen w-screen overflow-hidden bg-[#1D120C] text-[#FFF9F0] select-none"
+      className="relative h-dvh w-full overflow-hidden bg-[#1D120C] text-[#FFF9F0] select-none"
       onDragEnter={handleDragEnter}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
@@ -619,10 +619,10 @@ export function Showcase3D() {
       )}
 
       {/* ================= TOP-LEFT STUDIO HEADER & MODE SWITCHER ================= */}
-      <div className="pointer-events-none fixed left-4 top-4 z-40 flex max-w-[calc(100vw-13rem)] flex-col gap-2.5 sm:max-w-[calc(100vw-14rem)] sm:pr-4">
-        <div className="pointer-events-auto inline-flex flex-wrap items-center gap-2 rounded-2xl border border-amber-900/40 bg-[#26170F]/90 px-3.5 py-2 shadow-xl backdrop-blur-md">
+      <div className="pointer-events-none fixed inset-x-3 top-14 z-40 flex flex-col gap-2 sm:left-4 sm:right-auto sm:top-4 sm:max-w-[calc(100vw-15rem)] sm:gap-2.5 sm:pr-4">
+        <div className="pointer-events-auto inline-flex max-w-full flex-wrap items-center gap-2 rounded-2xl border border-amber-900/40 bg-[#26170F]/90 px-3 py-2 shadow-xl backdrop-blur-md sm:px-3.5">
           <div className="flex items-center gap-2 pr-1">
-            <span className="font-display text-base font-black tracking-tight text-[#FFFBF4]">
+            <span className="font-display text-sm font-black tracking-tight text-[#FFFBF4] sm:text-base">
               PAWS 3D Studio
             </span>
           </div>
@@ -630,7 +630,7 @@ export function Showcase3D() {
           <div
             role="tablist"
             aria-label="Chế độ 3D Studio"
-            className="inline-flex rounded-xl bg-black/40 p-1"
+            className="flex flex-wrap items-center gap-1 rounded-xl bg-black/40 p-1"
           >
             {(
               [
@@ -648,7 +648,7 @@ export function Showcase3D() {
                   role="tab"
                   aria-selected={active}
                   onClick={() => setMode(tab.id)}
-                  className={`cursor-pointer rounded-lg px-3 py-1.5 text-xs font-extrabold transition-all focus-visible:outline-2 focus-visible:outline-amber-300 ${
+                  className={`cursor-pointer rounded-lg px-2.5 py-1.5 text-[11px] font-extrabold transition-all focus-visible:outline-2 focus-visible:outline-amber-300 sm:px-3 sm:text-xs ${
                     active
                       ? 'bg-amber-400 text-[#2C1B11] shadow-sm'
                       : 'text-amber-100/80 hover:bg-white/10 hover:text-white'
@@ -670,7 +670,7 @@ export function Showcase3D() {
       </div>
 
       {/* ================= BOTTOM FLOATING HUD ================= */}
-      <div className="pointer-events-none fixed inset-x-0 bottom-4 z-40 flex justify-center px-3 sm:px-6">
+      <div className="safe-bottom-bar pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center sm:px-6 sm:pb-4">
         {/* HUD: LINEUP MODE */}
         {mode === 'lineup' && (
           <div className="pointer-events-auto flex w-full max-w-3xl flex-col gap-2.5 rounded-3xl border border-amber-200/20 bg-[#26170F]/82 px-4 py-3 shadow-2xl backdrop-blur-md">

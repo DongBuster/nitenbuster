@@ -48,7 +48,7 @@ export function BrawlHud({
   const topScores = getSortedStandings(match.scores).slice(0, 4);
 
   return (
-    <div className="pointer-events-none fixed inset-0 z-20 flex flex-col justify-between p-3 sm:p-5">
+    <div className="safe-hud-inset pointer-events-none fixed inset-0 z-20 flex flex-col justify-between sm:p-5">
       {/* TOP HUD: Header bar + Top-edge Notifications (keeps center arena unobstructed) */}
       <div className="flex flex-col gap-2">
         <header className="flex flex-wrap items-start justify-between gap-2">

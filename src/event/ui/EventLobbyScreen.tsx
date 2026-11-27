@@ -245,7 +245,7 @@ export function EventLobbyScreen({
     room.settings.games.length >= 1;
 
   return (
-    <div className="min-h-screen bg-[#1a100b] bg-[radial-gradient(circle_at_15%_0%,_#4b2612_0%,_transparent_46%),radial-gradient(circle_at_85%_10%,_#112e3d_0%,_transparent_46%),linear-gradient(180deg,_#1c110c_0%,_#110a07_100%)] px-4 py-6 text-[#FFF9F0]">
+    <div className="min-h-dvh bg-[#1a100b] bg-[radial-gradient(circle_at_15%_0%,_#4b2612_0%,_transparent_46%),radial-gradient(circle_at_85%_10%,_#112e3d_0%,_transparent_46%),linear-gradient(180deg,_#1c110c_0%,_#110a07_100%)] px-4 py-6 text-[#FFF9F0]">
       <div className="mx-auto max-w-6xl space-y-5">
         {/* Top bar */}
         <header className="flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-amber-400/30 bg-[#27150d]/95 px-5 py-4 shadow-xl">
@@ -346,7 +346,7 @@ export function EventLobbyScreen({
                 <div className="mb-2 text-xs font-bold text-amber-200/80">
                   Chọn nhân vật thú bông 3D
                 </div>
-                <div className="grid grid-cols-4 gap-2">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                   {ANIMALS.map((a) => {
                     const active = a.id === selectedAnimal;
                     return (
@@ -520,7 +520,7 @@ export function EventLobbyScreen({
                       className="w-full rounded-xl border border-amber-400/30 bg-black/40 px-2.5 py-1 text-xs font-bold text-white outline-none focus:border-amber-300"
                     />
                   </label>
-                  <div className="grid grid-cols-4 gap-1.5">
+                  <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
                     {ANIMALS.map((a) => {
                       const active = a.id === selectedAnimal;
                       return (
@@ -528,16 +528,13 @@ export function EventLobbyScreen({
                           key={a.id}
                           type="button"
                           onClick={() => handleSelectAnimal(a.id)}
-                          className={`inline-flex cursor-pointer items-center justify-center gap-1 rounded-xl border px-1.5 py-1 text-[10px] font-black transition ${
+                          className={`inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-xl border px-2 py-1.5 text-[11px] font-black transition ${
                             active
                               ? 'border-amber-300 bg-amber-400/25 text-white'
                               : 'border-white/10 bg-black/30 text-amber-100/70 hover:border-amber-400/35'
                           }`}
                         >
-                          <span
-                            className="h-2.5 w-2.5 shrink-0 rounded-full"
-                            style={{ backgroundColor: a.accentHex }}
-                          />
+                          <AnimalAvatar animal={a.id} size="xs" />
                           <span className="truncate">{a.name}</span>
                         </button>
                       );

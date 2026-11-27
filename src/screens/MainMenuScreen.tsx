@@ -104,8 +104,8 @@ export function MainMenuScreen({
   };
 
   return (
-    <div className="min-h-screen bg-[#1c120c] bg-[radial-gradient(circle_at_50%_0%,_#382419_0%,_#1a0f0a_70%)] text-[#FFF9F0] selection:bg-amber-300 selection:text-[#2C1B11]">
-      <div className="mx-auto flex min-h-screen max-w-7xl flex-col justify-between px-4 pb-8 pt-12 sm:px-6 lg:px-8">
+    <div className="min-h-dvh bg-[#1c120c] bg-[radial-gradient(circle_at_50%_0%,_#382419_0%,_#1a0f0a_70%)] text-[#FFF9F0] selection:bg-amber-300 selection:text-[#2C1B11]">
+      <div className="mx-auto flex min-h-dvh max-w-7xl flex-col gap-5 px-4 pb-8 pt-6 sm:px-6 sm:pt-10 lg:px-8">
         {/* Top Header */}
         <header className="mb-6 flex flex-wrap items-center justify-between gap-4">
           <div className="flex flex-wrap items-center gap-3">

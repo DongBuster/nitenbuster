@@ -36,7 +36,7 @@ export function EventRoundResult({
   const isFinalRound = round.roundIndex + 1 >= round.totalRounds;
 
   return (
-    <div className="min-h-screen bg-[#160d09] bg-[radial-gradient(circle_at_50%_0%,_#3d2113_0%,_transparent_52%),linear-gradient(180deg,_#1c110c_0%,_#100906_100%)] px-4 py-6 text-[#FFF9F0]">
+    <div className="min-h-dvh bg-[#160d09] bg-[radial-gradient(circle_at_50%_0%,_#3d2113_0%,_transparent_52%),linear-gradient(180deg,_#1c110c_0%,_#100906_100%)] px-4 py-6 text-[#FFF9F0]">
       <div className="mx-auto max-w-5xl space-y-5">
         {/* Header */}
         <header className="flex flex-col gap-3 rounded-3xl border border-amber-400/35 bg-[#26150d]/95 px-6 py-5 shadow-2xl sm:flex-row sm:items-center sm:justify-between">

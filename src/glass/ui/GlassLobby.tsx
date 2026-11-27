@@ -285,7 +285,7 @@ export function GlassLobby({
   // 1. Supabase Not Configured State
   if (!room.isConfigured) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#0e1827] bg-[radial-gradient(circle_at_50%_0%,_rgba(56,189,248,0.18)_0%,_#0e1827_70%)] p-4 text-[#FFF9F0]">
+      <div className="flex min-h-dvh items-center justify-center bg-[#0e1827] bg-[radial-gradient(circle_at_50%_0%,_rgba(56,189,248,0.18)_0%,_#0e1827_70%)] p-4 text-[#FFF9F0]">
         <main className="w-full max-w-xl rounded-3xl border-2 border-cyan-400/35 bg-[#121d2d] p-6 shadow-2xl sm:p-8">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="inline-flex items-center gap-1.5 rounded-full border border-cyan-400/35 bg-cyan-950/70 px-3 py-1 text-xs font-black text-cyan-200">
@@ -343,7 +343,7 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
     const equippedSummary = formatEquippedSummary(myAccessory);
 
     return (
-      <div className="min-h-screen bg-[#0e1827] bg-[radial-gradient(circle_at_18%_0%,_rgba(56,189,248,0.18)_0%,_transparent_46%),radial-gradient(circle_at_84%_0%,_rgba(251,191,36,0.14)_0%,_transparent_46%),linear-gradient(180deg,_#121d2d_0%,_#0e1827_100%)] p-4 text-[#FFF9F0] sm:p-6 lg:p-8">
+      <div className="min-h-dvh bg-[#0e1827] bg-[radial-gradient(circle_at_18%_0%,_rgba(56,189,248,0.18)_0%,_transparent_46%),radial-gradient(circle_at_84%_0%,_rgba(251,191,36,0.14)_0%,_transparent_46%),linear-gradient(180deg,_#121d2d_0%,_#0e1827_100%)] p-4 text-[#FFF9F0] sm:p-6 lg:p-8">
         <div className="mx-auto max-w-4xl space-y-5">
           <header className="flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -602,7 +602,7 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
       : `Cả đội đã sẵn sàng — bấm để bắt đầu ${activeMapMeta.shortTitle}!`;
 
   return (
-    <div className="min-h-screen bg-[#0e1827] bg-[radial-gradient(circle_at_18%_0%,_rgba(56,189,248,0.18)_0%,_transparent_46%),radial-gradient(circle_at_84%_0%,_rgba(251,191,36,0.14)_0%,_transparent_46%),linear-gradient(180deg,_#121d2d_0%,_#0e1827_100%)] p-4 text-[#FFF9F0] sm:p-6 lg:p-8">
+    <div className="min-h-dvh bg-[#0e1827] bg-[radial-gradient(circle_at_18%_0%,_rgba(56,189,248,0.18)_0%,_transparent_46%),radial-gradient(circle_at_84%_0%,_rgba(251,191,36,0.14)_0%,_transparent_46%),linear-gradient(180deg,_#121d2d_0%,_#0e1827_100%)] p-4 text-[#FFF9F0] sm:p-6 lg:p-8">
       <div className="mx-auto max-w-4xl space-y-5">
         <header className="flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-cyan-400/30 bg-[#121d2d]/95 px-5 py-4 shadow-xl">
           <div className="flex flex-wrap items-center gap-3">

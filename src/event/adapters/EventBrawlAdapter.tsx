@@ -477,7 +477,7 @@ export function EventBrawlAdapter({
   }, [roster, subScores]);
 
   return (
-    <div className="relative h-screen w-screen overflow-hidden bg-[#14243A] select-none">
+    <div className="relative h-dvh w-full overflow-hidden bg-[#14243A] select-none">
       <ArenaScene
         roundKey={roundKey}
         fighters={fighters}

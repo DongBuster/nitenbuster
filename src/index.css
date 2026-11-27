@@ -15,11 +15,16 @@
 }
 
 @layer base {
+  html {
+    scroll-padding-bottom: calc(3.5rem + env(safe-area-inset-bottom, 0px));
+  }
+
   html,
   body {
     font-family: var(--font-sans);
     color: var(--color-paws-ink);
     background-color: var(--color-paws-cream);
+    overflow-wrap: break-word;
   }
 
   h1,
@@ -27,11 +32,42 @@
   h3,
   h4 {
     font-family: var(--font-display);
+    text-wrap: balance;
   }
 }
 
 /* Tactile 3D Physical Buttons & Game UI Tokens */
 @layer utilities {
+  .safe-top-bar {
+    padding-top: max(0.75rem, env(safe-area-inset-top, 0px));
+    padding-left: max(0.75rem, env(safe-area-inset-left, 0px));
+    padding-right: max(0.75rem, env(safe-area-inset-right, 0px));
+  }
+
+  .safe-bottom-bar {
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+    padding-left: max(0.75rem, env(safe-area-inset-left, 0px));
+    padding-right: max(0.75rem, env(safe-area-inset-right, 0px));
+  }
+
+  .safe-hud-inset {
+    padding-top: max(0.75rem, env(safe-area-inset-top, 0px));
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+    padding-left: max(0.75rem, env(safe-area-inset-left, 0px));
+    padding-right: max(0.75rem, env(safe-area-inset-right, 0px));
+  }
+
+  .touch-target {
+    min-block-size: 36px;
+    min-inline-size: 36px;
+  }
+
+  @media (pointer: coarse) {
+    .touch-target {
+      min-block-size: 44px;
+      min-inline-size: 44px;
+    }
+  }
   .btn-tactile-amber {
     background: linear-gradient(180deg, #fbbf24 0%, #f59e0b 100%);
     box-shadow: 0 4px 0 #b45309, 0 6px 12px rgba(0, 0, 0, 0.25);
