@@ -119,6 +119,7 @@ export function useOnlineRoom() {
   const myProfileRef = useRef<LobbyPresenceMember | null>(null);
   const hostStateRef = useRef<GameState | null>(null);
   const seqRef = useRef<number>(0);
+  const lastHandSeqRef = useRef<number>(0);
   const lastSnapshotRef = useRef<GameSnapshotEvent | null>(null);
   const myHandRef = useRef<CardData[]>([]);
   const turnDeadlineRef = useRef<number>(0);
@@ -166,25 +167,14 @@ export function useOnlineRoom() {
 
       if (!channel) return;
 
-      const snapshot: GameSnapshotEvent = {
-        seq: nextSeq,
-        hostId: myPeerId,
-        publicState: sanitizeStateForBroadcast(nextState),
-        turnDeadlineMs: deadline,
-        accessories: roomAccessoriesRef.current,
-      };
-      lastSnapshotRef.current = snapshot;
+      const remainingMs = deadline > 0 ? Math.max(0, deadline - Date.now()) : 0;
 
-      void channel.send({
-        type: 'broadcast',
-        event: 'game_snapshot',
-        payload: snapshot,
-      });
-
+      // Send private hands before the public snapshot so clients receive matching seq state together
       for (const player of nextState.players) {
         if (player.isBot) continue;
         if (player.id === myPeerId) {
           myHandRef.current = player.hand.slice();
+          lastHandSeqRef.current = nextSeq;
           continue;
         }
         const handSync: HandSyncEvent = {
@@ -198,6 +188,22 @@ export function useOnlineRoom() {
           payload: handSync,
         });
       }
+
+      const snapshot: GameSnapshotEvent = {
+        seq: nextSeq,
+        hostId: myPeerId,
+        publicState: sanitizeStateForBroadcast(nextState),
+        turnDeadlineMs: deadline,
+        turnRemainingMs: remainingMs,
+        accessories: roomAccessoriesRef.current,
+      };
+      lastSnapshotRef.current = snapshot;
+
+      void channel.send({
+        type: 'broadcast',
+        event: 'game_snapshot',
+        payload: snapshot,
+      });
     },
     [myPeerId],
   );
@@ -309,6 +315,7 @@ export function useOnlineRoom() {
     myProfileRef.current = null;
     turnDeadlineRef.current = 0;
     seqRef.current = 0;
+    lastHandSeqRef.current = 0;
     setRoomCode('');
     setPhase('idle');
     setConnectionStatus('disconnected');
@@ -343,6 +350,10 @@ export function useOnlineRoom() {
       }
 
       teardownChannel();
+      lastSnapshotRef.current = null;
+      myHandRef.current = [];
+      lastHandSeqRef.current = 0;
+      turnDeadlineRef.current = 0;
       setError(null);
       setRoomCode(code);
       setConnectionStatus('connecting');
@@ -426,7 +437,13 @@ export function useOnlineRoom() {
             return;
           }
           lastSnapshotRef.current = evt;
-          turnDeadlineRef.current = evt.turnDeadlineMs;
+          const effectiveDeadline =
+            evt.turnRemainingMs !== undefined
+              ? evt.turnRemainingMs > 0
+                ? Date.now() + evt.turnRemainingMs
+                : 0
+              : evt.turnDeadlineMs;
+          turnDeadlineRef.current = effectiveDeadline;
           const normalizedEvtAcc: Partial<Record<AnimalId, string[]>> = {};
           if (evt.accessories) {
             for (const [k, v] of Object.entries(evt.accessories)) {
@@ -440,8 +457,8 @@ export function useOnlineRoom() {
           roomAccessoriesRef.current = normalizedEvtAcc;
           setPhase('playing');
           setTurnSecondsLeft(
-            evt.turnDeadlineMs > 0
-              ? Math.max(0, Math.ceil((evt.turnDeadlineMs - Date.now()) / 1000))
+            effectiveDeadline > 0
+              ? Math.max(0, Math.ceil((effectiveDeadline - Date.now()) / 1000))
               : 0,
           );
           const rebuilt = reconstructClientGameState(
@@ -454,8 +471,15 @@ export function useOnlineRoom() {
         .on('broadcast', { event: 'hand_sync' }, ({ payload }) => {
           const evt = payload as HandSyncEvent | undefined;
           if (!evt || evt.targetPeerId !== myPeerId) return;
+          if (evt.seq < lastHandSeqRef.current) {
+            return;
+          }
+          lastHandSeqRef.current = evt.seq;
           myHandRef.current = evt.hand.slice();
-          if (lastSnapshotRef.current) {
+          if (
+            lastSnapshotRef.current &&
+            lastSnapshotRef.current.seq >= evt.seq
+          ) {
             const rebuilt = reconstructClientGameState(
               lastSnapshotRef.current.publicState,
               myPeerId,
@@ -478,6 +502,7 @@ export function useOnlineRoom() {
           hostStateRef.current = null;
           lastSnapshotRef.current = null;
           myHandRef.current = [];
+          lastHandSeqRef.current = 0;
           turnDeadlineRef.current = 0;
           setGameState(null);
           setPhase('lobby');
@@ -748,8 +773,21 @@ export function useOnlineRoom() {
         if (autoTimeoutFiredTurnRef.current === state.turnCount) return;
 
         autoTimeoutFiredTurnRef.current = state.turnCount;
-        const nextState = drawTurnAction(state, active.id);
-        if (nextState !== state) {
+        const beforeLen = active.hand.length;
+        const drawnState = drawTurnAction(state, active.id);
+        if (drawnState !== state) {
+          const afterPlayer = drawnState.players.find((p) => p.id === active.id);
+          const gained = Math.max(
+            0,
+            (afterPlayer?.hand.length ?? beforeLen) - beforeLen,
+          );
+          const timeoutMsg = `⏱️ ${active.name} hết giờ — tự rút +${gained} lá!`;
+          const nextState: GameState = {
+            ...drawnState,
+            lastEffectBanner: drawnState.lastEffectBanner
+              ? `${timeoutMsg} (${drawnState.lastEffectBanner})`
+              : timeoutMsg,
+          };
           broadcastStateFromHost(nextState, true);
         }
       }
@@ -758,7 +796,7 @@ export function useOnlineRoom() {
     return () => clearInterval(timer);
   }, [broadcastStateFromHost, myPeerId, phase]);
 
-  // Host Authoritative Bot AI loop (950ms) + Disconnected Human fallback (2000ms)
+  // Host Authoritative Bot AI loop (950ms) + Disconnected Human fallback (10000ms)
   useEffect(() => {
     if (!isHost || phase !== 'playing') return;
     const state = hostStateRef.current;
@@ -774,7 +812,7 @@ export function useOnlineRoom() {
 
     if (!currentPlayer.isBot && !isDisconnectedHuman) return;
 
-    const delayMs = currentPlayer.isBot ? 950 : 2000;
+    const delayMs = currentPlayer.isBot ? 950 : 10000;
     const scheduledTurn = state.turnCount;
 
     const timeout = setTimeout(() => {
@@ -801,7 +839,18 @@ export function useOnlineRoom() {
         nextState = callPaws(nextState, active.id);
       }
 
-      if (decision.quip) {
+      if (isDisconnectedHuman) {
+        const prefix = `🤖 ${active.name} mất kết nối — Bot đi hộ`;
+        nextState = {
+          ...nextState,
+          lastEffectBanner: nextState.lastEffectBanner
+            ? `${prefix} (${nextState.lastEffectBanner})`
+            : prefix,
+          players: nextState.players.map((p) =>
+            p.id === active.id ? { ...p, quip: 'Mất kết nối — Bot đi hộ!' } : p,
+          ),
+        };
+      } else if (decision.quip) {
         nextState = {
           ...nextState,
           players: nextState.players.map((p) =>
@@ -829,6 +878,10 @@ export function useOnlineRoom() {
   useEffect(() => {
     return () => {
       teardownChannel();
+      lastSnapshotRef.current = null;
+      myHandRef.current = [];
+      lastHandSeqRef.current = 0;
+      turnDeadlineRef.current = 0;
     };
   }, [teardownChannel]);
 

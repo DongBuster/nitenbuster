@@ -44,6 +44,7 @@ export interface GameSnapshotEvent {
   hostId: string;
   publicState: PublicGameState;
   turnDeadlineMs: number;
+  turnRemainingMs?: number;
   accessories: Partial<Record<AnimalId, AccessorySelection>>;
 }
 

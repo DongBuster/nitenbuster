@@ -558,4 +558,53 @@ describe('PAWS Card Game Engine', () => {
     assert.equal(getPredictedBombVictim(s), null);
     assert.equal(s.players.find((p) => p.id === 'p1')!.hand.length, p1Before + 4);
   });
+
+  it('16. crossbow, bomb, and catchMissedPaws report total cards including trapped banana bonus', () => {
+    const baseState = makeCustomState({
+      currentIndex: 0,
+      players: [
+        makePlayer('p0', [
+          { id: 'cb-1', type: 'crossbow', color: 'pink' },
+          { id: 'p0-keep', type: 'basic', color: 'pink', value: 1 },
+        ], false, 'dog'),
+        makePlayer('p1', [{ id: 'p1-1', type: 'basic', color: 'blue', value: 2 }], true, 'cat'),
+      ],
+    });
+    const trappedTop: CardData = { id: 'trap-1', type: 'banana', trapped: true };
+    const stateWithTrap: GameState = {
+      ...baseState,
+      drawPile: [trappedTop, ...baseState.drawPile],
+    };
+
+    const afterCrossbow = playCard(stateWithTrap, 'p0', 'cb-1', {
+      targetPlayerId: 'p1',
+      seed: 21,
+    });
+    assert.equal(afterCrossbow.players[1].hand.length, 5); // 1 original + 1 crossbow + 3 banana
+    assert.match(afterCrossbow.lastEffectBanner ?? '', /\+4 lá/);
+    assert.match(afterCrossbow.lastEffectBanner ?? '', /Vỏ Chuối/);
+
+    const afterCatch = catchMissedPaws(
+      {
+        ...baseState,
+        drawPile: [trappedTop, ...baseState.drawPile],
+      },
+      'p1',
+      'p0',
+      22,
+    );
+    assert.equal(afterCatch.players[1].hand.length, 6); // 1 original + 2 PAWS + 3 banana
+    assert.match(afterCatch.lastEffectBanner ?? '', /\+5 lá/);
+
+    const bombState: GameState = {
+      ...baseState,
+      activeBomb: { fuse: 1, color: 'pink', ownerId: 'p1' },
+      drawPile: [trappedTop, ...baseState.drawPile],
+    };
+    // p0 plays p0-keep (still has cb-1 left), advancing turn to p1 where bomb explodes on trappedTop
+    const afterBomb = playCard(bombState, 'p0', 'p0-keep', { seed: 23 });
+    assert.equal(afterBomb.players[1].hand.length, 8); // 1 original + 4 bomb + 3 banana
+    assert.match(afterBomb.lastEffectBanner ?? '', /\+7 lá/);
+    assert.match(afterBomb.lastEffectBanner ?? '', /Vỏ Chuối/);
+  });
 });

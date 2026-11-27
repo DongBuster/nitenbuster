@@ -383,10 +383,16 @@ function tickActiveBomb(state: GameState, seed?: number): GameState {
   // Bomb explodes on the player whose turn it just landed on!
   const victimIdx = state.currentIndex;
   const victim = state.players[victimIdx];
-  const { state: afterDraw } = drawCardsForPlayer(state, victimIdx, 4, seed);
+  const { state: afterDraw, drawnCards, hitBanana } = drawCardsForPlayer(
+    state,
+    victimIdx,
+    4,
+    seed,
+  );
   const nextPlayers = updatePlayerAt(afterDraw.players, victimIdx, {
     emotion: 'shock',
   });
+  const total = drawnCards.length;
 
   return {
     ...afterDraw,
@@ -395,10 +401,14 @@ function tickActiveBomb(state: GameState, seed?: number): GameState {
     logs: appendLog(
       afterDraw.logs,
       afterDraw.turnCount,
-      `💣 Bom Kẹo phát nổ ngay trước mặt ${victim.name}! Rút +4 lá!`,
+      hitBanana
+        ? `💣 Bom Kẹo phát nổ ngay trước mặt ${victim.name}! Rút +4 lá và dính 🍌 Vỏ Chuối (tổng +${total} lá)!`
+        : `💣 Bom Kẹo phát nổ ngay trước mặt ${victim.name}! Rút +${total} lá!`,
       'penalty',
     ),
-    lastEffectBanner: `💣 BÙM! ${victim.name} rút +4 lá!`,
+    lastEffectBanner: hitBanana
+      ? `💣 BÙM! ${victim.name} rút +${total} lá (Bom + 🍌 Vỏ Chuối)!`
+      : `💣 BÙM! ${victim.name} rút +${total} lá!`,
   };
 }
 
@@ -516,6 +526,7 @@ function resolveCardEffect(
     };
 
     let drawnCount = 0;
+    let hitAnyBanana = false;
     const maxSafeDraws =
       nextState.drawPile.length + Math.max(0, nextState.discardPile.length - 1) + 4;
 
@@ -527,6 +538,7 @@ function resolveCardEffect(
         options?.seed !== undefined ? options.seed + drawnCount * 13 : undefined,
       );
       nextState = res.state;
+      if (res.hitBanana) hitAnyBanana = true;
       if (res.drawnCards.length === 0) break;
       drawnCount += res.drawnCards.length;
       const firstDrawn = res.drawnCards[0];
@@ -539,6 +551,7 @@ function resolveCardEffect(
       emotion: 'shock',
     });
     const nextIdx = getNextIndex(playerIndex, nextState.direction, playerCount, 1);
+    const bananaSuffix = hitAnyBanana ? ' (có dính 🍌 Vỏ Chuối)' : '';
 
     return {
       state: {
@@ -548,10 +561,10 @@ function resolveCardEffect(
         logs: appendLog(
           nextState.logs,
           nextState.turnCount,
-          `⚡ ${player.name} giật Tia Chớp màu ${COLOR_VI[chosenColor]}! ${target.name} phải rút ${drawnCount} lá và mất lượt!`,
+          `⚡ ${player.name} giật Tia Chớp màu ${COLOR_VI[chosenColor]}! ${target.name} phải rút ${drawnCount} lá${bananaSuffix} và mất lượt!`,
           'penalty',
         ),
-        lastEffectBanner: `⚡ Tia Chớp (${COLOR_VI[chosenColor]})! ${target.name} rút ${drawnCount} lá!`,
+        lastEffectBanner: `⚡ Tia Chớp (${COLOR_VI[chosenColor]})! ${target.name} rút ${drawnCount} lá${bananaSuffix}!`,
       },
       skipBombTick: false,
     };
@@ -608,16 +621,17 @@ function resolveCardEffect(
       targetIdx = getNextIndex(playerIndex, state.direction, playerCount, 0);
     }
     const target = state.players[targetIdx];
-    const { state: afterGift } = drawCardsForPlayer(
+    const { state: afterGift, drawnCards, hitBanana } = drawCardsForPlayer(
       state,
       targetIdx,
       1,
       options?.seed,
     );
     const nextPlayers = updatePlayerAt(afterGift.players, targetIdx, {
-      emotion: 'sad',
+      emotion: hitBanana ? 'shock' : 'sad',
     });
     const nextIdx = getNextIndex(playerIndex, afterGift.direction, playerCount, 0);
+    const total = drawnCards.length;
 
     return {
       state: {
@@ -628,10 +642,14 @@ function resolveCardEffect(
         logs: appendLog(
           afterGift.logs,
           afterGift.turnCount,
-          `🏹 ${player.name} bắn Nỏ Thần! Tặng ${target.name} 1 lá bài!`,
-          'effect',
+          hitBanana
+            ? `🏹 ${player.name} bắn Nỏ Thần vào ${target.name} và trúng 🍌 Vỏ Chuối! Rút tổng +${total} lá!`
+            : `🏹 ${player.name} bắn Nỏ Thần! Tặng ${target.name} 1 lá bài!`,
+          hitBanana ? 'penalty' : 'effect',
         ),
-        lastEffectBanner: `🏹 Nỏ Thần bắn trúng ${target.name} (+1 lá)!`,
+        lastEffectBanner: hitBanana
+          ? `🏹 Nỏ Thần trúng ${target.name} + 🍌 Vỏ Chuối (+${total} lá)!`
+          : `🏹 Nỏ Thần bắn trúng ${target.name} (+1 lá)!`,
       },
       skipBombTick: false,
     };
@@ -980,11 +998,17 @@ export function catchMissedPaws(
     return state;
   }
 
-  const { state: afterPenalty } = drawCardsForPlayer(state, targetIdx, 2, seed);
+  const { state: afterPenalty, drawnCards, hitBanana } = drawCardsForPlayer(
+    state,
+    targetIdx,
+    2,
+    seed,
+  );
   const nextPlayers = updatePlayerAt(afterPenalty.players, targetIdx, {
     emotion: 'shock',
     quip: 'Quên hô PAWS rồi!! 😱',
   });
+  const total = drawnCards.length;
 
   return {
     ...afterPenalty,
@@ -992,9 +1016,13 @@ export function catchMissedPaws(
     logs: appendLog(
       afterPenalty.logs,
       afterPenalty.turnCount,
-      `🚨 ${catcherName} bắt lỗi ${target.name} quên hô PAWS! Phạt rút +2 lá!`,
+      hitBanana
+        ? `🚨 ${catcherName} bắt lỗi ${target.name} quên hô PAWS! Phạt +2 lá + dính 🍌 Vỏ Chuối (tổng +${total} lá)!`
+        : `🚨 ${catcherName} bắt lỗi ${target.name} quên hô PAWS! Phạt rút +2 lá!`,
       'penalty',
     ),
-    lastEffectBanner: `🚨 ${catcherName} bắt lỗi ${target.name} quên hô PAWS! (+2 lá)`,
+    lastEffectBanner: hitBanana
+      ? `🚨 ${catcherName} bắt lỗi ${target.name} quên hô PAWS (+${total} lá, dính 🍌)!`
+      : `🚨 ${catcherName} bắt lỗi ${target.name} quên hô PAWS! (+2 lá)`,
   };
 }

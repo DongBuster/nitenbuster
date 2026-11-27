@@ -56,7 +56,9 @@ export function computePenaltyNoticeMessage({
     reason.includes('PAWS') ||
     reason.includes('Bom') ||
     reason.includes('Vỏ Chuối') ||
-    reason.includes('Tia Chớp');
+    reason.includes('Tia Chớp') ||
+    reason.includes('hết giờ') ||
+    reason.includes('Bot đi hộ');
 
   return isNotableEvent ? `+${delta} lá — ${reason}` : null;
 }
