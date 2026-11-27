@@ -69,8 +69,13 @@ export function BrawlOnlineContainer({
   const match = room.match;
   const controlsEnabled =
     room.phase === 'playing' && match?.phase === 'fighting' && !menuOpen;
-  const { consumeInput, pressedSkills, triggerSkill, setVirtualHold } =
-    useKeyboardMouse(controlsEnabled);
+  const {
+    consumeInput,
+    pressedSkills,
+    triggerSkill,
+    setVirtualHold,
+    setVirtualMove,
+  } = useKeyboardMouse(controlsEnabled);
 
   useEffect(() => {
     setAudioPreferences({ sfxEnabled: settings.sfxEnabled });
@@ -245,6 +250,7 @@ export function BrawlOnlineContainer({
           pressedSkills={pressedSkills}
           onTriggerSkill={triggerSkill}
           onVirtualHold={setVirtualHold}
+          onVirtualMove={setVirtualMove}
           sfxEnabled={settings.sfxEnabled}
           onToggleSfx={() =>
             updateSettings({ sfxEnabled: !settings.sfxEnabled })

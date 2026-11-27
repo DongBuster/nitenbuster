@@ -18,7 +18,9 @@ import type {
   MatchPhase,
 } from '../../brawl/sim/types';
 import { BrawlSkillBar } from '../../brawl/ui/BrawlSkillBar';
+import { TouchDpad } from '../../components/TouchDpad';
 import { ANIMALS } from '../../engine/types';
+import { useDeviceFormFactor } from '../../utils/useDeviceFormFactor';
 import {
   formatSecondsClock,
   getGrandPrixPointsForRank,
@@ -148,9 +150,15 @@ export function EventBrawlAdapter({
   const subRoundEndedRef = useRef<boolean>(false);
   const roundAdvanceTimerRef = useRef<number | null>(null);
 
+  const isTablet = useDeviceFormFactor() === 'tablet';
   const controlsEnabled = phase === 'fighting';
-  const { consumeInput, pressedSkills, triggerSkill, setVirtualHold } =
-    useKeyboardMouse(controlsEnabled);
+  const {
+    consumeInput,
+    pressedSkills,
+    triggerSkill,
+    setVirtualHold,
+    setVirtualMove,
+  } = useKeyboardMouse(controlsEnabled);
 
   // Clear pending sub-round advance timeout & input timer on unmount
   useEffect(() => {
@@ -581,17 +589,39 @@ export function EventBrawlAdapter({
         </div>
       )}
 
-      {/* Bottom skill bar */}
-      <div className="pointer-events-none fixed inset-x-0 bottom-3 z-20 flex justify-center px-3">
-        <div className="pointer-events-auto">
-          <BrawlSkillBar
-            hud={hud}
-            controlsEnabled={controlsEnabled}
-            pressedSkills={pressedSkills}
-            onTriggerSkill={triggerSkill}
-            onVirtualHold={setVirtualHold}
-          />
-        </div>
+      {/* Bottom skill bar (+ left D-pad on tablet) */}
+      <div className="safe-bottom-bar pointer-events-none fixed inset-x-0 bottom-0 z-20 px-3 pb-3">
+        {isTablet ? (
+          <div className="flex w-full items-end justify-between gap-3">
+            <TouchDpad
+              enabled={controlsEnabled}
+              onChange={(vec) => setVirtualMove(vec.x, vec.y)}
+              accent="amber"
+            />
+            <div className="pointer-events-auto">
+              <BrawlSkillBar
+                hud={hud}
+                controlsEnabled={controlsEnabled}
+                pressedSkills={pressedSkills}
+                onTriggerSkill={triggerSkill}
+                onVirtualHold={setVirtualHold}
+                compact
+              />
+            </div>
+          </div>
+        ) : (
+          <div className="flex justify-center">
+            <div className="pointer-events-auto">
+              <BrawlSkillBar
+                hud={hud}
+                controlsEnabled={controlsEnabled}
+                pressedSkills={pressedSkills}
+                onTriggerSkill={triggerSkill}
+                onVirtualHold={setVirtualHold}
+              />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

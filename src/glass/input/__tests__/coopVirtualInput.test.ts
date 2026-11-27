@@ -6,6 +6,7 @@ import {
   readVirtualInput,
   setKeyboardPressedMirror,
   setVirtualHold,
+  setVirtualMoveDpad,
   subscribePressedState,
   triggerVirtualPulse,
   type CoopPressedState,
@@ -19,6 +20,8 @@ function resetBus(): void {
     jump: false,
     moveLeft: false,
     moveRight: false,
+    moveForward: false,
+    moveBackward: false,
   });
 }
 
@@ -71,6 +74,8 @@ describe('coopVirtualInput bus', () => {
       jump: false,
       moveLeft: false,
       moveRight: false,
+      moveForward: false,
+      moveBackward: false,
     });
     // Identical update should NOT fire a duplicate notification
     setKeyboardPressedMirror({
@@ -79,6 +84,8 @@ describe('coopVirtualInput bus', () => {
       jump: false,
       moveLeft: false,
       moveRight: false,
+      moveForward: false,
+      moveBackward: false,
     });
     setVirtualHold('jump', true);
     clearAllVirtualInputs();
@@ -90,5 +97,23 @@ describe('coopVirtualInput bus', () => {
     assert.equal(snapshots[1]?.jump, true);
     assert.equal(snapshots[2]?.jump, false);
     assert.equal(snapshots[2]?.liftUp, true);
+  });
+
+  it('maps D-pad forward/backward/left/right into moveZ (+1/-1) and moveX (+1/-1)', () => {
+    resetBus();
+    setVirtualMoveDpad({ up: true, down: false, left: true, right: false });
+    const diag = readVirtualInput(3000);
+    assert.equal(diag.moveZ, 1);
+    assert.equal(diag.moveX, 1);
+
+    setVirtualMoveDpad({ up: false, down: true, left: false, right: true });
+    const backRight = readVirtualInput(3010);
+    assert.equal(backRight.moveZ, -1);
+    assert.equal(backRight.moveX, -1);
+
+    setVirtualMoveDpad({ up: false, down: false, left: false, right: false });
+    const idle = readVirtualInput(3020);
+    assert.equal(idle.moveZ, 0);
+    assert.equal(idle.moveX, 0);
   });
 });

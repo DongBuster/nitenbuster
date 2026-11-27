@@ -14,12 +14,15 @@ import {
   Zap,
 } from 'lucide-react';
 import { playSfx } from '../../audio/soundEngine';
+import { TouchDpad } from '../../components/TouchDpad';
 import {
   getCoopMapMeta,
   getCoopMapPack,
   type CoopMapId,
 } from '../../coop/maps/registry';
 import { CoopSkillBar } from '../../coop/ui/CoopSkillBar';
+import { useDeviceFormFactor } from '../../utils/useDeviceFormFactor';
+import { setVirtualMoveDpad } from '../input/coopVirtualInput';
 import type { GlassRoomController } from '../online/useGlassRoom';
 import type { GlassHudSnapshot } from '../render/renderTypes';
 import type { ShatterReason } from '../sim/types';
@@ -235,10 +238,13 @@ export function GlassHud({
 
   const isHostSlot =
     room.mySlot === 'p1' || (room.mySlot === null && room.isHost);
+  const isTablet = useDeviceFormFactor() === 'tablet';
   const maxHp = Math.max(1, hud.glassMaxHp || 3);
   const totalCheckpoints = Math.max(1, hud.totalCheckpoints || 4);
   const isDisconnected =
     room.partnerDisconnectedSec !== null || room.partnerLeftPermanently;
+  const controlsEnabled =
+    room.phase === 'playing' && !isDisconnected && hud.shatterTimer <= 0;
 
   return (
     <div className="safe-hud-inset pointer-events-none fixed inset-0 z-20 flex flex-col justify-between sm:p-4">
@@ -636,19 +642,33 @@ export function GlassHud({
         )}
       </div>
 
-      {/* BOTTOM-CENTER: Interactive Co-op Skill Bar + Emotes */}
-      <footer className="flex flex-col items-center gap-2">
-        <CoopSkillBar
-          mapId={activeMapId}
-          mySlot={isHostSlot ? 'p1' : 'p2'}
-          hud={hud}
-          controlsEnabled={
-            room.phase === 'playing' &&
-            !isDisconnected &&
-            hud.shatterTimer <= 0
-          }
-          onSendEmote={room.sendEmote}
-        />
+      {/* BOTTOM: Interactive Co-op Skill Bar + Emotes (+ left D-pad on tablet) */}
+      <footer className="flex w-full flex-col items-center gap-2">
+        {isTablet ? (
+          <div className="flex w-full items-end justify-between gap-3">
+            <TouchDpad
+              enabled={controlsEnabled}
+              onChange={(_, dirs) => setVirtualMoveDpad(dirs)}
+              accent="cyan"
+            />
+            <CoopSkillBar
+              mapId={activeMapId}
+              mySlot={isHostSlot ? 'p1' : 'p2'}
+              hud={hud}
+              controlsEnabled={controlsEnabled}
+              onSendEmote={room.sendEmote}
+              compact
+            />
+          </div>
+        ) : (
+          <CoopSkillBar
+            mapId={activeMapId}
+            mySlot={isHostSlot ? 'p1' : 'p2'}
+            hud={hud}
+            controlsEnabled={controlsEnabled}
+            onSendEmote={room.sendEmote}
+          />
+        )}
       </footer>
     </div>
   );

@@ -4,11 +4,12 @@ import {
   useEffect,
   useImperativeHandle,
   useRef,
-  useState,
   type MutableRefObject,
   type PointerEvent as ReactPointerEvent,
 } from 'react';
 import { playSfx, type SfxType } from '../../audio/soundEngine.ts';
+import { TouchDpad } from '../../components/TouchDpad.tsx';
+import { useDeviceFormFactor } from '../../utils/useDeviceFormFactor.ts';
 import {
   SURVIVAL_SNAPSHOT_INTERVAL_MS,
   packSurvivalSnapshot,
@@ -93,8 +94,6 @@ export interface SurvivalCanvasProps {
 
 const HUD_INTERVAL_MS = 66;
 const LEVELUP_SNAPSHOT_INTERVAL_MS = 500;
-const JOYSTICK_MAX_RADIUS = 42;
-const JOYSTICK_DEADZONE = 0.12;
 
 const WEAPON_SFX: Record<WeaponId, SfxType> = {
   candy_smg: 'shoot',
@@ -368,7 +367,6 @@ export const SurvivalCanvas = forwardRef<SurvivalCanvasHandle, SurvivalCanvasPro
   ) {
     const containerRef = useRef<HTMLDivElement | null>(null);
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
-    const joystickKnobRef = useRef<HTMLDivElement | null>(null);
 
     const effectiveLocalId = online?.localPlayerId ?? localPlayerId;
     const isClient = online?.role === 'client';
@@ -423,8 +421,7 @@ export const SurvivalCanvas = forwardRef<SurvivalCanvasHandle, SurvivalCanvasPro
     const pointerScreenRef = useRef<{ x: number; y: number } | null>(null);
     const mouseLeftDownRef = useRef<boolean>(false);
     const touchMoveRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
-    const joystickPointerIdRef = useRef<number | null>(null);
-    const joystickOriginRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+    const dpadActiveRef = useRef<boolean>(false);
 
     const tickRef = useRef<number>(0);
     const lastPhaseRef = useRef<SurvivalPhase | null>(null);
@@ -433,10 +430,7 @@ export const SurvivalCanvas = forwardRef<SurvivalCanvasHandle, SurvivalCanvasPro
     const lastSnapshotSentAtRef = useRef<number>(0);
     const sfxCooldownMapRef = useRef<Map<string, number>>(new Map());
 
-    const [showTouchControls, setShowTouchControls] = useState<boolean>(() => {
-      if (typeof window === 'undefined' || !window.matchMedia) return false;
-      return window.matchMedia('(pointer: coarse)').matches;
-    });
+    const showTouchControls = useDeviceFormFactor() === 'tablet';
 
     const playThrottledSfx = useCallback(
       (key: string, sfxType: SfxType, cooldownMs: number, nowMs: number) => {
@@ -575,20 +569,6 @@ export const SurvivalCanvas = forwardRef<SurvivalCanvasHandle, SurvivalCanvasPro
       [emitHostStateImmediately],
     );
 
-    // Coarse pointer detection (bidirectional so toggling DevTools mobile view cleanly switches back)
-    useEffect(() => {
-      if (typeof window === 'undefined' || !window.matchMedia) return;
-      const mq = window.matchMedia('(pointer: coarse)');
-      const sync = () => {
-        setShowTouchControls(mq.matches);
-      };
-      sync();
-      mq.addEventListener('change', sync);
-      return () => {
-        mq.removeEventListener('change', sync);
-      };
-    }, []);
-
     // ResizeObserver + DPR scaling
     useEffect(() => {
       const container = containerRef.current;
@@ -626,10 +606,7 @@ export const SurvivalCanvas = forwardRef<SurvivalCanvasHandle, SurvivalCanvasPro
       dashPressedRef.current = false;
       mouseLeftDownRef.current = false;
       touchMoveRef.current = { x: 0, y: 0 };
-      joystickPointerIdRef.current = null;
-      if (joystickKnobRef.current) {
-        joystickKnobRef.current.style.transform = 'translate3d(0px, 0px, 0px)';
-      }
+      dpadActiveRef.current = false;
     }, []);
 
     // Notify parent when touch controls visibility changes (coordinates HUD spacing)
@@ -710,7 +687,6 @@ export const SurvivalCanvas = forwardRef<SurvivalCanvasHandle, SurvivalCanvasPro
       const onPointerDown = (e: PointerEvent) => {
         if (pausedRef.current || inputDisabledRef.current) return;
         if (e.pointerType === 'touch') {
-          setShowTouchControls(true);
           return;
         }
         if (e.target === canvasRef.current) {
@@ -893,7 +869,7 @@ export const SurvivalCanvas = forwardRef<SurvivalCanvasHandle, SurvivalCanvasPro
         const manualAim =
           (!autoAimRef.current || mouseLeftDownRef.current) &&
           aimCursorWorld !== null &&
-          joystickPointerIdRef.current === null;
+          !dpadActiveRef.current;
 
         const aimX = manualAim && aimCursorWorld ? aimCursorWorld.x : 0;
         const aimY = manualAim && aimCursorWorld ? aimCursorWorld.y : 0;
@@ -1169,68 +1145,18 @@ export const SurvivalCanvas = forwardRef<SurvivalCanvasHandle, SurvivalCanvasPro
       playThrottledSfx,
     ]);
 
-    // Touch Virtual Joystick Handlers
-    const updateJoystickFromEvent = (clientX: number, clientY: number) => {
-      const dx = clientX - joystickOriginRef.current.x;
-      const dy = clientY - joystickOriginRef.current.y;
-      const dist = Math.hypot(dx, dy);
-      const clampedDist = Math.min(JOYSTICK_MAX_RADIUS, dist);
-      const angle = dist > 1e-4 ? Math.atan2(dy, dx) : 0;
-      const kx = Math.cos(angle) * clampedDist;
-      const ky = Math.sin(angle) * clampedDist;
-
-      const norm = clampedDist / JOYSTICK_MAX_RADIUS;
-      if (norm < JOYSTICK_DEADZONE) {
-        touchMoveRef.current = { x: 0, y: 0 };
-      } else {
-        touchMoveRef.current = {
-          x: kx / JOYSTICK_MAX_RADIUS,
-          y: ky / JOYSTICK_MAX_RADIUS,
-        };
-      }
-
-      if (joystickKnobRef.current) {
-        joystickKnobRef.current.style.transform = `translate3d(${kx.toFixed(1)}px, ${ky.toFixed(1)}px, 0px)`;
-      }
-    };
-
-    const handleJoystickPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
-      if (pausedRef.current || inputDisabledRef.current) return;
-      if (joystickPointerIdRef.current !== null) return;
-      e.stopPropagation();
-      e.currentTarget.setPointerCapture(e.pointerId);
-      const rect = e.currentTarget.getBoundingClientRect();
-      joystickPointerIdRef.current = e.pointerId;
-      joystickOriginRef.current = {
-        x: rect.left + rect.width * 0.5,
-        y: rect.top + rect.height * 0.5,
-      };
-      updateJoystickFromEvent(e.clientX, e.clientY);
-    };
-
-    const handleJoystickPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
-      if (joystickPointerIdRef.current !== e.pointerId) return;
-      e.stopPropagation();
-      updateJoystickFromEvent(e.clientX, e.clientY);
-    };
-
-    const handleJoystickPointerEnd = (e: ReactPointerEvent<HTMLDivElement>) => {
-      if (joystickPointerIdRef.current !== e.pointerId) return;
-      e.stopPropagation();
-      if (e.currentTarget.hasPointerCapture(e.pointerId)) {
-        e.currentTarget.releasePointerCapture(e.pointerId);
-      }
-      joystickPointerIdRef.current = null;
-      touchMoveRef.current = { x: 0, y: 0 };
-      if (joystickKnobRef.current) {
-        joystickKnobRef.current.style.transform = 'translate3d(0px, 0px, 0px)';
-      }
-    };
-
     const handleDashTouchDown = (e: ReactPointerEvent<HTMLButtonElement>) => {
+      e.preventDefault();
       e.stopPropagation();
       if (pausedRef.current || inputDisabledRef.current) return;
       dashPressedRef.current = true;
+    };
+
+    const handleAutoAimTouchDown = (e: ReactPointerEvent<HTMLButtonElement>) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (pausedRef.current || inputDisabledRef.current) return;
+      onAutoAimChangeRef.current(!autoAimRef.current);
     };
 
     return (
@@ -1249,48 +1175,57 @@ export const SurvivalCanvas = forwardRef<SurvivalCanvasHandle, SurvivalCanvasPro
 
         {showTouchControls && (
           <>
-            {/* Bottom-left translucent Virtual Joystick */}
-            <div
-              onPointerDown={handleJoystickPointerDown}
-              onPointerMove={handleJoystickPointerMove}
-              onPointerUp={handleJoystickPointerEnd}
-              onPointerCancel={handleJoystickPointerEnd}
-              onLostPointerCapture={handleJoystickPointerEnd}
-              role="application"
-              aria-label="Cần điều khiển di chuyển"
-              className="pointer-events-auto fixed bottom-6 left-5 z-20 flex h-28 w-28 touch-none items-center justify-center rounded-full border-2 border-white/25 bg-slate-900/45 shadow-lg backdrop-blur-xs"
-            >
-              <div className="pointer-events-none h-20 w-20 rounded-full border border-white/15" />
-              <div
-                ref={joystickKnobRef}
-                className="pointer-events-none absolute h-12 w-12 rounded-full border-2 border-amber-200/80 bg-amber-400/75 shadow-md"
-              />
-            </div>
+            {/* Bottom-left Tablet D-pad */}
+            <TouchDpad
+              enabled={!paused && !isInputDisabled}
+              onChange={(vec) => {
+                touchMoveRef.current = vec;
+                dpadActiveRef.current = vec.x !== 0 || vec.y !== 0;
+              }}
+              accent="emerald"
+              className="fixed bottom-5 left-5 z-20"
+            />
 
-            {/* Bottom-right circular Dash Button */}
-            <button
-              type="button"
-              onPointerDown={handleDashTouchDown}
-              aria-label="Lướt nhanh (Dash)"
-              className="pointer-events-auto fixed right-5 bottom-8 z-20 flex h-16 w-16 touch-none items-center justify-center rounded-full border-2 border-cyan-200/80 bg-cyan-500/45 text-xs font-black tracking-wide text-white shadow-lg backdrop-blur-xs active:scale-95"
-            >
-              <span className="flex flex-col items-center leading-none">
-                <svg
-                  viewBox="0 0 24 24"
-                  className="mb-0.5 h-5 w-5"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.4"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="M5 12h11" />
-                  <path d="M12 5l7 7-7 7" />
-                </svg>
-                <span>DASH</span>
-              </span>
-            </button>
+            {/* Bottom-right Tablet Skill Cluster: Auto-Aim + Dash */}
+            <div className="pointer-events-auto fixed right-5 bottom-6 z-20 flex flex-col items-end gap-2.5">
+              <button
+                type="button"
+                onPointerDown={handleAutoAimTouchDown}
+                aria-label={autoAim ? 'Tắt tự ngắm' : 'Bật tự ngắm'}
+                aria-pressed={autoAim}
+                className={`flex min-h-[44px] touch-none items-center gap-1.5 rounded-full border-2 px-3.5 py-2 text-[11px] font-black shadow-lg backdrop-blur-xs active:scale-95 ${
+                  autoAim
+                    ? 'border-emerald-300/80 bg-emerald-500/45 text-emerald-50'
+                    : 'border-white/30 bg-slate-900/75 text-slate-200'
+                }`}
+              >
+                <span>{autoAim ? 'Tự ngắm: BẬT' : 'Tự ngắm: TẮT'}</span>
+              </button>
+
+              <button
+                type="button"
+                onPointerDown={handleDashTouchDown}
+                aria-label="Lướt nhanh (Dash)"
+                className="flex h-[72px] w-[72px] touch-none items-center justify-center rounded-full border-2 border-cyan-200/80 bg-cyan-500/45 text-xs font-black tracking-wide text-white shadow-lg backdrop-blur-xs active:scale-95"
+              >
+                <span className="flex flex-col items-center leading-none">
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="mb-0.5 h-5 w-5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.4"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M5 12h11" />
+                    <path d="M12 5l7 7-7 7" />
+                  </svg>
+                  <span>DASH</span>
+                </span>
+              </button>
+            </div>
           </>
         )}
       </div>

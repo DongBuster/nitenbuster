@@ -430,7 +430,7 @@ export function SurvivalHud({
         <section
           aria-label="Trạng thái nhân vật"
           className={`w-[min(21.5rem,calc(100vw-1.5rem))] rounded-3xl border border-amber-400/35 bg-[#121826]/90 p-2.5 text-white shadow-2xl backdrop-blur-md sm:p-3 ${
-            touchControlsActive ? 'mb-32' : ''
+            touchControlsActive ? 'mb-44' : ''
           }`}
         >
           <div className="flex items-center justify-between gap-2">

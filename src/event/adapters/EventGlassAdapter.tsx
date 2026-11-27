@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { CheckCircle2, ShieldAlert, Users } from 'lucide-react';
+import { TouchDpad } from '../../components/TouchDpad';
 import { getDefaultMapPackId } from '../../coop/maps/registry';
+import { CoopSkillBar } from '../../coop/ui/CoopSkillBar';
+import { setVirtualMoveDpad } from '../../glass/input/coopVirtualInput';
 import { createGlassInputSender } from '../../glass/online/inputSync';
 import {
   type CoopSnapshotPayload,
@@ -16,6 +19,7 @@ import { GLASS_MAX_HP } from '../../glass/sim/constants';
 import { GLASS_COURSE } from '../../glass/sim/course';
 import type { PlayerInput } from '../../glass/sim/types';
 import { getSupabaseClient } from '../../online/supabaseClient';
+import { useDeviceFormFactor } from '../../utils/useDeviceFormFactor';
 import type { GlassPairAssignment } from '../protocol';
 import { rankEventRound } from '../scoring';
 import type { EventAdapterProps } from './types';
@@ -458,6 +462,8 @@ export function EventGlassAdapter({
     ],
   );
 
+  const isTablet = useDeviceFormFactor() === 'tablet';
+  const controlsEnabled = localPhase === 'playing' && hud.shatterTimer <= 0;
   const sortedTeams = useMemo(() => {
     return Object.values(teamProgress).sort((a, b) => {
       if (a.finished !== b.finished) return a.finished ? -1 : 1;
@@ -535,6 +541,39 @@ export function EventGlassAdapter({
             })}
           </ul>
         </div>
+      </div>
+
+      {/* Bottom controls (+ left D-pad on tablet) */}
+      <div className="safe-bottom-bar pointer-events-none fixed inset-x-0 bottom-0 z-20 px-3 pb-3">
+        {isTablet ? (
+          <div className="flex w-full items-end justify-between gap-3">
+            <TouchDpad
+              enabled={controlsEnabled}
+              onChange={(_, dirs) => setVirtualMoveDpad(dirs)}
+              accent="cyan"
+            />
+            <CoopSkillBar
+              mapId="glass_carry"
+              mySlot={effectiveIsHost ? 'p1' : 'p2'}
+              hud={hud}
+              controlsEnabled={controlsEnabled}
+              onSendEmote={() => {}}
+              compact
+              showEmotes={false}
+            />
+          </div>
+        ) : (
+          <div className="flex justify-center">
+            <CoopSkillBar
+              mapId="glass_carry"
+              mySlot={effectiveIsHost ? 'p1' : 'p2'}
+              hud={hud}
+              controlsEnabled={controlsEnabled}
+              onSendEmote={() => {}}
+              showEmotes={false}
+            />
+          </div>
+        )}
       </div>
 
       {/* Finished waiting overlay */}

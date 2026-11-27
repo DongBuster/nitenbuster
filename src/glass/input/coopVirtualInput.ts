@@ -5,7 +5,9 @@ export type CoopVirtualSkillKey =
   | 'liftDown'
   | 'jump'
   | 'moveLeft'
-  | 'moveRight';
+  | 'moveRight'
+  | 'moveForward'
+  | 'moveBackward';
 
 export interface CoopPressedState {
   liftUp: boolean;
@@ -13,6 +15,8 @@ export interface CoopPressedState {
   jump: boolean;
   moveLeft: boolean;
   moveRight: boolean;
+  moveForward: boolean;
+  moveBackward: boolean;
 }
 
 const ALL_KEYS: readonly CoopVirtualSkillKey[] = [
@@ -21,6 +25,8 @@ const ALL_KEYS: readonly CoopVirtualSkillKey[] = [
   'jump',
   'moveLeft',
   'moveRight',
+  'moveForward',
+  'moveBackward',
 ];
 
 const EMPTY_PRESSED: CoopPressedState = {
@@ -29,6 +35,8 @@ const EMPTY_PRESSED: CoopPressedState = {
   jump: false,
   moveLeft: false,
   moveRight: false,
+  moveForward: false,
+  moveBackward: false,
 };
 
 const virtualHolds: CoopPressedState = { ...EMPTY_PRESSED };
@@ -38,6 +46,8 @@ const virtualPulseUntil: Record<CoopVirtualSkillKey, number> = {
   jump: 0,
   moveLeft: 0,
   moveRight: 0,
+  moveForward: 0,
+  moveBackward: 0,
 };
 const keyboardMirror: CoopPressedState = { ...EMPTY_PRESSED };
 
@@ -62,7 +72,9 @@ function statesEqual(a: CoopPressedState, b: CoopPressedState): boolean {
     a.liftDown === b.liftDown &&
     a.jump === b.jump &&
     a.moveLeft === b.moveLeft &&
-    a.moveRight === b.moveRight
+    a.moveRight === b.moveRight &&
+    a.moveForward === b.moveForward &&
+    a.moveBackward === b.moveBackward
   );
 }
 
@@ -74,6 +86,10 @@ function computeCombined(nowMs: number): CoopPressedState {
     moveLeft: keyboardMirror.moveLeft || isVirtualKeyActive('moveLeft', nowMs),
     moveRight:
       keyboardMirror.moveRight || isVirtualKeyActive('moveRight', nowMs),
+    moveForward:
+      keyboardMirror.moveForward || isVirtualKeyActive('moveForward', nowMs),
+    moveBackward:
+      keyboardMirror.moveBackward || isVirtualKeyActive('moveBackward', nowMs),
   };
 }
 
@@ -91,6 +107,25 @@ export function setVirtualHold(
 ): void {
   if (virtualHolds[key] === held) return;
   virtualHolds[key] = held;
+  emitIfChanged(nowMs);
+}
+
+export function setVirtualMoveDpad(
+  dirs: { up: boolean; down: boolean; left: boolean; right: boolean },
+  nowMs?: number,
+): void {
+  if (
+    virtualHolds.moveForward === dirs.up &&
+    virtualHolds.moveBackward === dirs.down &&
+    virtualHolds.moveLeft === dirs.left &&
+    virtualHolds.moveRight === dirs.right
+  ) {
+    return;
+  }
+  virtualHolds.moveForward = dirs.up;
+  virtualHolds.moveBackward = dirs.down;
+  virtualHolds.moveLeft = dirs.left;
+  virtualHolds.moveRight = dirs.right;
   emitIfChanged(nowMs);
 }
 
@@ -141,6 +176,8 @@ export function setKeyboardPressedMirror(
   keyboardMirror.jump = next.jump;
   keyboardMirror.moveLeft = next.moveLeft;
   keyboardMirror.moveRight = next.moveRight;
+  keyboardMirror.moveForward = next.moveForward;
+  keyboardMirror.moveBackward = next.moveBackward;
   emitIfChanged(nowMs);
 }
 
@@ -152,7 +189,10 @@ export function readVirtualInput(nowMs?: number): PlayerInput {
   const currentNow = getNowMs(nowMs);
   const left = isVirtualKeyActive('moveLeft', currentNow);
   const right = isVirtualKeyActive('moveRight', currentNow);
+  const forward = isVirtualKeyActive('moveForward', currentNow);
+  const backward = isVirtualKeyActive('moveBackward', currentNow);
   const moveX = (left ? 1 : 0) + (right ? -1 : 0);
+  const moveZ = (forward ? 1 : 0) + (backward ? -1 : 0);
   const jump = isVirtualKeyActive('jump', currentNow);
   const liftUp = isVirtualKeyActive('liftUp', currentNow);
   const liftDown = isVirtualKeyActive('liftDown', currentNow);
@@ -161,7 +201,7 @@ export function readVirtualInput(nowMs?: number): PlayerInput {
 
   return {
     moveX,
-    moveZ: 0,
+    moveZ,
     jump,
     lift,
   };

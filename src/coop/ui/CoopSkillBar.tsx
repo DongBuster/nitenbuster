@@ -34,6 +34,8 @@ export interface CoopSkillBarProps {
   hud: GlassHudSnapshot;
   controlsEnabled: boolean;
   onSendEmote: (emoteIndex: number) => void;
+  compact?: boolean;
+  showEmotes?: boolean;
 }
 
 interface CoopSkillSlot {
@@ -67,6 +69,8 @@ export function CoopSkillBar({
   hud,
   controlsEnabled,
   onSendEmote,
+  compact = false,
+  showEmotes = true,
 }: CoopSkillBarProps) {
   const toolbarRef = useRef<HTMLDivElement | null>(null);
   const [pressed, setPressed] = useState<CoopPressedState>(() =>
@@ -430,13 +434,19 @@ export function CoopSkillBar({
       role="toolbar"
       aria-label="Thanh chiêu thức và biểu cảm phối hợp"
       {...({ focusgroup: 'toolbar wrap' } as Record<string, string>)}
-      className="pointer-events-auto flex flex-wrap items-center justify-center gap-2 rounded-2xl border border-cyan-400/35 bg-[#0e1827]/92 px-3 py-2 text-white shadow-2xl backdrop-blur-md"
+      className={`pointer-events-auto flex flex-wrap items-center gap-2 rounded-2xl border border-cyan-400/35 bg-[#0e1827]/92 text-white shadow-2xl backdrop-blur-md ${
+        compact
+          ? 'max-w-[280px] flex-col items-end gap-1.5 p-2'
+          : 'justify-center px-3 py-2'
+      }`}
     >
       {/* Skill Buttons Group */}
       <div
         role="group"
         aria-label="Chiêu thức hành động"
-        className="flex flex-wrap items-center justify-center gap-1.5"
+        className={`flex flex-wrap items-center gap-1.5 ${
+          compact ? 'justify-end' : 'justify-center'
+        }`}
       >
         {skills.map((skill) => {
           const isHold = skill.mode === 'hold';
@@ -517,47 +527,53 @@ export function CoopSkillBar({
         })}
       </div>
 
-      {/* Border-drawn separator (visible under forced-colors) */}
-      <span
-        role="separator"
-        aria-orientation="vertical"
-        className="hidden h-10 border-l border-white/15 sm:block"
-      />
+      {showEmotes && (
+        <>
+          {/* Border-drawn separator (visible under forced-colors) */}
+          {!compact && (
+            <span
+              role="separator"
+              aria-orientation="vertical"
+              className="hidden h-10 border-l border-white/15 sm:block"
+            />
+          )}
 
-      {/* Compact 4-Slot Emote Buttons Group */}
-      <div
-        role="group"
-        aria-label="Biểu cảm nhanh"
-        className="flex items-center justify-center gap-1"
-      >
-        {GLASS_EMOTES.map((emote, index) => (
-          <button
-            key={emote.id}
-            type="button"
-            title={`${emote.text} (Phím ${emote.id})`}
-            aria-label={`Gửi emote ${emote.text} (phím ${emote.id})`}
-            onPointerDown={(e) => {
-              e.preventDefault();
-              playSfx('click');
-              onSendEmote(index);
-            }}
-            onClick={(e) => {
-              if (e.detail !== 0) return;
-              e.currentTarget.blur();
-              playSfx('click');
-              onSendEmote(index);
-            }}
-            className={`relative flex min-h-[48px] min-w-[44px] cursor-pointer touch-manipulation select-none flex-col items-center justify-between rounded-xl border border-cyan-400/25 bg-[#152438]/90 px-1.5 py-1.5 text-white shadow-[0_3px_0_rgba(0,0,0,0.4)] transition-[transform,border-color,background-color] duration-75 hover:border-cyan-300 hover:bg-cyan-500/20 active:translate-y-0.5 motion-reduce:transition-none motion-reduce:active:translate-y-0 ${FOCUS_RING_CLASS}`}
+          {/* Compact 4-Slot Emote Buttons Group */}
+          <div
+            role="group"
+            aria-label="Biểu cảm nhanh"
+            className="flex items-center justify-center gap-1"
           >
-            <kbd className="self-start rounded bg-black/50 px-1 py-0.5 font-mono text-[9px] font-black leading-none text-amber-200">
-              {emote.id}
-            </kbd>
-            <span aria-hidden="true" className="text-base leading-none">
-              {emote.icon}
-            </span>
-          </button>
-        ))}
-      </div>
+            {GLASS_EMOTES.map((emote, index) => (
+              <button
+                key={emote.id}
+                type="button"
+                title={`${emote.text} (Phím ${emote.id})`}
+                aria-label={`Gửi emote ${emote.text} (phím ${emote.id})`}
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  playSfx('click');
+                  onSendEmote(index);
+                }}
+                onClick={(e) => {
+                  if (e.detail !== 0) return;
+                  e.currentTarget.blur();
+                  playSfx('click');
+                  onSendEmote(index);
+                }}
+                className={`relative flex min-h-[48px] min-w-[44px] cursor-pointer touch-manipulation select-none flex-col items-center justify-between rounded-xl border border-cyan-400/25 bg-[#152438]/90 px-1.5 py-1.5 text-white shadow-[0_3px_0_rgba(0,0,0,0.4)] transition-[transform,border-color,background-color] duration-75 hover:border-cyan-300 hover:bg-cyan-500/20 active:translate-y-0.5 motion-reduce:transition-none motion-reduce:active:translate-y-0 ${FOCUS_RING_CLASS}`}
+              >
+                <kbd className="self-start rounded bg-black/50 px-1 py-0.5 font-mono text-[9px] font-black leading-none text-amber-200">
+                  {emote.id}
+                </kbd>
+                <span aria-hidden="true" className="text-base leading-none">
+                  {emote.icon}
+                </span>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }

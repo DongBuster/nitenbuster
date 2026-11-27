@@ -24,6 +24,7 @@ export interface BrawlSkillBarProps {
   pressedSkills: PressedSkillState;
   onTriggerSkill: (skill: 'punch' | 'headbutt' | 'roll' | 'jump') => void;
   onVirtualHold: (skill: 'grab' | 'sprint', held: boolean) => void;
+  compact?: boolean;
 }
 
 interface SkillSlotDescriptor {
@@ -53,6 +54,7 @@ export function BrawlSkillBar({
   pressedSkills,
   onTriggerSkill,
   onVirtualHold,
+  compact = false,
 }: BrawlSkillBarProps) {
   const [sprintToggled, setSprintToggled] = useState(false);
   const toolbarRef = useRef<HTMLDivElement | null>(null);
@@ -306,7 +308,11 @@ export function BrawlSkillBar({
   return (
     <div
       data-brawl-ui="true"
-      className="pointer-events-auto flex w-full max-w-[332px] flex-wrap items-center justify-center gap-2.5 rounded-2xl border border-white/15 bg-slate-950/90 px-3 py-2.5 text-xs text-white shadow-2xl backdrop-blur-md sm:w-auto sm:max-w-none sm:px-3.5"
+      className={`pointer-events-auto flex flex-wrap items-center justify-center gap-2.5 rounded-2xl border border-white/15 bg-slate-950/90 px-3 py-2.5 text-xs text-white shadow-2xl backdrop-blur-md ${
+        compact
+          ? 'w-[244px] flex-col items-stretch gap-2 p-2.5'
+          : 'w-full max-w-[332px] sm:w-auto sm:max-w-none sm:px-3.5'
+      }`}
     >
       {/* Balance / Stun Meter */}
       <div className="flex flex-col gap-1">
@@ -322,7 +328,11 @@ export function BrawlSkillBar({
             {Math.round(balancePct)}%
           </span>
         </div>
-        <div className="h-2 w-28 overflow-hidden rounded-full bg-white/15 sm:w-32">
+        <div
+          className={`h-2 overflow-hidden rounded-full bg-white/15 ${
+            compact ? 'w-full' : 'w-28 sm:w-32'
+          }`}
+        >
           <div
             className={`h-full transition-[width,background-color] duration-150 motion-reduce:transition-none ${
               hud.playerStunned || balancePct < 35
@@ -336,11 +346,13 @@ export function BrawlSkillBar({
         </div>
       </div>
 
-      <span
-        role="separator"
-        aria-orientation="vertical"
-        className="hidden h-10 w-px bg-white/15 sm:block"
-      />
+      {!compact && (
+        <span
+          role="separator"
+          aria-orientation="vertical"
+          className="hidden h-10 w-px bg-white/15 sm:block"
+        />
+      )}
 
       {/* 6-Button Skill Bar */}
       <div
@@ -348,7 +360,11 @@ export function BrawlSkillBar({
         role="toolbar"
         aria-label="Thanh chiêu thức chiến đấu"
         {...({ focusgroup: 'toolbar wrap' } as Record<string, string>)}
-        className="grid w-full grid-cols-3 gap-1.5 sm:flex sm:w-auto sm:flex-wrap sm:items-center sm:justify-center"
+        className={
+          compact
+            ? 'grid w-full grid-cols-3 gap-1.5'
+            : 'grid w-full grid-cols-3 gap-1.5 sm:flex sm:w-auto sm:flex-wrap sm:items-center sm:justify-center'
+        }
       >
         {skills.map((skill) => {
           const isCooling = skill.readyPct < 0.99;

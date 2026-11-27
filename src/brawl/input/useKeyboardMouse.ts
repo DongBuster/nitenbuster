@@ -39,6 +39,7 @@ export function useKeyboardMouse(enabled: boolean) {
   const emoteQueuedRef = useRef<EmoteKind | null>(null);
   const virtualGrabRef = useRef<boolean>(false);
   const virtualSprintRef = useRef<boolean>(false);
+  const virtualMoveRef = useRef<{ x: number; z: number }>({ x: 0, z: 0 });
   const pulseTimersRef = useRef<Partial<Record<keyof PressedSkillState, number>>>({});
   const enabledRef = useRef<boolean>(enabled);
   enabledRef.current = enabled;
@@ -78,6 +79,7 @@ export function useKeyboardMouse(enabled: boolean) {
     emoteQueuedRef.current = null;
     virtualGrabRef.current = false;
     virtualSprintRef.current = false;
+    virtualMoveRef.current = { x: 0, z: 0 };
     for (const timer of Object.values(pulseTimersRef.current)) {
       if (timer !== undefined) window.clearTimeout(timer);
     }
@@ -120,6 +122,11 @@ export function useKeyboardMouse(enabled: boolean) {
     },
     [setSkillVisual],
   );
+
+  const setVirtualMove = useCallback((moveX: number, moveZ: number) => {
+    if (!enabledRef.current && (moveX !== 0 || moveZ !== 0)) return;
+    virtualMoveRef.current = { x: moveX, z: moveZ };
+  }, []);
 
   useEffect(() => {
     if (!enabled) {
@@ -236,18 +243,18 @@ export function useKeyboardMouse(enabled: boolean) {
 
   const consumeInput = useCallback((): FighterInput => {
     const keys = keysRef.current;
-    let moveX = 0;
-    let moveZ = 0;
+    let moveX = virtualMoveRef.current.x;
+    let moveZ = virtualMoveRef.current.z;
 
     if (keys.has('KeyW') || keys.has('ArrowUp')) moveZ -= 1;
     if (keys.has('KeyS') || keys.has('ArrowDown')) moveZ += 1;
     if (keys.has('KeyA') || keys.has('ArrowLeft')) moveX -= 1;
     if (keys.has('KeyD') || keys.has('ArrowRight')) moveX += 1;
 
-    if (moveX !== 0 && moveZ !== 0) {
-      const inv = 1 / Math.SQRT2;
-      moveX *= inv;
-      moveZ *= inv;
+    const moveLen = Math.hypot(moveX, moveZ);
+    if (moveLen > 1) {
+      moveX /= moveLen;
+      moveZ /= moveLen;
     }
 
     const nowMs = performance.now();
@@ -287,5 +294,11 @@ export function useKeyboardMouse(enabled: boolean) {
     };
   }, []);
 
-  return { consumeInput, pressedSkills, triggerSkill, setVirtualHold };
+  return {
+    consumeInput,
+    pressedSkills,
+    triggerSkill,
+    setVirtualHold,
+    setVirtualMove,
+  };
 }

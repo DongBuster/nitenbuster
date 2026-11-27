@@ -79,8 +79,13 @@ export function BrawlScreen({
   const recordedRef = useRef<boolean>(false);
 
   const controlsEnabled = match.phase === 'fighting' && !paused;
-  const { consumeInput, pressedSkills, triggerSkill, setVirtualHold } =
-    useKeyboardMouse(controlsEnabled);
+  const {
+    consumeInput,
+    pressedSkills,
+    triggerSkill,
+    setVirtualHold,
+    setVirtualMove,
+  } = useKeyboardMouse(controlsEnabled);
 
   // Sync audio preferences
   useEffect(() => {
@@ -215,6 +220,7 @@ export function BrawlScreen({
           pressedSkills={pressedSkills}
           onTriggerSkill={triggerSkill}
           onVirtualHold={setVirtualHold}
+          onVirtualMove={setVirtualMove}
           sfxEnabled={settings.sfxEnabled}
           onToggleSfx={() =>
             updateSettings({ sfxEnabled: !settings.sfxEnabled })

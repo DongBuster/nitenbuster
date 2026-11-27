@@ -15,6 +15,8 @@ import {
 } from 'lucide-react';
 import { playSfx } from '../../audio/soundEngine';
 import { AnimalAvatar } from '../../components/AnimalAvatar';
+import { TouchDpad } from '../../components/TouchDpad';
+import { useDeviceFormFactor } from '../../utils/useDeviceFormFactor';
 import { getSortedStandings } from '../sim/matchStore';
 import type { HudSnapshot, MatchState, PressedSkillState } from '../sim/types';
 import { BrawlSkillBar } from './BrawlSkillBar';
@@ -27,6 +29,7 @@ export interface BrawlHudProps {
   pressedSkills: PressedSkillState;
   onTriggerSkill: (skill: 'punch' | 'headbutt' | 'roll' | 'jump') => void;
   onVirtualHold: (skill: 'grab' | 'sprint', held: boolean) => void;
+  onVirtualMove?: (moveX: number, moveZ: number) => void;
   sfxEnabled: boolean;
   onToggleSfx: () => void;
   onTogglePause: () => void;
@@ -46,6 +49,7 @@ export function BrawlHud({
   pressedSkills,
   onTriggerSkill,
   onVirtualHold,
+  onVirtualMove,
   sfxEnabled,
   onToggleSfx,
   onTogglePause,
@@ -57,6 +61,7 @@ export function BrawlHud({
   exitLabel = 'Thoát',
 }: BrawlHudProps) {
   const [showHelp, setShowHelp] = useState(false);
+  const isTablet = useDeviceFormFactor() === 'tablet';
   const topScores = getSortedStandings(match.scores).slice(0, 4);
 
   return (
@@ -338,7 +343,7 @@ export function BrawlHud({
       )}
 
       {/* BOTTOM PLAYER STATUS DOCK */}
-      <footer className="flex flex-col items-center gap-2">
+      <footer className="flex w-full flex-col items-center gap-2">
         {!hud.playerAlive && match.phase === 'fighting' && (
           <div className="inline-flex items-center gap-2 rounded-full border border-rose-300/60 bg-rose-950/90 px-4 py-1.5 text-xs font-black text-rose-100 shadow-xl">
             <ShieldAlert className="h-4 w-4 text-rose-400" />
@@ -346,13 +351,31 @@ export function BrawlHud({
           </div>
         )}
 
-        <BrawlSkillBar
-          hud={hud}
-          controlsEnabled={controlsEnabled}
-          pressedSkills={pressedSkills}
-          onTriggerSkill={onTriggerSkill}
-          onVirtualHold={onVirtualHold}
-        />
+        {isTablet && onVirtualMove ? (
+          <div className="flex w-full items-end justify-between gap-3">
+            <TouchDpad
+              enabled={controlsEnabled}
+              onChange={(vec) => onVirtualMove(vec.x, vec.y)}
+              accent="amber"
+            />
+            <BrawlSkillBar
+              hud={hud}
+              controlsEnabled={controlsEnabled}
+              pressedSkills={pressedSkills}
+              onTriggerSkill={onTriggerSkill}
+              onVirtualHold={onVirtualHold}
+              compact
+            />
+          </div>
+        ) : (
+          <BrawlSkillBar
+            hud={hud}
+            controlsEnabled={controlsEnabled}
+            pressedSkills={pressedSkills}
+            onTriggerSkill={onTriggerSkill}
+            onVirtualHold={onVirtualHold}
+          />
+        )}
       </footer>
     </div>
   );

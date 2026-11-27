@@ -76,6 +76,8 @@ export function useGlassInput({
       jump: keys.has('Space'),
       moveLeft: keys.has('KeyA') || keys.has('ArrowLeft'),
       moveRight: keys.has('KeyD') || keys.has('ArrowRight'),
+      moveForward: keys.has('KeyW') || keys.has('ArrowUp'),
+      moveBackward: keys.has('KeyS') || keys.has('ArrowDown'),
     });
   }, []);
 
@@ -89,6 +91,8 @@ export function useGlassInput({
       jump: false,
       moveLeft: false,
       moveRight: false,
+      moveForward: false,
+      moveBackward: false,
     });
   }, []);
 
@@ -188,7 +192,7 @@ export function useGlassInput({
     const virtual = readVirtualInput();
 
     let moveX = virtual.moveX;
-    let moveZ = 0;
+    let moveZ = virtual.moveZ;
 
     if (keys.has('KeyW') || keys.has('ArrowUp')) moveZ += 1;
     if (keys.has('KeyS') || keys.has('ArrowDown')) moveZ -= 1;
@@ -196,6 +200,7 @@ export function useGlassInput({
     if (keys.has('KeyA') || keys.has('ArrowLeft')) moveX += 1;
 
     moveX = Math.max(-1, Math.min(1, moveX));
+    moveZ = Math.max(-1, Math.min(1, moveZ));
 
     if (moveX !== 0 && moveZ !== 0) {
       const inv = 1 / Math.SQRT2;

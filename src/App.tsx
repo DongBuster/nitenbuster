@@ -8,6 +8,8 @@ import { OnlineGame3DScreen } from './screens/OnlineGame3DScreen';
 import { ModeSelectScreen } from './screens/ModeSelectScreen';
 import { normalizeRoomCode } from './online/sanitize';
 import { useOnlineRoom } from './online/useOnlineRoom';
+import { MobileBlockScreen } from './components/MobileBlockScreen';
+import { useDeviceFormFactor } from './utils/useDeviceFormFactor';
 
 const LazyBrawlScreen = lazy(() => import('./screens/BrawlScreen'));
 const LazyBlockBlastScreen = lazy(() => import('./screens/BlockBlastScreen'));
@@ -151,6 +153,7 @@ function readInitialRoomCodeParam(paramName: string): string {
 }
 
 export function App() {
+  const formFactor = useDeviceFormFactor();
   const [initialBbRoomCode] = useState<string>(() =>
     readInitialRoomCodeParam('bbRoom'),
   );
@@ -222,6 +225,10 @@ export function App() {
     initialGlassRoomCode,
     initialSurvivalRoomCode,
   ]);
+
+  if (formFactor === 'mobile') {
+    return <MobileBlockScreen />;
+  }
 
   return (
     <div className="relative min-h-dvh">
