@@ -1,5 +1,6 @@
 import { ArrowRight, Crown, Medal, Sparkles, Trophy } from 'lucide-react';
 import { playSfx } from '../../audio/soundEngine';
+import { AnimalAvatar } from '../../components/AnimalAvatar';
 import { ANIMALS } from '../../engine/types';
 import {
   EVENT_GAME_META,
@@ -116,10 +117,7 @@ export function EventRoundResult({
                       >
                         #{r.rank}
                       </span>
-                      <span
-                        className="h-3 w-3 shrink-0 rounded-full ring-2 ring-white/25"
-                        style={{ backgroundColor: animalMeta.accentHex }}
-                      />
+                      <AnimalAvatar animal={animalMeta.id} size="sm" />
                       <div className="min-w-0">
                         <div className="truncate text-sm font-black text-white">
                           {m?.name ?? r.peerId} {isMe ? '(Bạn)' : ''}
@@ -162,10 +160,7 @@ export function EventRoundResult({
                       <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-black/45 text-xs font-black text-amber-300">
                         {idx === 0 ? <Crown className="h-4 w-4 text-amber-400" /> : `#${idx + 1}`}
                       </span>
-                      <span
-                        className="h-3 w-3 shrink-0 rounded-full ring-2 ring-white/25"
-                        style={{ backgroundColor: animalMeta.accentHex }}
-                      />
+                      <AnimalAvatar animal={animalMeta.id} size="sm" />
                       <div className="min-w-0">
                         <div className="truncate text-sm font-black text-white">
                           {s.name} {isMe ? '(Bạn)' : ''}

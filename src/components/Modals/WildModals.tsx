@@ -9,17 +9,7 @@ import {
   type Player,
 } from '../../engine/types';
 import { CARD_META, COLOR_THEME } from '../Card/cardMeta';
-
-const ANIMAL_EMOJI: Record<AnimalId, string> = {
-  dog: '🐶',
-  cat: '🐱',
-  duck: '🦆',
-  shark: '🦈',
-  dino: '🦖',
-  panda: '🐼',
-  chicken: '🐔',
-  bunny: '🐰',
-};
+import { AnimalAvatar } from '../AnimalAvatar';
 
 function AnimalBadge({
   animal,
@@ -31,24 +21,18 @@ function AnimalBadge({
   highlight?: boolean;
 }) {
   const meta = ANIMALS.find((a) => a.id === animal) ?? ANIMALS[0];
-  const dims =
-    size === 'sm'
-      ? 'h-10 w-10 text-lg'
-      : size === 'lg'
-        ? 'h-24 w-24 text-5xl'
-        : 'h-14 w-14 text-2xl';
+  const avatarSize = size === 'sm' ? 'md' : size === 'lg' ? '2xl' : 'xl';
 
   return (
     <div
-      className={`flex shrink-0 items-center justify-center rounded-2xl border-2 shadow-md ${dims} ${
-        highlight ? 'border-amber-300 ring-4 ring-amber-400/35' : 'border-white/30'
-      }`}
-      style={{
-        background: `linear-gradient(145deg, ${meta.accentHex}, #1E293B)`,
-      }}
+      className="inline-flex shrink-0"
       title={`${meta.name} — ${meta.personality}`}
     >
-      <span aria-hidden="true">{ANIMAL_EMOJI[animal]}</span>
+      <AnimalAvatar
+        animal={animal}
+        size={avatarSize}
+        className={highlight ? 'ring-4 ring-amber-300/75' : 'ring-2 ring-white/35'}
+      />
     </div>
   );
 }

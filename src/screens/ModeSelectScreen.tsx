@@ -11,6 +11,7 @@ import {
   Users,
 } from 'lucide-react';
 import { playSfx } from '../audio/soundEngine';
+import { AnimalAvatar } from '../components/AnimalAvatar';
 import { MAX_COOP_STARS, countTotalCoopStars } from '../coop/maps/registry';
 import { ANIMALS } from '../engine/types';
 import { formatEquippedSummary } from '../scene3d/accessoryCatalog';
@@ -207,11 +208,8 @@ export function ModeSelectScreen({
 
             <div className="flex flex-wrap items-center gap-2 lg:shrink-0 lg:justify-end">
               {/* Active Character + Equipped Summary */}
-              <div className="inline-flex items-center gap-2 rounded-2xl border border-amber-900/50 bg-black/35 px-3.5 py-2 text-xs font-extrabold text-amber-100 shadow-inner">
-                <span
-                  className="h-3 w-3 rounded-full ring-2 ring-white/30"
-                  style={{ backgroundColor: animalMeta.accentHex }}
-                />
+              <div className="inline-flex items-center gap-2 rounded-2xl border border-amber-900/50 bg-black/35 px-3 py-1.5 text-xs font-extrabold text-amber-100 shadow-inner">
+                <AnimalAvatar animal={animalMeta.id} size="sm" />
                 <span>{animalMeta.name}</span>
                 {equippedSummary && (
                   <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[11px] font-bold text-emerald-200">

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AlertTriangle, Eye, LogOut, Trophy, X } from 'lucide-react';
 import { setAudioPreferences } from '../audio/soundEngine';
-import { ANIMALS } from '../engine/types';
+import { AnimalAvatar } from '../components/AnimalAvatar';
 import { EVENT_GAME_META } from '../event/protocol';
 import { formatSecondsClock } from '../event/scoring';
 import { EventBlockBlastAdapter } from '../event/adapters/EventBlockBlastAdapter';
@@ -99,26 +99,19 @@ export function EventRoomScreen({
               <Trophy className="h-3.5 w-3.5" />
               <span>Bảng Điểm Tổng Hiện Tại</span>
             </div>
-            {room.standings.map((s, idx) => {
-              const animalMeta =
-                ANIMALS.find((a) => a.id === s.animal) ?? ANIMALS[0];
-              return (
+            {room.standings.map((s, idx) => (
                 <div
                   key={s.peerId}
                   className="flex items-center justify-between rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-xs font-bold"
                 >
                   <div className="flex items-center gap-2">
                     <span className="font-black text-amber-300">#{idx + 1}</span>
-                    <span
-                      className="h-2.5 w-2.5 rounded-full"
-                      style={{ backgroundColor: animalMeta.accentHex }}
-                    />
+                    <AnimalAvatar animal={s.animal} size="xs" />
                     <span>{s.name}</span>
                   </div>
                   <span className="font-black text-amber-300">{s.totalPoints} đ</span>
                 </div>
-              );
-            })}
+              ))}
           </div>
 
           <button

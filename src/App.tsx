@@ -29,14 +29,26 @@ type AppScreen =
   | 'glassCarry'
   | 'event';
 
-function OnlineModeContainer({ onBackToMenu }: { onBackToMenu: () => void }) {
+function OnlineModeContainer({
+  initialRoomCode,
+  onBackToMenu,
+}: {
+  initialRoomCode?: string;
+  onBackToMenu: () => void;
+}) {
   const room = useOnlineRoom();
 
   if (room.phase === 'playing' && room.gameState) {
     return <OnlineGame3DScreen room={room} onBackToMenu={onBackToMenu} />;
   }
 
-  return <OnlineLobbyScreen room={room} onBackToMenu={onBackToMenu} />;
+  return (
+    <OnlineLobbyScreen
+      room={room}
+      initialRoomCode={initialRoomCode}
+      onBackToMenu={onBackToMenu}
+    />
+  );
 }
 
 interface ModeBoundaryProps {
@@ -148,8 +160,12 @@ export function App() {
   const [initialEventRoomCode] = useState<string>(() =>
     readInitialRoomCodeParam('eventRoom'),
   );
+  const [initialCardsRoomCode] = useState<string>(() =>
+    readInitialRoomCodeParam('cardsRoom'),
+  );
   const [screen, setScreen] = useState<AppScreen>(() => {
     if (initialEventRoomCode) return 'event';
+    if (initialCardsRoomCode) return 'online';
     if (initialBbRoomCode) return 'blockblastRoom';
     if (initialGlassRoomCode) return 'glassCarry';
     return 'modeSelect';
@@ -157,14 +173,17 @@ export function App() {
 
   useEffect(() => {
     if (
-      (!initialBbRoomCode && !initialGlassRoomCode && !initialEventRoomCode) ||
+      (!initialBbRoomCode &&
+        !initialGlassRoomCode &&
+        !initialEventRoomCode &&
+        !initialCardsRoomCode) ||
       typeof window === 'undefined'
     ) {
       return;
     }
     const params = new URLSearchParams(window.location.search);
     let changed = false;
-    for (const key of ['bbRoom', 'coopRoom', 'glassRoom', 'eventRoom']) {
+    for (const key of ['bbRoom', 'coopRoom', 'glassRoom', 'eventRoom', 'cardsRoom']) {
       if (params.has(key)) {
         params.delete(key);
         changed = true;
@@ -175,7 +194,12 @@ export function App() {
       const nextUrl = `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ''}${window.location.hash}`;
       window.history.replaceState({}, '', nextUrl);
     }
-  }, [initialBbRoomCode, initialEventRoomCode, initialGlassRoomCode]);
+  }, [
+    initialBbRoomCode,
+    initialCardsRoomCode,
+    initialEventRoomCode,
+    initialGlassRoomCode,
+  ]);
 
   return (
     <div className="relative min-h-screen">
@@ -229,7 +253,10 @@ export function App() {
         <Game3DScreen onBackToMenu={() => setScreen('menu')} />
       )}
       {screen === 'online' && (
-        <OnlineModeContainer onBackToMenu={() => setScreen('menu')} />
+        <OnlineModeContainer
+          initialRoomCode={initialCardsRoomCode}
+          onBackToMenu={() => setScreen('menu')}
+        />
       )}
       {screen === 'studio3d' && <Showcase3D />}
 

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Cookie, Crown, Home, RotateCcw, Trophy } from 'lucide-react';
 import { playSfx } from '../../audio/soundEngine';
+import { AnimalAvatar } from '../../components/AnimalAvatar';
 import { ANIMALS } from '../../engine/types';
 import { useProfileStore } from '../../store/profileStore';
 import {
@@ -105,12 +106,11 @@ export function EventFinalPodium({
                       Hạng #{rank}
                     </span>
                   )}
-                  <div
-                    className="mt-1 flex h-12 w-12 items-center justify-center rounded-2xl border-2 border-white/30 text-sm font-black text-white shadow-inner"
-                    style={{ backgroundColor: animalMeta.accentHex }}
-                  >
-                    {animalMeta.name.slice(0, 2).toUpperCase()}
-                  </div>
+                  <AnimalAvatar
+                    animal={animalMeta.id}
+                    size="xl"
+                    className="mt-1"
+                  />
                   <h2 className="mt-2 font-display text-xl font-black text-white">
                     {entry.name}
                     {entry.peerId === myPeerId ? ' (Bạn)' : ''}

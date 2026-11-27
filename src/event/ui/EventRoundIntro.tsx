@@ -1,4 +1,5 @@
 import { Clock, ShieldCheck, Sparkles, Users } from 'lucide-react';
+import { AnimalAvatar } from '../../components/AnimalAvatar';
 import { ANIMALS } from '../../engine/types';
 import {
   EVENT_GAME_META,
@@ -100,12 +101,9 @@ export function EventRoundIntro({
                           return (
                             <span
                               key={pid}
-                              className="inline-flex items-center gap-1 rounded-full bg-black/40 px-2 py-0.5 font-bold"
+                              className="inline-flex items-center gap-1.5 rounded-full bg-black/40 py-0.5 pl-1 pr-2 font-bold"
                             >
-                              <span
-                                className="h-2 w-2 rounded-full"
-                                style={{ backgroundColor: metaAnimal.accentHex }}
-                              />
+                              <AnimalAvatar animal={metaAnimal.id} size="xs" />
                               <span>
                                 {m?.name ?? pid}
                                 {pid === myPeerId ? ' (Bạn)' : ''}

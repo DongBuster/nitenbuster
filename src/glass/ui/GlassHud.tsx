@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { playSfx } from '../../audio/soundEngine';
 import { getCoopMapMeta, type CoopMapId } from '../../coop/maps/registry';
-import { GLASS_EMOTES } from '../online/protocol';
+import { CoopSkillBar } from '../../coop/ui/CoopSkillBar';
 import type { GlassRoomController } from '../online/useGlassRoom';
 import type { GlassHudSnapshot } from '../render/renderTypes';
 import type { ShatterReason } from '../sim/types';
@@ -617,47 +617,19 @@ export function GlassHud({
         )}
       </div>
 
-      {/* BOTTOM-CENTER: Dynamic Keybinds + 4 Clickable Emote Buttons */}
+      {/* BOTTOM-CENTER: Interactive Co-op Skill Bar + Emotes */}
       <footer className="flex flex-col items-center gap-2">
-        <div className="pointer-events-auto flex flex-wrap items-center justify-center gap-2 rounded-2xl border border-cyan-400/30 bg-[#0e1827]/90 px-3 py-2 shadow-xl backdrop-blur-md">
-          <div className="hidden items-center gap-2 pr-2 text-[11px] font-bold text-slate-300 md:flex md:border-r md:border-white/15">
-            {activeMapMeta.controls.slice(0, 4).map((ctrl, idx) => (
-              <span key={ctrl.keys} className="inline-flex items-center gap-1">
-                {idx > 0 && (
-                  <span aria-hidden="true" className="text-slate-500">
-                    ·
-                  </span>
-                )}
-                <kbd className="rounded bg-black/40 px-1 py-0.5 font-mono text-[10px] text-cyan-200">
-                  {ctrl.keys}
-                </kbd>
-                <span>{ctrl.label}</span>
-              </span>
-            ))}
-          </div>
-
-          <div className="flex flex-wrap items-center justify-center gap-1.5">
-            {GLASS_EMOTES.map((emote, index) => (
-              <button
-                key={emote.id}
-                type="button"
-                onClick={(e) => {
-                  e.currentTarget.blur();
-                  playSfx('click');
-                  room.sendEmote(index);
-                }}
-                aria-label={`Gửi emote ${emote.text} (phím ${emote.id})`}
-                className={`inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-cyan-400/30 bg-[#152438] px-2.5 py-1.5 text-xs font-extrabold text-white transition-colors hover:border-cyan-300 hover:bg-cyan-500/20 active:translate-y-0.5 motion-reduce:transition-none motion-reduce:active:translate-y-0 ${FOCUS_RING_CLASS}`}
-              >
-                <span aria-hidden="true">{emote.icon}</span>
-                <span className="hidden sm:inline">{emote.text}</span>
-                <kbd className="rounded bg-black/40 px-1 py-0.5 font-mono text-[10px] text-amber-200">
-                  {emote.id}
-                </kbd>
-              </button>
-            ))}
-          </div>
-        </div>
+        <CoopSkillBar
+          mapId={activeMapId}
+          mySlot={isHostSlot ? 'p1' : 'p2'}
+          hud={hud}
+          controlsEnabled={
+            room.phase === 'playing' &&
+            !isDisconnected &&
+            hud.shatterTimer <= 0
+          }
+          onSendEmote={room.sendEmote}
+        />
       </footer>
     </div>
   );

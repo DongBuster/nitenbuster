@@ -36,6 +36,7 @@ import {
 } from '../engine';
 import { GameTableScene3D } from '../scene3d/GameTableScene3D';
 import { CARD_META, COLOR_THEME, CardInfoButton } from '../components/Card';
+import { AnimalAvatar } from '../components/AnimalAvatar';
 import {
   ColorPickerModal,
   ResultModal,
@@ -797,11 +798,7 @@ export function Game3DScreen({ onBackToMenu }: Game3DScreenProps) {
         <div className="pointer-events-auto flex w-full max-w-3xl flex-wrap items-center justify-between gap-2.5 rounded-2xl border-2 border-amber-900/40 bg-[#24160f]/90 px-4 py-2.5 shadow-2xl backdrop-blur-md">
           {/* Human Player Animal Badge + Card Count */}
           <div className="flex items-center gap-2.5">
-            <span
-              aria-hidden="true"
-              className="h-3.5 w-3.5 shrink-0 rounded-full ring-2 ring-white/40"
-              style={{ backgroundColor: humanAnimalMeta.accentHex }}
-            />
+            <AnimalAvatar animal={humanAnimalMeta.id} size="sm" />
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-xs font-black text-[#FFFBF4] sm:text-sm">
                 {humanPlayer.name} ({humanAnimalMeta.name})

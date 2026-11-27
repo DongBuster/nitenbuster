@@ -9,7 +9,7 @@ import {
   Trophy,
   WifiOff,
 } from 'lucide-react';
-import { ANIMALS } from '../../engine/types.ts';
+import { AnimalAvatar } from '../../components/AnimalAvatar';
 import type { BbRoomStanding } from '../online/protocol.ts';
 
 export interface BlockBlastLiveLeaderboardProps {
@@ -22,14 +22,11 @@ export interface BlockBlastLiveLeaderboardProps {
   roundNumber: number;
 }
 
-const ANIMAL_ACCENT_BY_ID = new Map(ANIMALS.map((a) => [a.id, a.accentHex]));
-
 function renderStandingRowContent(
   entry: BbRoomStanding,
   isSelf: boolean,
   isWatching: boolean,
 ) {
-  const accentHex = ANIMAL_ACCENT_BY_ID.get(entry.animal) ?? '#F59E0B';
   const rankBadgeClass =
     entry.rank === 1
       ? 'border-yellow-300/60 bg-yellow-400/20 text-yellow-200'
@@ -80,11 +77,7 @@ function renderStandingRowContent(
           )}
         </span>
 
-        <span
-          aria-hidden="true"
-          className="h-2.5 w-2.5 shrink-0 rounded-full ring-1 ring-white/40"
-          style={{ backgroundColor: accentHex }}
-        />
+        <AnimalAvatar animal={entry.animal} size="sm" />
 
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">

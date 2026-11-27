@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
   Bot,
@@ -7,22 +7,32 @@ import {
   Copy,
   Crown,
   Globe,
+  Link2,
   Minus,
   Play,
   Plus,
   Settings,
+  Share2,
   Sparkles,
   Users,
 } from 'lucide-react';
 import { ANIMALS, type AnimalId, type BotDifficulty, type GameDeckMode } from '../engine/types';
+import {
+  buildRoomInviteUrl,
+  canUseNativeShare,
+  copyTextSafe,
+  shareRoomInvite,
+} from '../online/inviteLink';
 import { normalizeRoomCode } from '../online/sanitize';
 import type { OnlineRoomController } from '../online/useOnlineRoom';
 import { useProfileStore } from '../store/profileStore';
 import { formatEquippedSummary } from '../scene3d/accessoryCatalog';
 import { playSfx } from '../audio/soundEngine';
+import { AnimalAvatar } from '../components/AnimalAvatar';
 
 export interface OnlineLobbyScreenProps {
   room: OnlineRoomController;
+  initialRoomCode?: string;
   onBackToMenu: () => void;
 }
 
@@ -39,21 +49,56 @@ function loadSavedName(): string {
 
 export function OnlineLobbyScreen({
   room,
+  initialRoomCode = '',
   onBackToMenu,
 }: OnlineLobbyScreenProps) {
   const { selectedAnimal, equippedAccessory, selectAnimal } = useProfileStore();
   const [displayName, setDisplayName] = useState<string>(() => loadSavedName());
-  const [joinCodeInput, setJoinCodeInput] = useState<string>('');
+  const [joinCodeInput, setJoinCodeInput] = useState<string>(() =>
+    normalizeRoomCode(initialRoomCode),
+  );
   const [copied, setCopied] = useState<boolean>(false);
+  const [copiedLink, setCopiedLink] = useState<boolean>(false);
+  const [sharedLink, setSharedLink] = useState<boolean>(false);
+  const autoJoinedRef = useRef<boolean>(false);
 
   const myAccessory = equippedAccessory[selectedAnimal] ?? [];
+  const nativeShareSupported = canUseNativeShare();
   const myMember = useMemo(
     () => room.members.find((m) => m.peerId === room.myPeerId) ?? null,
     [room.members, room.myPeerId],
   );
 
+  // One-click auto-join when arriving via ?cardsRoom=<CODE> invite link
+  useEffect(() => {
+    const clean = normalizeRoomCode(initialRoomCode);
+    if (
+      autoJoinedRef.current ||
+      clean.length < 4 ||
+      !room.configured ||
+      room.phase !== 'idle'
+    ) {
+      return;
+    }
+    autoJoinedRef.current = true;
+    room.joinRoom(clean, {
+      name: displayName.trim() || 'Người chơi',
+      animal: selectedAnimal,
+      accessory: myAccessory,
+    });
+  }, [
+    displayName,
+    initialRoomCode,
+    myAccessory,
+    room,
+    selectedAnimal,
+  ]);
+
   const saveName = (val: string) => {
     setDisplayName(val);
+    if (room.phase === 'lobby') {
+      room.updateMyProfile({ name: val.trim() || 'Người chơi' });
+    }
     if (typeof window !== 'undefined') {
       try {
         window.localStorage.setItem(NAME_STORAGE_KEY, val);
@@ -97,12 +142,34 @@ export function OnlineLobbyScreen({
   const handleCopyCode = async () => {
     if (!room.roomCode) return;
     playSfx('click');
-    try {
-      await navigator.clipboard.writeText(room.roomCode);
+    if (await copyTextSafe(room.roomCode)) {
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1800);
-    } catch {
-      // Clipboard API unavailable
+    }
+  };
+
+  const handleCopyInviteLink = async () => {
+    if (!room.roomCode) return;
+    playSfx('click');
+    const url = buildRoomInviteUrl('cards', room.roomCode);
+    if (await copyTextSafe(url)) {
+      setCopiedLink(true);
+      window.setTimeout(() => setCopiedLink(false), 1800);
+    }
+  };
+
+  const handleShareInvite = async () => {
+    if (!room.roomCode) return;
+    playSfx('click');
+    const outcome = await shareRoomInvite({
+      kind: 'cards',
+      roomCode: room.roomCode,
+      title: 'PAWS Cards 3D — Mời vào bàn đấu',
+      text: `Vào bàn PAWS Cards Online (${room.roomCode}) chơi bài với mình nhé!`,
+    });
+    if (outcome === 'shared' || outcome === 'copied') {
+      setSharedLink(true);
+      window.setTimeout(() => setSharedLink(false), 1800);
     }
   };
 
@@ -246,9 +313,10 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
                             : 'border-amber-900/40 bg-black/25 text-amber-100 hover:bg-white/10'
                         }`}
                       >
-                        <span
-                          className="h-7 w-7 rounded-full ring-2 ring-white/30 shadow-md"
-                          style={{ backgroundColor: a.accentHex }}
+                        <AnimalAvatar
+                          animal={a.id}
+                          size="lg"
+                          className={active ? 'ring-amber-950/35' : ''}
                         />
                         <span className={`text-xs font-black ${active ? 'text-[#26160b]' : 'text-white'}`}>
                           {a.name}
@@ -362,7 +430,7 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
               <span>Rời Phòng</span>
             </button>
 
-            <div className="flex items-center gap-2 rounded-2xl border border-amber-400/40 bg-amber-950/70 px-3.5 py-1.5 shadow-md">
+            <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-amber-400/40 bg-amber-950/70 px-3.5 py-1.5 shadow-md">
               <span className="text-xs font-bold text-amber-300">MÃ PHÒNG:</span>
               <span className="font-mono text-lg font-black tracking-[0.2em] text-white">
                 {room.roomCode}
@@ -375,15 +443,51 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
                 {copied ? (
                   <>
                     <Check className="h-3.5 w-3.5 text-emerald-950" />
-                    <span>Đã sao chép!</span>
+                    <span>Đã copy mã!</span>
                   </>
                 ) : (
                   <>
                     <Copy className="h-3.5 w-3.5" />
-                    <span>Sao chép</span>
+                    <span>Mã</span>
                   </>
                 )}
               </button>
+              <button
+                type="button"
+                onClick={handleCopyInviteLink}
+                className="inline-flex cursor-pointer items-center gap-1 rounded-xl border border-sky-400/50 bg-sky-500/20 px-2.5 py-1 text-xs font-black text-sky-100 transition hover:bg-sky-500/35"
+              >
+                {copiedLink ? (
+                  <>
+                    <Check className="h-3.5 w-3.5 text-emerald-300" />
+                    <span>Đã copy link!</span>
+                  </>
+                ) : (
+                  <>
+                    <Link2 className="h-3.5 w-3.5 text-sky-300" />
+                    <span>Link mời</span>
+                  </>
+                )}
+              </button>
+              {nativeShareSupported && (
+                <button
+                  type="button"
+                  onClick={handleShareInvite}
+                  className="inline-flex cursor-pointer items-center gap-1 rounded-xl border border-emerald-400/50 bg-emerald-500/20 px-2.5 py-1 text-xs font-black text-emerald-100 transition hover:bg-emerald-500/35"
+                >
+                  {sharedLink ? (
+                    <>
+                      <Check className="h-3.5 w-3.5 text-emerald-300" />
+                      <span>Đã gửi</span>
+                    </>
+                  ) : (
+                    <>
+                      <Share2 className="h-3.5 w-3.5 text-emerald-300" />
+                      <span>Chia sẻ</span>
+                    </>
+                  )}
+                </button>
+              )}
             </div>
           </div>
 
@@ -400,6 +504,44 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
             {room.error}
           </div>
         )}
+
+        {/* Quick profile customization inside lobby (useful after 1-click invite join) */}
+        <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-amber-900/40 bg-[#29170f]/95 p-3.5 shadow-lg sm:flex-row sm:items-center sm:justify-between">
+          <label className="flex items-center gap-2 text-xs font-bold text-amber-200/85 sm:min-w-[230px]">
+            <span className="shrink-0">Tên bạn:</span>
+            <input
+              type="text"
+              maxLength={18}
+              value={displayName}
+              onChange={(e) => saveName(e.target.value)}
+              placeholder="Nhập tên..."
+              className="w-full rounded-xl border border-amber-400/35 bg-black/35 px-3 py-1.5 text-xs font-bold text-white outline-none focus:border-amber-300"
+            />
+          </label>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {ANIMALS.map((a) => {
+              const active = selectedAnimal === a.id;
+              return (
+                <button
+                  key={a.id}
+                  type="button"
+                  onClick={() => handleSelectAnimal(a.id)}
+                  className={`inline-flex cursor-pointer items-center gap-1 rounded-xl border px-2 py-1 text-[11px] font-black transition ${
+                    active
+                      ? 'border-amber-300 bg-amber-400/25 text-white'
+                      : 'border-white/10 bg-black/30 text-amber-100/75 hover:border-amber-400/40'
+                  }`}
+                >
+                  <span
+                    className="h-2.5 w-2.5 shrink-0 rounded-full"
+                    style={{ backgroundColor: a.accentHex }}
+                  />
+                  <span>{a.name}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
 
         <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-5">
           {/* Live Presence Seats */}
@@ -433,10 +575,7 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
                     }`}
                   >
                     <div className="flex items-center gap-3">
-                      <span
-                        className="h-8 w-8 rounded-full ring-2 ring-white/30 shadow-md"
-                        style={{ backgroundColor: animalMeta.accentHex }}
-                      />
+                      <AnimalAvatar animal={animalMeta.id} size="md" />
                       <div>
                         <div className="flex flex-wrap items-center gap-1.5">
                           <span className="text-sm font-black text-white">

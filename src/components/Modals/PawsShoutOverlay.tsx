@@ -1,5 +1,6 @@
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { ANIMALS, type AnimalId } from '../../engine/types';
+import type { AnimalId } from '../../engine/types';
+import { AnimalAvatar } from '../AnimalAvatar';
 
 export interface PawsShoutInfo {
   key: string;
@@ -7,22 +8,8 @@ export interface PawsShoutInfo {
   animal: AnimalId;
 }
 
-const ANIMAL_EMOJI: Record<AnimalId, string> = {
-  dog: '🐶',
-  cat: '🐱',
-  duck: '🦆',
-  shark: '🦈',
-  dino: '🦖',
-  panda: '🐼',
-  chicken: '🐔',
-  bunny: '🐰',
-};
-
 export function PawsShoutOverlay({ shout }: { shout: PawsShoutInfo | null }) {
   const prefersReducedMotion = useReducedMotion();
-  const meta = shout
-    ? ANIMALS.find((a) => a.id === shout.animal) ?? ANIMALS[0]
-    : ANIMALS[0];
 
   return (
     <div
@@ -71,12 +58,8 @@ export function PawsShoutOverlay({ shout }: { shout: PawsShoutInfo | null }) {
                 transition={{ type: 'spring', stiffness: 440, damping: 28 }}
                 className="flex items-center gap-2 rounded-2xl border-2 border-amber-200 bg-gradient-to-r from-amber-400 via-orange-400 to-amber-500 px-3.5 py-2 text-[#2C1B11] shadow-[0_10px_32px_rgba(251,191,36,0.5)]"
               >
-                <div className="flex items-center gap-1 rounded-full bg-[#2C1B11]/90 px-2.5 py-0.5 text-[11px] font-black uppercase tracking-wider text-amber-200">
-                  <span
-                    className="inline-block h-2 w-2 rounded-full"
-                    style={{ backgroundColor: meta.accentHex }}
-                  />
-                  <span>{ANIMAL_EMOJI[shout.animal]}</span>
+                <div className="flex items-center gap-1.5 rounded-full bg-[#2C1B11]/90 py-0.5 pl-1 pr-2.5 text-[11px] font-black uppercase tracking-wider text-amber-200">
+                  <AnimalAvatar animal={shout.animal} size="xs" />
                   <span className="max-w-[96px] truncate">{shout.playerName}</span>
                 </div>
 

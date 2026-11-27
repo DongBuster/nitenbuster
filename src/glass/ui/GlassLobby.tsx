@@ -14,6 +14,7 @@ import {
   Users,
 } from 'lucide-react';
 import { playSfx } from '../../audio/soundEngine';
+import { AnimalAvatar } from '../../components/AnimalAvatar';
 import {
   COOP_MAPS,
   MAX_COOP_STARS,
@@ -116,13 +117,7 @@ function renderSlotCard(
 
       {member && animalMeta ? (
         <div className="mt-4 flex items-center gap-3.5">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/15 bg-[#0a1320] shadow-inner">
-            <span
-              aria-hidden="true"
-              className="h-6 w-6 rounded-full ring-2 ring-white/40"
-              style={{ backgroundColor: animalMeta.accentHex }}
-            />
-          </div>
+          <AnimalAvatar animal={animalMeta.id} size="lg" />
 
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-1.5">
@@ -515,11 +510,7 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
                             : 'border-white/10 bg-[#0a1320] text-slate-300 hover:border-cyan-400/40'
                         }`}
                       >
-                        <span
-                          aria-hidden="true"
-                          className="h-3 w-3 shrink-0 rounded-full ring-1 ring-white/40"
-                          style={{ backgroundColor: animal.accentHex }}
-                        />
+                        <AnimalAvatar animal={animal.id} size="sm" />
                         <span className="truncate">{animal.name}</span>
                       </button>
                     );
@@ -858,11 +849,7 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
                           : 'border-white/10 bg-[#0a1320] text-slate-300 hover:border-cyan-400/40'
                       }`}
                     >
-                      <span
-                        aria-hidden="true"
-                        className="h-3 w-3 shrink-0 rounded-full ring-1 ring-white/40"
-                        style={{ backgroundColor: animal.accentHex }}
-                      />
+                      <AnimalAvatar animal={animal.id} size="sm" />
                       <span className="truncate">{animal.name}</span>
                     </button>
                   );

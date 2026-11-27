@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   AlertTriangle,
   ArrowDown,
@@ -11,6 +11,7 @@ import {
   Crown,
   Link2,
   Play,
+  Share2,
   Shuffle,
   Sparkles,
   Trophy,
@@ -19,7 +20,14 @@ import {
   WifiOff,
 } from 'lucide-react';
 import { playSfx } from '../../audio/soundEngine';
+import { AnimalAvatar } from '../../components/AnimalAvatar';
 import { ANIMALS, type AnimalId } from '../../engine/types';
+import {
+  buildRoomInviteUrl,
+  canUseNativeShare,
+  copyTextSafe,
+  shareRoomInvite,
+} from '../../online/inviteLink';
 import { normalizeRoomCode } from '../../online/sanitize';
 import { useProfileStore } from '../../store/profileStore';
 import {
@@ -64,9 +72,37 @@ export function EventLobbyScreen({
   );
   const [copiedCode, setCopiedCode] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [sharedStatus, setSharedStatus] = useState(false);
+  const autoJoinedRef = useRef(false);
 
   const myMember = room.members.find((m) => m.peerId === room.myPeerId);
   const myAccessories = equippedAccessory[selectedAnimal] ?? [];
+  const nativeShareSupported = canUseNativeShare();
+
+  // One-click auto-join when arriving via ?eventRoom=<CODE> invite link
+  useEffect(() => {
+    const clean = normalizeRoomCode(initialRoomCode);
+    if (
+      autoJoinedRef.current ||
+      clean.length < 4 ||
+      !room.configured ||
+      room.phase !== 'idle'
+    ) {
+      return;
+    }
+    autoJoinedRef.current = true;
+    room.joinRoom(clean, {
+      name: playerName.trim() || 'Người Chơi',
+      animal: selectedAnimal,
+      accessory: myAccessories,
+    });
+  }, [
+    initialRoomCode,
+    myAccessories,
+    playerName,
+    room,
+    selectedAnimal,
+  ]);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && playerName.trim()) {
@@ -109,24 +145,42 @@ export function EventLobbyScreen({
 
   const handleCopyCode = async () => {
     if (!room.roomCode) return;
-    try {
-      await navigator.clipboard.writeText(room.roomCode);
+    playSfx('click');
+    if (await copyTextSafe(room.roomCode)) {
       setCopiedCode(true);
       setTimeout(() => setCopiedCode(false), 1800);
-    } catch {
-      // Ignore clipboard failure
     }
   };
 
   const handleCopyInviteLink = async () => {
-    if (!room.roomCode || typeof window === 'undefined') return;
-    const url = `${window.location.origin}${window.location.pathname}?eventRoom=${room.roomCode}`;
-    try {
-      await navigator.clipboard.writeText(url);
+    if (!room.roomCode) return;
+    playSfx('click');
+    const url = buildRoomInviteUrl('event', room.roomCode);
+    if (await copyTextSafe(url)) {
       setCopiedLink(true);
       setTimeout(() => setCopiedLink(false), 1800);
-    } catch {
-      // Ignore clipboard failure
+    }
+  };
+
+  const handleShareInvite = async () => {
+    if (!room.roomCode) return;
+    playSfx('click');
+    const outcome = await shareRoomInvite({
+      kind: 'event',
+      roomCode: room.roomCode,
+      title: 'PAWS Event Cup — Mời vào giải đấu',
+      text: `Vào phòng PAWS Event Cup (${room.roomCode}) thi đấu liên hoàn 4 trò chơi với mình nhé!`,
+    });
+    if (outcome === 'shared' || outcome === 'copied') {
+      setSharedStatus(true);
+      setTimeout(() => setSharedStatus(false), 1800);
+    }
+  };
+
+  const handleNameChange = (nextName: string) => {
+    setPlayerName(nextName);
+    if (room.phase === 'lobby') {
+      room.updateMyProfile({ name: nextName.trim() || 'Người Chơi' });
     }
   };
 
@@ -306,10 +360,7 @@ export function EventLobbyScreen({
                             : 'border-white/10 bg-black/30 text-amber-100/75 hover:border-amber-400/40'
                         }`}
                       >
-                        <span
-                          className="h-4 w-4 rounded-full ring-2 ring-white/30"
-                          style={{ backgroundColor: a.accentHex }}
-                        />
+                        <AnimalAvatar animal={a.id} size="md" />
                         <span className="truncate">{a.name}</span>
                       </button>
                     );
@@ -440,6 +491,57 @@ export function EventLobbyScreen({
                       )}
                       <span>{copiedLink ? 'Đã copy link' : 'Link mời'}</span>
                     </button>
+                    {nativeShareSupported && (
+                      <button
+                        type="button"
+                        onClick={handleShareInvite}
+                        className="inline-flex cursor-pointer items-center gap-1 rounded-xl border border-sky-400/40 bg-sky-500/20 px-2.5 py-1.5 text-xs font-bold text-sky-100 hover:bg-sky-500/30"
+                      >
+                        {sharedStatus ? (
+                          <Check className="h-3.5 w-3.5 text-emerald-300" />
+                        ) : (
+                          <Share2 className="h-3.5 w-3.5" />
+                        )}
+                        <span>{sharedStatus ? 'Đã gửi' : 'Chia sẻ'}</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Quick profile edit inside lobby (especially handy after 1-click invite auto-join) */}
+                <div className="mt-3 space-y-2 border-t border-white/10 pt-3">
+                  <label className="flex items-center gap-2 text-[11px] font-bold text-amber-200/80">
+                    <span className="shrink-0">Tên của bạn:</span>
+                    <input
+                      type="text"
+                      maxLength={18}
+                      value={playerName}
+                      onChange={(e) => handleNameChange(e.target.value)}
+                      className="w-full rounded-xl border border-amber-400/30 bg-black/40 px-2.5 py-1 text-xs font-bold text-white outline-none focus:border-amber-300"
+                    />
+                  </label>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {ANIMALS.map((a) => {
+                      const active = a.id === selectedAnimal;
+                      return (
+                        <button
+                          key={a.id}
+                          type="button"
+                          onClick={() => handleSelectAnimal(a.id)}
+                          className={`inline-flex cursor-pointer items-center justify-center gap-1 rounded-xl border px-1.5 py-1 text-[10px] font-black transition ${
+                            active
+                              ? 'border-amber-300 bg-amber-400/25 text-white'
+                              : 'border-white/10 bg-black/30 text-amber-100/70 hover:border-amber-400/35'
+                          }`}
+                        >
+                          <span
+                            className="h-2.5 w-2.5 shrink-0 rounded-full"
+                            style={{ backgroundColor: a.accentHex }}
+                          />
+                          <span className="truncate">{a.name}</span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
@@ -486,10 +588,7 @@ export function EventLobbyScreen({
                           }`}
                         >
                           <div className="flex items-center gap-2.5 min-w-0">
-                            <span
-                              className="h-3.5 w-3.5 shrink-0 rounded-full ring-2 ring-white/30"
-                              style={{ backgroundColor: animalMeta.accentHex }}
-                            />
+                            <AnimalAvatar animal={animalMeta.id} size="md" />
                             <div className="min-w-0">
                               <div className="flex items-center gap-1.5 truncate text-sm font-black text-white">
                                 <span className="truncate">

@@ -12,6 +12,7 @@ import { Canvas, type RootState } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import { Compass, PawPrint, Sparkles } from 'lucide-react';
 import { ANIMALS, type AnimalId, type Emotion } from '../../engine/types';
+import { AnimalAvatar } from '../../components/AnimalAvatar';
 import { Character3D } from '../../scene3d/Character3D';
 import { WinterCabinStage } from '../../scene3d/WinterCabinStage';
 import { formatEquippedSummary } from '../../scene3d/accessoryCatalog';
@@ -318,11 +319,8 @@ export function MascotStage({
 
               <div className="flex min-w-0 flex-1 flex-col gap-1.5">
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/30 bg-[#1a100b] px-2.5 py-0.5 text-xs font-black text-amber-50">
-                    <span
-                      className="h-2.5 w-2.5 rounded-full ring-1 ring-white/40"
-                      style={{ backgroundColor: animalMeta.accentHex }}
-                    />
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/30 bg-[#1a100b] py-0.5 pl-1 pr-2.5 text-xs font-black text-amber-50">
+                    <AnimalAvatar animal={animalMeta.id} size="xs" />
                     <span>{animalMeta.name}</span>
                   </span>
                   {equippedSummary && (
@@ -399,11 +397,8 @@ export function MascotStage({
 
             {/* Companion name and equipped accessories overlay */}
             <div className="pointer-events-none absolute left-3 top-3 flex flex-col gap-1.5">
-              <div className="inline-flex w-fit items-center gap-2 rounded-2xl border border-amber-400/30 bg-[#24160f]/90 px-3 py-1 shadow-md">
-                <span
-                  className="h-3 w-3 rounded-full ring-2 ring-white/40"
-                  style={{ backgroundColor: animalMeta.accentHex }}
-                />
+              <div className="inline-flex w-fit items-center gap-2 rounded-2xl border border-amber-400/30 bg-[#24160f]/90 py-1 pl-1.5 pr-3 shadow-md">
+                <AnimalAvatar animal={animalMeta.id} size="sm" />
                 <span className="text-xs font-black text-amber-50 sm:text-sm">
                   {animalMeta.name}
                 </span>

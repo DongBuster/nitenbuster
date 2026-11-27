@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Clock, LogOut, Trophy, X } from 'lucide-react';
 import { playSfx } from '../../audio/soundEngine';
+import { AnimalAvatar } from '../../components/AnimalAvatar';
 import { ANIMALS } from '../../engine/types';
 import { EVENT_GAME_META, type EventRoundConfig, type EventStanding } from '../protocol';
 import { formatSecondsClock } from '../scoring';
@@ -154,10 +155,7 @@ export function EventTimerHud({
                     <span className="w-5 text-center font-black text-amber-300">
                       #{idx + 1}
                     </span>
-                    <span
-                      className="h-2.5 w-2.5 shrink-0 rounded-full"
-                      style={{ backgroundColor: animalMeta.accentHex }}
-                    />
+                    <AnimalAvatar animal={animalMeta.id} size="xs" />
                     <span className="truncate">
                       {s.name} {isMe ? '(Bạn)' : ''}
                     </span>

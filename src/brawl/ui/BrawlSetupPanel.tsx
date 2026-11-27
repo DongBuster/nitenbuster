@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { ANIMALS, type AnimalId } from '../../engine/types';
 import { playSfx } from '../../audio/soundEngine';
+import { AnimalAvatar } from '../../components/AnimalAvatar';
 import {
   formatEquippedSummary,
   type AccessorySelection,
@@ -126,9 +127,10 @@ export function BrawlSetupPanel({
                           : 'border-sky-900/40 bg-black/25 text-slate-200 hover:bg-white/10'
                       }`}
                     >
-                      <span
-                        className="h-6 w-6 rounded-full ring-2 ring-white/30 shadow-md"
-                        style={{ backgroundColor: a.accentHex }}
+                      <AnimalAvatar
+                        animal={a.id}
+                        size="lg"
+                        className={active ? 'ring-amber-950/35' : ''}
                       />
                       <span className={`text-xs font-black ${active ? 'text-[#26160b]' : 'text-white'}`}>{a.name}</span>
                     </button>

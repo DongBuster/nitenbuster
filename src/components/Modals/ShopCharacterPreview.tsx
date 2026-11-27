@@ -6,6 +6,7 @@ import type { AnimalId, Emotion } from '../../engine/types';
 import { Character3D } from '../../scene3d/Character3D';
 import { WinterCabinStage } from '../../scene3d/WinterCabinStage';
 import { playSfx } from '../../audio/soundEngine';
+import { AnimalAvatar } from '../AnimalAvatar';
 
 const SHOP_PREVIEW_EMOTIONS: { id: Emotion; label: string }[] = [
   { id: 'idle', label: 'Bình thường' },
@@ -29,7 +30,6 @@ export interface ShopCharacterPreviewProps {
 export function ShopCharacterPreview({
   animal,
   animalName,
-  accentHex,
   accessories,
   equippedLabel,
   previewItemName = null,
@@ -73,11 +73,8 @@ export function ShopCharacterPreview({
         </Canvas>
 
         <div className="pointer-events-none absolute left-3 top-3 flex flex-col gap-1">
-          <div className="inline-flex w-fit items-center gap-1.5 rounded-xl border border-amber-400/30 bg-[#24160f]/90 px-2.5 py-1 text-xs font-black text-amber-50 shadow-md">
-            <span
-              className="h-2.5 w-2.5 rounded-full ring-1 ring-white/40"
-              style={{ backgroundColor: accentHex }}
-            />
+          <div className="inline-flex w-fit items-center gap-1.5 rounded-xl border border-amber-400/30 bg-[#24160f]/90 py-1 pl-1.5 pr-2.5 text-xs font-black text-amber-50 shadow-md">
+            <AnimalAvatar animal={animal} size="xs" />
             <span>{animalName}</span>
           </div>
           {equippedLabel && (

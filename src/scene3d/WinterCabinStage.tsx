@@ -1,3 +1,5 @@
+import { useLayoutEffect } from 'react';
+import { useThree } from '@react-three/fiber';
 import {
   ContactShadows,
   Environment,
@@ -10,6 +12,13 @@ export interface WinterCabinStageProps {
 }
 
 export function WinterCabinStage({ mode = 'turntable' }: WinterCabinStageProps) {
+  const gl = useThree((s) => s.gl);
+
+  useLayoutEffect(() => {
+    // Prevent opaque black sheet artifacts in ContactShadows when parent Canvas uses gl={{ alpha: false }}
+    gl.setClearAlpha(0);
+  }, [gl]);
+
   return (
     <group>
       {/* Offline Procedural Environment Map for Velvet Plush Sheen & Soft Reflections */}

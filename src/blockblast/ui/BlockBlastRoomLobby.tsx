@@ -12,6 +12,7 @@ import {
   Users,
 } from 'lucide-react';
 import { playSfx } from '../../audio/soundEngine.ts';
+import { AnimalAvatar } from '../../components/AnimalAvatar';
 import { ANIMALS, type AnimalId } from '../../engine/types.ts';
 import { normalizeRoomCode } from '../../online/sanitize.ts';
 import { formatEquippedSummary } from '../../scene3d/accessoryCatalog.ts';
@@ -287,11 +288,7 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
                             : 'border-amber-900/50 bg-[#170d08] text-amber-100/75 hover:border-amber-500/40'
                         }`}
                       >
-                        <span
-                          aria-hidden="true"
-                          className="h-3 w-3 shrink-0 rounded-full ring-1 ring-white/40"
-                          style={{ backgroundColor: animal.accentHex }}
-                        />
+                        <AnimalAvatar animal={animal.id} size="sm" />
                         <span className="truncate">{animal.name}</span>
                       </button>
                     );
@@ -450,11 +447,7 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
                     }`}
                   >
                     <div className="flex min-w-0 items-center gap-2.5">
-                      <span
-                        aria-hidden="true"
-                        className="h-4 w-4 shrink-0 rounded-full ring-2 ring-white/30"
-                        style={{ backgroundColor: animalMeta.accentHex }}
-                      />
+                      <AnimalAvatar animal={animalMeta.id} size="md" />
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5">
                           <span className="truncate text-sm font-extrabold text-amber-50">

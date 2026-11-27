@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useRef } from 'react';
 import type { LiftIntent, PlayerInput } from '../sim/types';
+import {
+  clearAllVirtualInputs,
+  readVirtualInput,
+  setKeyboardPressedMirror,
+} from './coopVirtualInput';
 
 export interface UseGlassInputOptions {
   enabled: boolean;
@@ -62,9 +67,29 @@ export function useGlassInput({
   const onEmoteRef = useRef<(emoteId: number) => void>(onEmote);
   onEmoteRef.current = onEmote;
 
+  const syncKeyboardMirror = useCallback(() => {
+    const keys = keysRef.current;
+    const mouse = mouseButtonsRef.current;
+    setKeyboardPressedMirror({
+      liftUp: keys.has('KeyE') || mouse.has(0),
+      liftDown: keys.has('KeyQ') || mouse.has(2),
+      jump: keys.has('Space'),
+      moveLeft: keys.has('KeyA') || keys.has('ArrowLeft'),
+      moveRight: keys.has('KeyD') || keys.has('ArrowRight'),
+    });
+  }, []);
+
   const clearInputs = useCallback(() => {
     keysRef.current.clear();
     mouseButtonsRef.current.clear();
+    clearAllVirtualInputs();
+    setKeyboardPressedMirror({
+      liftUp: false,
+      liftDown: false,
+      jump: false,
+      moveLeft: false,
+      moveRight: false,
+    });
   }, []);
 
   useEffect(() => {
@@ -96,10 +121,12 @@ export function useGlassInput({
       }
 
       keysRef.current.add(e.code);
+      syncKeyboardMirror();
     };
 
     const onKeyUp = (e: KeyboardEvent) => {
       keysRef.current.delete(e.code);
+      syncKeyboardMirror();
     };
 
     const onMouseDown = (e: MouseEvent) => {
@@ -107,12 +134,14 @@ export function useGlassInput({
       if (isInteractiveHudTarget(e.target)) return;
       if (e.button === 0 || e.button === 2) {
         mouseButtonsRef.current.add(e.button);
+        syncKeyboardMirror();
       }
     };
 
     const onMouseUp = (e: MouseEvent) => {
       if (e.button === 0 || e.button === 2) {
         mouseButtonsRef.current.delete(e.button);
+        syncKeyboardMirror();
       }
     };
 
@@ -147,7 +176,7 @@ export function useGlassInput({
       document.removeEventListener('visibilitychange', onVisibilityChange);
       clearInputs();
     };
-  }, [clearInputs, enabled]);
+  }, [clearInputs, enabled, syncKeyboardMirror]);
 
   const readInput = useCallback((): PlayerInput => {
     if (!enabledRef.current) {
@@ -156,8 +185,9 @@ export function useGlassInput({
 
     const keys = keysRef.current;
     const mouse = mouseButtonsRef.current;
+    const virtual = readVirtualInput();
 
-    let moveX = 0;
+    let moveX = virtual.moveX;
     let moveZ = 0;
 
     if (keys.has('KeyW') || keys.has('ArrowUp')) moveZ += 1;
@@ -165,15 +195,17 @@ export function useGlassInput({
     if (keys.has('KeyD') || keys.has('ArrowRight')) moveX -= 1;
     if (keys.has('KeyA') || keys.has('ArrowLeft')) moveX += 1;
 
+    moveX = Math.max(-1, Math.min(1, moveX));
+
     if (moveX !== 0 && moveZ !== 0) {
       const inv = 1 / Math.SQRT2;
       moveX *= inv;
       moveZ *= inv;
     }
 
-    const jump = keys.has('Space');
-    const liftUp = keys.has('KeyE') || mouse.has(0);
-    const liftDown = keys.has('KeyQ') || mouse.has(2);
+    const jump = keys.has('Space') || virtual.jump;
+    const liftUp = keys.has('KeyE') || mouse.has(0) || virtual.lift === 1;
+    const liftDown = keys.has('KeyQ') || mouse.has(2) || virtual.lift === -1;
     const lift: LiftIntent =
       liftUp && !liftDown ? 1 : liftDown && !liftUp ? -1 : 0;
 

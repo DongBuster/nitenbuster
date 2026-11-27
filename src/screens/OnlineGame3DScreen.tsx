@@ -30,6 +30,7 @@ import { ONLINE_EMOTES } from '../online/protocol';
 import type { OnlineRoomController } from '../online/useOnlineRoom';
 import { GameTableScene3D } from '../scene3d/GameTableScene3D';
 import { CARD_META, COLOR_THEME, CardInfoButton } from '../components/Card';
+import { AnimalAvatar } from '../components/AnimalAvatar';
 import {
   ColorPickerModal,
   ResultModal,
@@ -542,11 +543,8 @@ export function OnlineGame3DScreen({
       {/* Bottom Compact HUD */}
       <footer className="pointer-events-none fixed inset-x-0 bottom-0 z-20 flex flex-wrap items-end justify-between gap-2 p-3 sm:p-4">
         {/* Human Player Pill */}
-        <div className="pointer-events-auto flex items-center gap-2.5 rounded-2xl border border-white/20 bg-slate-900/90 px-3.5 py-2 shadow-xl backdrop-blur-md">
-          <span
-            className="h-3.5 w-3.5 rounded-full border border-white/60"
-            style={{ backgroundColor: humanAnimalMeta.accentHex }}
-          />
+        <div className="pointer-events-auto flex items-center gap-2.5 rounded-2xl border border-white/20 bg-slate-900/90 px-3 py-1.5 shadow-xl backdrop-blur-md">
+          <AnimalAvatar animal={humanAnimalMeta.id} size="md" />
           <div>
             <div className="flex items-center gap-1.5 text-xs font-black text-white">
               <span>{humanPlayer.name}</span>

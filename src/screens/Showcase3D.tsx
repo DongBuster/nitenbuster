@@ -19,6 +19,7 @@ import { useGlbAvailability } from '../scene3d/GLBCharacter3D';
 import { WinterCabinStage } from '../scene3d/WinterCabinStage';
 import { Card3D } from '../scene3d/Card3D';
 import { CardFan3D } from '../scene3d/CardFan3D';
+import { AnimalAvatar } from '../components/AnimalAvatar';
 import {
   ANIMALS,
   EMOTIONS,
@@ -296,6 +297,10 @@ export function Showcase3D() {
             antialias: true,
             powerPreference: 'high-performance',
           }}
+          onCreated={({ gl }) => {
+            // Keep opaque WebGL canvas while ensuring offscreen ContactShadows targets clear to alpha 0
+            gl.setClearAlpha(0);
+          }}
           camera={{ position: [0, 3.8, 7.6], fov: 42 }}
         >
           <color attach="background" args={['#261810']} />
@@ -396,9 +401,9 @@ export function Showcase3D() {
                   frames={1}
                   resolution={256}
                   opacity={0.38}
-                  scale={10}
+                  scale={[8.0, 1.55]}
                   blur={2}
-                  far={3}
+                  far={2.2}
                   color="#3B2314"
                 />
                 <ContactShadows
@@ -406,9 +411,9 @@ export function Showcase3D() {
                   frames={1}
                   resolution={256}
                   opacity={0.38}
-                  scale={10}
+                  scale={[8.0, 1.55]}
                   blur={2}
-                  far={3}
+                  far={2.2}
                   color="#3B2314"
                 />
 
@@ -709,11 +714,7 @@ export function Showcase3D() {
           <div className="pointer-events-auto flex w-full max-w-3xl flex-col gap-2.5 rounded-3xl border border-amber-200/20 bg-[#26170F]/82 px-4 py-3 shadow-2xl backdrop-blur-md">
             <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
               <div className="inline-flex items-center gap-2 font-bold text-amber-200">
-                <span
-                  aria-hidden="true"
-                  className="h-2.5 w-2.5 rounded-full ring-2 ring-amber-300/60"
-                  style={{ backgroundColor: activeTableAnimalMeta.accentHex }}
-                />
+                <AnimalAvatar animal={activeTableAnimalMeta.id} size="xs" />
                 <span>
                   Đang tới lượt: <strong>{activeTableAnimalMeta.name}</strong> (
                   {activeTableAnimalMeta.personality})
@@ -756,11 +757,7 @@ export function Showcase3D() {
             {/* Bio & GLB Upload + Active toggle row */}
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-2.5">
               <div className="flex flex-wrap items-center gap-2">
-                <span
-                  aria-hidden="true"
-                  className="h-3.5 w-3.5 rounded-full ring-2 ring-white/40"
-                  style={{ backgroundColor: heroAnimalMeta.accentHex }}
-                />
+                <AnimalAvatar animal={heroAnimalMeta.id} size="sm" />
                 <h2 className="text-lg font-extrabold text-[#FFFBF4]">
                   {heroAnimalMeta.name}
                 </h2>
@@ -835,11 +832,7 @@ export function Showcase3D() {
                         : 'border-white/12 bg-white/8 text-amber-50 hover:bg-white/15'
                     }`}
                   >
-                    <span
-                      aria-hidden="true"
-                      className="h-2.5 w-2.5 rounded-full ring-1 ring-black/25"
-                      style={{ backgroundColor: a.accentHex }}
-                    />
+                    <AnimalAvatar animal={a.id} size="xs" />
                     <span>{a.name}</span>
                     {hasCustom && (
                       <span

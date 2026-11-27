@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Trophy } from 'lucide-react';
 import type { BlastGameState } from '../../blockblast/engine/types';
 import type { MatchReceipt } from '../../blockblast/engine/verify';
-import { ANIMALS } from '../../engine/types';
+import { AnimalAvatar } from '../../components/AnimalAvatar';
 import BlockBlastScreen, {
   type BlockBlastRoomModeConfig,
 } from '../../screens/BlockBlastScreen';
@@ -191,8 +191,6 @@ export function EventBlockBlastAdapter({ room, round }: EventAdapterProps) {
         </div>
         <ul className="space-y-1.5">
           {liveStandings.map(({ member, stats }, idx) => {
-            const animalMeta =
-              ANIMALS.find((a) => a.id === member.animal) ?? ANIMALS[0];
             const isMe = member.peerId === myPeerId;
             return (
               <li
@@ -205,10 +203,7 @@ export function EventBlockBlastAdapter({ room, round }: EventAdapterProps) {
               >
                 <div className="flex items-center gap-1.5 truncate">
                   <span className="text-emerald-300">#{idx + 1}</span>
-                  <span
-                    className="h-2 w-2 shrink-0 rounded-full"
-                    style={{ backgroundColor: animalMeta.accentHex }}
-                  />
+                  <AnimalAvatar animal={member.animal} size="xs" />
                   <span className="truncate">
                     {member.name}
                     {!stats.alive ? ' (Xong)' : ''}

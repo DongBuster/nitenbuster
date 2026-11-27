@@ -28,6 +28,7 @@ import {
 } from '../engine/types';
 import { Character3D } from '../scene3d/Character3D';
 import { WinterCabinStage } from '../scene3d/WinterCabinStage';
+import { AnimalAvatar } from '../components/AnimalAvatar';
 import { CookieShopModal, RulesModal } from '../components/Modals/RulesModal';
 import { TutorialOverlay } from '../components/Modals/TutorialOverlay';
 import { useProfileStore } from '../store/profileStore';
@@ -190,11 +191,8 @@ export function MainMenuScreen({
 
               {/* Character info overlay */}
               <div className="pointer-events-none absolute left-4 top-4 flex flex-col gap-1.5">
-                <div className="inline-flex items-center gap-2 rounded-2xl border border-amber-400/30 bg-[#24160f]/90 px-3.5 py-1.5 shadow-md">
-                  <span
-                    className="h-3.5 w-3.5 rounded-full ring-2 ring-white/40"
-                    style={{ backgroundColor: selectedMeta.accentHex }}
-                  />
+                <div className="inline-flex items-center gap-2 rounded-2xl border border-amber-400/30 bg-[#24160f]/90 px-3 py-1.5 shadow-md">
+                  <AnimalAvatar animal={selectedMeta.id} size="sm" />
                   <span className="text-sm font-black text-[#FFFBF4]">
                     {selectedMeta.name}
                   </span>
@@ -279,9 +277,10 @@ export function MainMenuScreen({
                             : 'border-amber-900/40 bg-black/20 text-amber-50 hover:bg-white/10'
                         }`}
                       >
-                        <span
-                          className="h-3.5 w-3.5 shrink-0 rounded-full ring-2 ring-black/30"
-                          style={{ backgroundColor: animal.accentHex }}
+                        <AnimalAvatar
+                          animal={animal.id}
+                          size="sm"
+                          className={active ? 'ring-amber-950/35' : ''}
                         />
                         <span className="truncate">{animal.name}</span>
                       </button>
