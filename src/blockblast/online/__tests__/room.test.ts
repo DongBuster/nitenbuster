@@ -14,15 +14,19 @@ import {
   EMPTY_COMPACT_GRID,
   encodeGrid,
 } from '../gridCodec.ts';
-import type {
-  BbParticipantInfo,
-  BbPlayerProgress,
-  BbRoomMember,
+import {
+  BB_DISCONNECT_GRACE_MS,
+  BB_PROGRESS_THROTTLE_MS,
+  type BbParticipantInfo,
+  type BbPlayerProgress,
+  type BbRoomMember,
 } from '../protocol.ts';
 import {
   computeRoomStandings,
   electRoomHost,
   isRoomMatchComplete,
+  shouldApplyProgressEvent,
+  shouldMarkPeerDisconnected,
   verifyRoomSubmission,
 } from '../ranking.ts';
 
@@ -251,5 +255,126 @@ describe('blockblast online ranking & completion state', () => {
     assert.equal(standings[3].peerId, 'p4');
     assert.equal(standings[3].verification, 'invalid');
     assert.equal(standings[3].rank, 4);
+  });
+
+  it('memoizes verifyRoomSubmission per receipt so repeated standings recomputations do not replay matches on Main Thread', () => {
+    const matchId = 'bb-room-CACHE1-r1-2026';
+    const seed = 2026;
+    const receipt = playPureSkillMatch(seed, matchId);
+
+    const first = verifyRoomSubmission(receipt, matchId, seed);
+    const second = verifyRoomSubmission(receipt, matchId, seed);
+    assert.equal(first.valid, true);
+    assert.equal(second, first, 'expected exact cached VerifyResult reference');
+
+    const roster = ['p1', 'p2'];
+    const snapshots: Record<string, BbParticipantInfo> = {
+      p1: { peerId: 'p1', name: 'Finished', animal: 'dog', accessory: [], joinedAt: 10 },
+      p2: { peerId: 'p2', name: 'Playing', animal: 'cat', accessory: [], joinedAt: 20 },
+    };
+    const receiptsByPeer: Record<string, MatchReceipt> = { p1: receipt };
+
+    const start = performance.now();
+    for (let seq = 1; seq <= 50; seq++) {
+      computeRoomStandings(
+        roster,
+        snapshots,
+        {
+          p1: makeProgress({ peerId: 'p1', matchId, seq: 10, score: receipt.claimedScore, status: 'finished' }),
+          p2: makeProgress({ peerId: 'p2', matchId, seq, score: seq * 120, status: 'playing' }),
+        },
+        receiptsByPeer,
+        matchId,
+        seed,
+        false,
+      );
+    }
+    const elapsedMs = performance.now() - start;
+    assert.ok(
+      elapsedMs < 30,
+      `expected 50 cached standings computations to take <30ms, took ${elapsedMs.toFixed(1)}ms`,
+    );
+  });
+
+  it('rejects duplicate progress seq echoes and protects active peers from premature disconnect', () => {
+    assert.ok(BB_DISCONNECT_GRACE_MS >= 15000);
+    assert.ok(BB_PROGRESS_THROTTLE_MS >= 300);
+
+    const matchId = 'm-seq';
+    const prevPlaying = makeProgress({
+      peerId: 'p2',
+      matchId,
+      seq: 12,
+      score: 1200,
+      status: 'playing',
+      updatedAt: 10_000,
+    });
+
+    // Duplicate echo with identical seq must be ignored
+    assert.equal(
+      shouldApplyProgressEvent(prevPlaying, { ...prevPlaying, seq: 12 }),
+      false,
+    );
+    // Stale lower seq ignored
+    assert.equal(
+      shouldApplyProgressEvent(prevPlaying, { ...prevPlaying, seq: 11 }),
+      false,
+    );
+    // Newer seq accepted
+    assert.equal(
+      shouldApplyProgressEvent(prevPlaying, { ...prevPlaying, seq: 13 }),
+      true,
+    );
+    // Transition from playing -> finished accepted even at same seq
+    assert.equal(
+      shouldApplyProgressEvent(prevPlaying, {
+        ...prevPlaying,
+        seq: 12,
+        status: 'finished',
+      }),
+      true,
+    );
+    // Duplicate finished echo rejected and regression finished -> playing rejected
+    const prevFinished = { ...prevPlaying, seq: 12, status: 'finished' as const };
+    assert.equal(
+      shouldApplyProgressEvent(prevFinished, { ...prevFinished, seq: 12 }),
+      false,
+    );
+    assert.equal(
+      shouldApplyProgressEvent(prevFinished, {
+        ...prevFinished,
+        seq: 15,
+        status: 'playing',
+      }),
+      false,
+    );
+
+    // Self must never be marked disconnected by local presence timer
+    assert.equal(
+      shouldMarkPeerDisconnected('p1', 'p1', prevPlaying, 99_999, BB_DISCONNECT_GRACE_MS),
+      false,
+    );
+    // Active peer whose progress updated within grace window must not be marked disconnected
+    assert.equal(
+      shouldMarkPeerDisconnected(
+        'p2',
+        'p1',
+        prevPlaying,
+        10_000 + BB_DISCONNECT_GRACE_MS - 1000,
+        BB_DISCONNECT_GRACE_MS,
+      ),
+      false,
+    );
+    // Silent peer past grace window is marked disconnected
+    assert.equal(
+      shouldMarkPeerDisconnected(
+        'p2',
+        'p1',
+        prevPlaying,
+        10_000 + BB_DISCONNECT_GRACE_MS + 100,
+        BB_DISCONNECT_GRACE_MS,
+      ),
+      true,
+    );
   });
 });

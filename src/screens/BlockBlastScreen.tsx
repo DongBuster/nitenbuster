@@ -2,6 +2,7 @@ import {
   memo,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -30,6 +31,7 @@ import {
 import { playSfx, setAudioPreferences } from '../audio/soundEngine';
 import {
   canPlacePiece,
+  countOccupiedCells,
   createInitialState,
   getBoardFillRatio,
   getPlacementPreview,
@@ -40,6 +42,7 @@ import {
   getStageNumber,
   getStageTheme,
   resolveStageColorToken,
+  STAGE_THEMES,
   type BoardStageTheme,
 } from '../blockblast/engine/stages';
 import {
@@ -122,10 +125,13 @@ interface ActiveDragSession {
   piece: TrayPiece;
   startX: number;
   startY: number;
+  latestX: number;
+  latestY: number;
   pointerId: number;
   pointerType: string;
   isDragging: boolean;
   boardCellSize: number;
+  boardRect: DOMRect | null;
 }
 
 interface DragVisualState {
@@ -244,10 +250,13 @@ function clientToBoardAnchor(
   clientY: number,
   piece: TrayPiece,
   pointerType: string,
+  cachedRect?: DOMRect | null,
 ): BoardCoord | null {
-  if (!boardEl) return null;
-  const rect = boardEl.getBoundingClientRect();
-  if (rect.width <= 0 || rect.height <= 0) return null;
+  const rect =
+    cachedRect && cachedRect.width > 0 && cachedRect.height > 0
+      ? cachedRect
+      : boardEl?.getBoundingClientRect();
+  if (!rect || rect.width <= 0 || rect.height <= 0) return null;
 
   const offsetY = pointerType === 'touch' ? TOUCH_DRAG_OFFSET_Y : 0;
   const cellSize = rect.width / BOARD_SIZE;
@@ -541,6 +550,7 @@ export default function BlockBlastScreen({
   const { state } = match;
   const stageNumber = getStageNumber(state.allClears);
   const stageTheme = getStageTheme(state.allClears);
+  const occupiedCells = useMemo(() => countOccupiedCells(state.grid), [state.grid]);
 
   const matchRef = useRef<MatchBundle>(match);
   useEffect(() => {
@@ -863,8 +873,8 @@ export default function BlockBlastScreen({
               isAllClearBurst,
             ),
             shockwaveCount: isAllClearBurst
-              ? 3
-              : Math.max(2, Math.min(3, stageThemeAfter.shockwaveRings)),
+              ? Math.min(5, Math.max(3, stageThemeAfter.shockwaveRings))
+              : Math.max(2, Math.min(5, stageThemeAfter.shockwaveRings)),
             callout,
             isAllClear: isAllClearBurst,
           },
@@ -890,9 +900,9 @@ export default function BlockBlastScreen({
                 (outcome.streakAfter >= 2 ? 4 : 0),
             );
         const shockwaveCount = isAllClearBurst
-          ? 3
+          ? Math.min(5, Math.max(3, stageThemeAfter.shockwaveRings))
           : lineCount >= 2 || outcome.streakAfter >= 3
-            ? Math.min(3, Math.max(2, stageThemeAfter.shockwaveRings))
+            ? Math.min(5, Math.max(2, stageThemeAfter.shockwaveRings))
             : stageThemeAfter.shockwaveRings;
         spawnBurst(
           {
@@ -1129,6 +1139,14 @@ export default function BlockBlastScreen({
     startNewMatch();
   }, [startNewMatch]);
 
+  // Sync floating drag transform to the latest pointer coordinates on mount/update
+  // so fast drags never snap back to stale initialX/initialY.
+  useLayoutEffect(() => {
+    if (!dragView || !floatingDragRef.current || !dragSessionRef.current) return;
+    const { latestX, latestY } = dragSessionRef.current;
+    floatingDragRef.current.style.transform = `translate3d(${latestX}px, ${latestY}px, 0) translate(-50%, -50%)`;
+  }, [dragView]);
+
   const handleSlotPointerDown = useCallback(
     (slotIndex: number, e: ReactPointerEvent<HTMLButtonElement>) => {
       if (
@@ -1142,26 +1160,60 @@ export default function BlockBlastScreen({
       const piece = matchRef.current.state.tray[slotIndex];
       if (!piece) return;
 
+      e.preventDefault();
       cancelActiveDrag();
 
-      const boardRect = boardRef.current?.getBoundingClientRect();
+      const captureEl = e.currentTarget;
+      const pointerId = e.pointerId;
+      try {
+        captureEl.setPointerCapture(pointerId);
+      } catch {
+        // Synthetic or unsupported pointers may decline capture; window listeners still handle drag
+      }
+
+      const boardRect = boardRef.current?.getBoundingClientRect() ?? null;
       const boardCellSize =
         boardRect && boardRect.width > 0 ? boardRect.width / BOARD_SIZE : 48;
+      const initialOffsetY =
+        e.pointerType === 'touch' ? TOUCH_DRAG_OFFSET_Y : 0;
 
       dragSessionRef.current = {
         slotIndex,
         piece,
         startX: e.clientX,
         startY: e.clientY,
-        pointerId: e.pointerId,
+        latestX: e.clientX,
+        latestY: e.clientY + initialOffsetY,
+        pointerId,
         pointerType: e.pointerType,
         isDragging: false,
         boardCellSize,
+        boardRect,
+      };
+
+      let rectRefreshRafId: number | null = null;
+
+      const invalidateBoardRect = () => {
+        const active = dragSessionRef.current;
+        if (active && active.pointerId === pointerId) {
+          active.boardRect = null;
+        }
       };
 
       const onPointerMove = (ev: PointerEvent) => {
         const active = dragSessionRef.current;
         if (!active || ev.pointerId !== active.pointerId) return;
+
+        // Self-heal if mouse primary button was released outside browser/OS without pointerup
+        if (ev.pointerType === 'mouse' && (ev.buttons & 1) === 0) {
+          cancelActiveDrag();
+          return;
+        }
+
+        const offsetY =
+          active.pointerType === 'touch' ? TOUCH_DRAG_OFFSET_Y : 0;
+        active.latestX = ev.clientX;
+        active.latestY = ev.clientY + offsetY;
 
         if (!active.isDragging) {
           const dist = Math.hypot(
@@ -1174,20 +1226,39 @@ export default function BlockBlastScreen({
           playSfx('blockPickup');
           setSelectedSlot(null);
 
-          const offsetY =
-            active.pointerType === 'touch' ? TOUCH_DRAG_OFFSET_Y : 0;
+          const freshRect = boardRef.current?.getBoundingClientRect() ?? null;
+          if (freshRect && freshRect.width > 0) {
+            active.boardRect = freshRect;
+            active.boardCellSize = freshRect.width / BOARD_SIZE;
+          }
+          if (rectRefreshRafId !== null) {
+            window.cancelAnimationFrame(rectRefreshRafId);
+          }
+          rectRefreshRafId = window.requestAnimationFrame(() => {
+            rectRefreshRafId = null;
+            const currentActive = dragSessionRef.current;
+            if (!currentActive || currentActive.pointerId !== pointerId) return;
+            const postLayoutRect = boardRef.current?.getBoundingClientRect() ?? null;
+            if (postLayoutRect && postLayoutRect.width > 0) {
+              currentActive.boardRect = postLayoutRect;
+            }
+          });
+
           setDragView({
             slotIndex: active.slotIndex,
             piece: active.piece,
             cellSizePx: active.boardCellSize,
-            initialX: ev.clientX,
-            initialY: ev.clientY + offsetY,
+            initialX: active.latestX,
+            initialY: active.latestY,
           });
-        } else {
-          const offsetY =
-            active.pointerType === 'touch' ? TOUCH_DRAG_OFFSET_Y : 0;
-          if (floatingDragRef.current) {
-            floatingDragRef.current.style.transform = `translate3d(${ev.clientX}px, ${ev.clientY + offsetY}px, 0) translate(-50%, -50%)`;
+        } else if (floatingDragRef.current) {
+          floatingDragRef.current.style.transform = `translate3d(${active.latestX}px, ${active.latestY}px, 0) translate(-50%, -50%)`;
+        }
+
+        if (!active.boardRect) {
+          const remeasured = boardRef.current?.getBoundingClientRect() ?? null;
+          if (remeasured && remeasured.width > 0) {
+            active.boardRect = remeasured;
           }
         }
 
@@ -1197,6 +1268,7 @@ export default function BlockBlastScreen({
           ev.clientY,
           active.piece,
           active.pointerType,
+          active.boardRect,
         );
         updateHoverAnchorIfChanged(nextAnchor);
       };
@@ -1205,8 +1277,21 @@ export default function BlockBlastScreen({
         const active = dragSessionRef.current;
         if (!active || ev.pointerId !== active.pointerId) return;
 
-        const { isDragging, slotIndex: sIdx, piece: activePiece, pointerType } =
-          active;
+        // Ignore secondary button release while primary button drag is still held
+        if (ev.pointerType === 'mouse' && ev.button !== 0) {
+          if ((ev.buttons & 1) === 0) {
+            cancelActiveDrag();
+          }
+          return;
+        }
+
+        const {
+          isDragging,
+          slotIndex: sIdx,
+          piece: activePiece,
+          pointerType,
+          boardRect: cachedBoardRect,
+        } = active;
 
         cancelActiveDrag();
 
@@ -1216,12 +1301,15 @@ export default function BlockBlastScreen({
           return;
         }
 
+        const liveDropRect =
+          boardRef.current?.getBoundingClientRect() ?? cachedBoardRect;
         const releaseAnchor = clientToBoardAnchor(
           boardRef.current,
           ev.clientX,
           ev.clientY,
           activePiece,
           pointerType,
+          liveDropRect,
         );
 
         if (
@@ -1243,21 +1331,65 @@ export default function BlockBlastScreen({
         cancelActiveDrag();
       };
 
+      const onLostPointerCapture = (ev: PointerEvent) => {
+        const active = dragSessionRef.current;
+        if (!active || ev.pointerId !== active.pointerId) return;
+        cancelActiveDrag();
+      };
+
+      const onContextMenu = (ev: MouseEvent) => {
+        if (!dragSessionRef.current) return;
+        ev.preventDefault();
+      };
+
       const onWindowBlur = () => {
         if (!dragSessionRef.current) return;
         cancelActiveDrag();
       };
 
+      const onVisibilityChange = () => {
+        if (document.hidden && dragSessionRef.current) {
+          cancelActiveDrag();
+        }
+      };
+
       window.addEventListener('pointermove', onPointerMove, { passive: true });
       window.addEventListener('pointerup', onPointerUp);
       window.addEventListener('pointercancel', onPointerCancel);
+      window.addEventListener('contextmenu', onContextMenu);
       window.addEventListener('blur', onWindowBlur);
+      window.addEventListener('resize', invalidateBoardRect, { passive: true });
+      window.addEventListener('scroll', invalidateBoardRect, {
+        capture: true,
+        passive: true,
+      });
+      document.addEventListener('visibilitychange', onVisibilityChange);
+      captureEl.addEventListener('lostpointercapture', onLostPointerCapture);
 
       windowDragCleanupRef.current = () => {
+        if (rectRefreshRafId !== null) {
+          window.cancelAnimationFrame(rectRefreshRafId);
+          rectRefreshRafId = null;
+        }
         window.removeEventListener('pointermove', onPointerMove);
         window.removeEventListener('pointerup', onPointerUp);
         window.removeEventListener('pointercancel', onPointerCancel);
+        window.removeEventListener('contextmenu', onContextMenu);
         window.removeEventListener('blur', onWindowBlur);
+        window.removeEventListener('resize', invalidateBoardRect);
+        window.removeEventListener('scroll', invalidateBoardRect, true);
+        document.removeEventListener('visibilitychange', onVisibilityChange);
+        captureEl.removeEventListener(
+          'lostpointercapture',
+          onLostPointerCapture,
+        );
+        try {
+          if (captureEl.hasPointerCapture?.(pointerId)) {
+            captureEl.releasePointerCapture(pointerId);
+          }
+        } catch {
+          // Ignore if element was unmounted or capture already released
+        }
       };
     },
     [cancelActiveDrag, updateHoverAnchorIfChanged],
@@ -1638,7 +1770,7 @@ export default function BlockBlastScreen({
               accessories={equippedList}
               emotion={emotion}
               quip={quip}
-              paused={anyDialogOpen}
+              paused={anyDialogOpen || dragView !== null}
               compact={!isDesktop || Boolean(roomMode)}
             />
 
@@ -1681,6 +1813,38 @@ export default function BlockBlastScreen({
                 </span>
               </div>
 
+              {/* 10-Stage Milestone Track */}
+              <div
+                className="mt-2 flex items-center gap-1"
+                role="img"
+                aria-label={`Đang ở Stage ${stageNumber} trên ${STAGE_THEMES.length} chủ đề`}
+              >
+                {STAGE_THEMES.map((theme) => {
+                  const unlocked = stageNumber >= theme.tier;
+                  const isCurrent =
+                    stageNumber === theme.tier ||
+                    (stageNumber > STAGE_THEMES.length &&
+                      theme.tier === STAGE_THEMES.length);
+                  return (
+                    <span
+                      key={theme.id}
+                      title={`Stage ${theme.tier}: ${theme.name}`}
+                      className={`h-1.5 flex-1 rounded-full transition-all duration-300 ${
+                        isCurrent ? 'scale-y-125 ring-1 ring-white/75' : ''
+                      }`}
+                      style={{
+                        backgroundColor: unlocked
+                          ? theme.accentHex
+                          : 'rgba(255,255,255,0.12)',
+                        boxShadow: isCurrent
+                          ? `0 0 10px ${theme.accentHex}`
+                          : undefined,
+                      }}
+                    />
+                  );
+                })}
+              </div>
+
               <div className="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-amber-900/45 pt-1.5 text-xs font-bold text-amber-200/80 sm:mt-2.5 sm:pt-2">
                 <span className="inline-flex items-center gap-1.5">
                   <Layers aria-hidden="true" className="h-3.5 w-3.5 text-emerald-300" />
@@ -1703,6 +1867,30 @@ export default function BlockBlastScreen({
                     <span>Nước đi: {state.movesCount}</span>
                   )}
                 </span>
+              </div>
+
+              <div className="mt-1.5 flex items-center justify-between gap-2 text-[11px] font-bold">
+                {occupiedCells > 0 && occupiedCells <= 20 ? (
+                  <span
+                    className="inline-flex items-center gap-1.5"
+                    style={{ color: stageTheme.sweepColorHex }}
+                  >
+                    <span
+                      className="h-1.5 w-1.5 animate-pulse rounded-full"
+                      style={{ backgroundColor: stageTheme.accentHex }}
+                      aria-hidden="true"
+                    />
+                    <span>
+                      Cơ hội All Clear · còn{' '}
+                      <strong className="tabular-nums text-white">{occupiedCells}</strong> ô → Stage{' '}
+                      {stageNumber + 1}
+                    </span>
+                  </span>
+                ) : (
+                  <span className="text-amber-200/60">
+                    Dọn sạch bàn (All Clear) để lên Stage {stageNumber + 1}
+                  </span>
+                )}
               </div>
             </section>
 
@@ -1764,7 +1952,7 @@ export default function BlockBlastScreen({
             {roomMode?.lastEmote && (
               <div
                 role="status"
-                className="flex items-center gap-2 rounded-full border border-amber-300/60 bg-[#2b180e]/95 px-4 py-1.5 text-xs font-black text-amber-100 shadow-lg"
+                className="pointer-events-none fixed left-1/2 top-20 z-40 flex -translate-x-1/2 items-center gap-2 rounded-full border border-amber-300/60 bg-[#2b180e]/95 px-4 py-1.5 text-xs font-black text-amber-100 shadow-lg"
               >
                 <span className="text-base">{roomMode.lastEmote.emote}</span>
                 <span>
@@ -1808,7 +1996,7 @@ export default function BlockBlastScreen({
               selectedSlot !== null && (
                 <div
                   role="status"
-                  className="flex w-full max-w-[492px] items-center justify-between gap-2 rounded-2xl border border-amber-400/45 bg-[#2a170e]/90 px-3.5 py-1.5 text-xs font-bold text-amber-100 shadow"
+                  className="fixed bottom-4 left-1/2 z-40 flex w-[min(92vw,492px)] -translate-x-1/2 items-center justify-between gap-2 rounded-2xl border border-amber-400/55 bg-[#2a170e]/95 px-3.5 py-2 text-xs font-bold text-amber-100 shadow-xl backdrop-blur-sm"
                 >
                   <span>
                     Đã chọn mảnh #{selectedSlot + 1} — nhấn vào ô trên bàn cờ để

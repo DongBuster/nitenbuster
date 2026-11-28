@@ -8,10 +8,13 @@ import type {
   BbParticipantInfo,
   BbPlayerProgress,
   BbPlayerStatus,
+  BbProgressEvent,
   BbRoomMember,
   BbRoomStanding,
   BbVerificationStatus,
 } from './protocol.ts';
+
+const verificationCache = new WeakMap<MatchReceipt, Map<string, VerifyResult>>();
 
 function verificationBucket(
   verification: BbVerificationStatus,
@@ -53,34 +56,78 @@ export function verifyRoomSubmission(
       maxStreak: 0,
     };
   }
+
+  const cacheKey = `${expectedMatchId}:${expectedSeed}`;
+  let byKey = verificationCache.get(receipt);
+  const cached = byKey?.get(cacheKey);
+  if (cached) return cached;
+
+  let result: VerifyResult;
   if (receipt.matchId !== expectedMatchId) {
-    return {
+    result = {
       valid: false,
       reason: 'Match ID mismatch',
       verifiedScore: 0,
       linesCleared: 0,
       maxStreak: 0,
     };
-  }
-  if (receipt.seed !== expectedSeed) {
-    return {
+  } else if (receipt.seed !== expectedSeed) {
+    result = {
       valid: false,
       reason: 'Seed mismatch',
       verifiedScore: 0,
       linesCleared: 0,
       maxStreak: 0,
     };
-  }
-  if (receipt.rescueEligible !== false || receipt.bombPaidCount !== 0) {
-    return {
+  } else if (receipt.rescueEligible !== false || receipt.bombPaidCount !== 0) {
+    result = {
       valid: false,
       reason: 'Paid Candy Bomb rescue is disabled in competitive rooms',
       verifiedScore: 0,
       linesCleared: 0,
       maxStreak: 0,
     };
+  } else {
+    result = verifyMatchReceipt(receipt);
   }
-  return verifyMatchReceipt(receipt);
+
+  if (!byKey) {
+    byKey = new Map<string, VerifyResult>();
+    verificationCache.set(receipt, byKey);
+  }
+  byKey.set(cacheKey, result);
+  return result;
+}
+
+/**
+ * Returns true if an incoming progress event advances a peer's known state,
+ * ignoring stale or duplicate-seq echoes while always allowing transition to 'finished'.
+ */
+export function shouldApplyProgressEvent(
+  prev: BbPlayerProgress | undefined,
+  evt: BbProgressEvent,
+): boolean {
+  if (!prev) return true;
+  if (evt.status === 'finished' && prev.status !== 'finished') return true;
+  if (prev.status === 'finished' && evt.status !== 'finished') return false;
+  return evt.seq > prev.seq;
+}
+
+/**
+ * Guards against false-positive disconnects caused by transient Presence flickers:
+ * never disconnects self and spares peers whose progress updated within the grace window.
+ */
+export function shouldMarkPeerDisconnected(
+  rosterId: string,
+  myPeerId: string,
+  latest: BbPlayerProgress | undefined,
+  nowMs: number,
+  graceMs: number,
+): boolean {
+  if (rosterId === myPeerId) return false;
+  if (!latest || latest.status !== 'playing') return false;
+  if (nowMs - latest.updatedAt < graceMs) return false;
+  return true;
 }
 
 /** Returns true once every participant in the match roster has finished or disconnected. */

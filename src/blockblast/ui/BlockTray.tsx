@@ -1,4 +1,4 @@
-import type { PointerEvent } from 'react';
+import { memo, type PointerEvent } from 'react';
 import { Bomb, Sparkles } from 'lucide-react';
 import type { TrayPiece } from '../engine/types.ts';
 import {
@@ -138,7 +138,7 @@ export interface BlockTrayProps {
  * Three-slot tactile piece tray supporting pointer drag-and-drop (.bb-drag-handle),
  * keyboard/click selection via native buttons, and progressive stage theming.
  */
-export function BlockTray({
+export const BlockTray = memo(function BlockTray({
   tray,
   draggingSlot,
   selectedSlot,
@@ -197,6 +197,9 @@ export function BlockTray({
                 ? 'Mảnh này hiện chưa có vị trí trống phù hợp trên bàn cờ'
                 : undefined
             }
+            draggable={false}
+            onDragStart={(e) => e.preventDefault()}
+            onContextMenu={(e) => e.preventDefault()}
             onPointerDown={(e) => {
               if (disabled) return;
               if (e.pointerType === 'mouse' && e.button !== 0) return;
@@ -249,4 +252,4 @@ export function BlockTray({
       })}
     </div>
   );
-}
+});

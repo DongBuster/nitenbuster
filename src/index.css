@@ -1,5 +1,17 @@
 @import "tailwindcss";
 
+:root {
+  --in-oklab: ;
+  --in-oklch: ;
+}
+
+@supports (background: linear-gradient(in oklab, white, black)) {
+  :root {
+    --in-oklab: in oklab;
+    --in-oklch: in oklch;
+  }
+}
+
 @theme {
   --font-display: "Fredoka", "Nunito", ui-rounded, "Hiragino Maru Gothic ProN",
     Quicksand, Comfortaa, "Arial Rounded MT", sans-serif;
@@ -351,6 +363,10 @@ dialog::backdrop {
     .bb-score-shimmer:not(.bb-no-motion) {
       animation: bb-score-shimmer 2.6s ease-in-out infinite;
     }
+
+    .bb-stage-aura:not(.bb-no-motion) {
+      animation: bb-stage-aura 3.8s ease-in-out infinite;
+    }
   }
 
   .bb-score-digits {
@@ -430,6 +446,72 @@ dialog::backdrop {
     background-size: 16px 16px, 100% 100%, 100% 100%;
   }
 
+  .bb-frame-rim-inferno {
+    background-image:
+      repeating-linear-gradient(
+        -45deg,
+        rgba(251, 146, 60, 0.24) 0 3px,
+        transparent 3px 11px,
+        rgba(244, 63, 94, 0.2) 11px 13px,
+        transparent 13px 20px
+      ),
+      linear-gradient(180deg var(--in-oklab), #4d190a, #1d0704);
+  }
+
+  .bb-frame-rim-emerald-jade {
+    background-image:
+      repeating-linear-gradient(
+        60deg,
+        rgba(52, 211, 153, 0.2) 0 2px,
+        transparent 2px 12px
+      ),
+      repeating-linear-gradient(
+        -60deg,
+        rgba(250, 204, 21, 0.16) 0 2px,
+        transparent 2px 12px
+      ),
+      linear-gradient(180deg var(--in-oklab), #104233, #051b14);
+  }
+
+  .bb-frame-rim-cyber-neon {
+    background-image:
+      repeating-linear-gradient(
+        90deg,
+        rgba(34, 211, 238, 0.26) 0 1px,
+        transparent 1px 10px
+      ),
+      repeating-linear-gradient(
+        0deg,
+        rgba(236, 72, 153, 0.22) 0 1px,
+        transparent 1px 10px
+      ),
+      linear-gradient(180deg var(--in-oklch), #15254d, #070d21);
+  }
+
+  .bb-frame-rim-eclipse {
+    background-image:
+      radial-gradient(circle at 50% 0%, rgba(251, 146, 60, 0.34), transparent 55%),
+      repeating-linear-gradient(
+        90deg,
+        rgba(167, 139, 250, 0.2) 0 2px,
+        transparent 2px 14px
+      ),
+      linear-gradient(180deg var(--in-oklab), #29134a, #0a0417);
+  }
+
+  .bb-frame-rim-prism-eternal {
+    background-image:
+      radial-gradient(circle, rgba(255, 255, 255, 0.42) 1px, transparent 1.6px),
+      linear-gradient(
+        135deg var(--in-oklch),
+        rgba(250, 204, 21, 0.28) 0%,
+        rgba(34, 211, 238, 0.28) 50%,
+        rgba(217, 70, 239, 0.3) 100%
+      ),
+      linear-gradient(180deg var(--in-oklab), #331b66, #110829);
+    background-size: 14px 14px, 100% 100%, 100% 100%;
+  }
+
   /* Block Blast stage board well subtle ambient washes */
   .bb-well-timber {
     background-image: repeating-linear-gradient(
@@ -468,6 +550,39 @@ dialog::backdrop {
     background-image:
       radial-gradient(circle at 22% 22%, rgba(99, 102, 241, 0.2), transparent 46%),
       radial-gradient(circle at 80% 78%, rgba(6, 182, 212, 0.16), transparent 50%);
+  }
+
+  .bb-well-inferno {
+    background-image:
+      radial-gradient(ellipse at 50% 100%, rgba(249, 115, 22, 0.22), transparent 58%),
+      radial-gradient(circle at 20% 20%, rgba(244, 63, 94, 0.16), transparent 46%);
+  }
+
+  .bb-well-emerald-jade {
+    background-image:
+      radial-gradient(ellipse at 50% 0%, rgba(16, 185, 129, 0.2), transparent 62%),
+      linear-gradient(135deg, rgba(250, 204, 21, 0.08) 0%, transparent 55%);
+  }
+
+  .bb-well-cyber-neon {
+    background-image:
+      linear-gradient(90deg, rgba(34, 211, 238, 0.06) 1px, transparent 1px),
+      linear-gradient(0deg, rgba(236, 72, 153, 0.06) 1px, transparent 1px),
+      radial-gradient(circle at 80% 18%, rgba(236, 72, 153, 0.18), transparent 48%),
+      radial-gradient(circle at 18% 82%, rgba(6, 182, 212, 0.2), transparent 50%);
+    background-size: 24px 24px, 24px 24px, 100% 100%, 100% 100%;
+  }
+
+  .bb-well-eclipse {
+    background-image:
+      radial-gradient(circle at 50% 50%, rgba(251, 146, 60, 0.14) 0%, rgba(124, 58, 237, 0.18) 38%, transparent 70%);
+  }
+
+  .bb-well-prism-eternal {
+    background-image:
+      radial-gradient(circle at 18% 18%, rgba(250, 204, 21, 0.18), transparent 46%),
+      radial-gradient(circle at 82% 24%, rgba(34, 211, 238, 0.18), transparent 46%),
+      radial-gradient(circle at 50% 85%, rgba(217, 70, 239, 0.22), transparent 52%);
   }
 
   /* Block Blast per-stage block material shaders */
@@ -598,6 +713,128 @@ dialog::backdrop {
       36% 36%
     );
     opacity: 0.92;
+    pointer-events: none;
+  }
+
+  .bb-tile-inferno::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      145deg var(--in-oklab),
+      rgba(255, 237, 213, 0.52) 0%,
+      rgba(251, 146, 60, 0.14) 45%,
+      rgba(159, 18, 57, 0.34) 100%
+    );
+    pointer-events: none;
+  }
+
+  .bb-tile-inferno::after {
+    content: "";
+    position: absolute;
+    inset: 2px;
+    border-radius: 3px;
+    border: 1px solid rgba(254, 215, 170, 0.48);
+    box-shadow: inset 0 0 8px rgba(251, 146, 60, 0.35);
+    pointer-events: none;
+  }
+
+  .bb-tile-emerald-jade::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(135deg, rgba(255, 255, 255, 0.5) 0% 34%, transparent 35%),
+      linear-gradient(315deg, rgba(6, 78, 59, 0.32) 0% 30%, transparent 31%);
+    pointer-events: none;
+  }
+
+  .bb-tile-emerald-jade::after {
+    content: "";
+    position: absolute;
+    inset: 20%;
+    border-radius: 3px;
+    border: 1px solid rgba(254, 243, 199, 0.62);
+    background: linear-gradient(145deg, rgba(209, 250, 229, 0.32), transparent);
+    pointer-events: none;
+  }
+
+  .bb-tile-cyber-neon::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+      repeating-linear-gradient(
+        0deg,
+        rgba(255, 255, 255, 0.14) 0 2px,
+        transparent 2px 5px
+      ),
+      linear-gradient(135deg, rgba(236, 254, 255, 0.42), transparent 56%);
+    pointer-events: none;
+  }
+
+  .bb-tile-cyber-neon::after {
+    content: "";
+    position: absolute;
+    inset: 2px;
+    border-radius: 3px;
+    border: 1px solid rgba(165, 243, 252, 0.65);
+    box-shadow: inset 0 0 7px rgba(244, 114, 182, 0.42);
+    pointer-events: none;
+  }
+
+  .bb-tile-eclipse::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(
+      circle at 28% 28%,
+      rgba(255, 247, 237, 0.56) 0%,
+      rgba(251, 146, 60, 0.14) 42%,
+      rgba(15, 7, 32, 0.38) 100%
+    );
+    pointer-events: none;
+  }
+
+  .bb-tile-eclipse::after {
+    content: "";
+    position: absolute;
+    inset: 18%;
+    border-radius: 999px;
+    border: 1.5px solid rgba(253, 186, 116, 0.72);
+    box-shadow: 0 0 6px rgba(251, 146, 60, 0.5);
+    pointer-events: none;
+  }
+
+  .bb-tile-prism-eternal::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      130deg var(--in-oklch),
+      rgba(255, 255, 255, 0.6) 0%,
+      rgba(103, 232, 249, 0.28) 45%,
+      rgba(232, 121, 249, 0.34) 100%
+    );
+    pointer-events: none;
+  }
+
+  .bb-tile-prism-eternal::after {
+    content: "";
+    position: absolute;
+    inset: 18%;
+    background: linear-gradient(135deg, #ffffff, #fef08a);
+    clip-path: polygon(
+      50% 0%,
+      68% 32%,
+      100% 50%,
+      68% 68%,
+      50% 100%,
+      32% 68%,
+      0% 50%,
+      32% 32%
+    );
+    opacity: 0.9;
     pointer-events: none;
   }
 }
@@ -906,5 +1143,17 @@ dialog::backdrop {
   }
   50% {
     filter: brightness(1.18);
+  }
+}
+
+@keyframes bb-stage-aura {
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.92;
+    transform: scale(1.008);
   }
 }

@@ -90,6 +90,67 @@ const STAGE_SCORE_VISUALS: Record<StageThemeId, StageScoreVisual> = {
       'border-cyan-300/80 bg-gradient-to-b from-violet-500/35 to-cyan-500/30 text-cyan-50 shadow-[0_0_22px_rgba(103,232,249,0.45)]',
     sparkColors: ['#FEF3C7', '#67E8F9', '#C4B5FD'],
   },
+  inferno: {
+    cardClass:
+      'border-orange-400/90 bg-gradient-to-b from-[#44170B] via-[#2B0E07] to-[#170604] shadow-[0_14px_40px_rgba(249,115,22,0.44),0_0_22px_rgba(244,63,94,0.26),inset_0_1px_0_rgba(254,215,170,0.4)]',
+    labelClass: 'text-orange-200/95',
+    digitGradient: 'linear-gradient(180deg, #FFF7ED 0%, #FDBA74 44%, #F43F5E 100%)',
+    digitGlow: 'drop-shadow(0 0 18px rgba(251,146,60,0.78))',
+    beamGradient:
+      'linear-gradient(110deg, transparent 15%, rgba(253,186,116,0.62) 46%, rgba(251,113,133,0.48) 58%, transparent 85%)',
+    streakActiveClass:
+      'border-orange-300/85 bg-gradient-to-b from-orange-500/40 to-rose-600/35 text-orange-50 shadow-[0_0_24px_rgba(249,115,22,0.5)]',
+    sparkColors: ['#FEF08A', '#FB923C', '#FB7185'],
+  },
+  emerald_jade: {
+    cardClass:
+      'border-emerald-400/90 bg-gradient-to-b from-[#0F3C2E] via-[#0A261D] to-[#051611] shadow-[0_14px_40px_rgba(16,185,129,0.44),0_0_22px_rgba(250,204,21,0.22),inset_0_1px_0_rgba(167,243,208,0.4)]',
+    labelClass: 'text-emerald-200/95',
+    digitGradient: 'linear-gradient(180deg, #ECFDF5 0%, #6EE7B7 46%, #FCD34D 100%)',
+    digitGlow: 'drop-shadow(0 0 19px rgba(52,211,153,0.78))',
+    beamGradient:
+      'linear-gradient(110deg, transparent 15%, rgba(167,243,208,0.62) 48%, rgba(252,211,77,0.45) 60%, transparent 85%)',
+    streakActiveClass:
+      'border-emerald-300/85 bg-gradient-to-b from-emerald-500/35 to-amber-500/30 text-emerald-50 shadow-[0_0_24px_rgba(52,211,153,0.48)]',
+    sparkColors: ['#D1FAE5', '#34D399', '#FCD34D'],
+  },
+  cyber_neon: {
+    cardClass:
+      'border-cyan-400/90 bg-gradient-to-b from-[#132245] via-[#0C1530] to-[#060B1C] shadow-[0_16px_42px_rgba(6,182,212,0.48),0_0_26px_rgba(236,72,153,0.34),inset_0_1px_0_rgba(165,243,252,0.44)]',
+    labelClass: 'text-cyan-200',
+    digitGradient: 'linear-gradient(180deg, #ECFEFF 0%, #22D3EE 46%, #F472B6 100%)',
+    digitGlow: 'drop-shadow(0 0 20px rgba(34,211,238,0.84))',
+    beamGradient:
+      'linear-gradient(110deg, transparent 14%, rgba(34,211,238,0.65) 45%, rgba(244,114,182,0.52) 58%, transparent 86%)',
+    streakActiveClass:
+      'border-cyan-300/85 bg-gradient-to-b from-cyan-500/40 to-fuchsia-500/35 text-cyan-50 shadow-[0_0_26px_rgba(34,211,238,0.52)]',
+    sparkColors: ['#ECFEFF', '#22D3EE', '#F472B6'],
+  },
+  eclipse: {
+    cardClass:
+      'border-amber-400/90 bg-gradient-to-b from-[#251342] via-[#170B2B] to-[#0B0417] shadow-[0_16px_44px_rgba(124,58,237,0.52),0_0_28px_rgba(251,146,60,0.36),inset_0_1px_0_rgba(254,215,170,0.44)]',
+    labelClass: 'text-amber-200',
+    digitGradient: 'linear-gradient(180deg, #FFF7ED 0%, #FDBA74 44%, #A78BFA 100%)',
+    digitGlow: 'drop-shadow(0 0 21px rgba(251,146,60,0.85))',
+    beamGradient:
+      'linear-gradient(110deg, transparent 14%, rgba(253,186,116,0.66) 46%, rgba(167,139,250,0.54) 58%, transparent 86%)',
+    streakActiveClass:
+      'border-amber-300/90 bg-gradient-to-b from-violet-600/40 to-orange-500/35 text-amber-50 shadow-[0_0_26px_rgba(251,146,60,0.54)]',
+    sparkColors: ['#FFF7ED', '#FB923C', '#C4B5FD'],
+  },
+  prism_eternal: {
+    cardClass:
+      'border-fuchsia-300/95 bg-gradient-to-b from-[#301961] via-[#1C0F3D] to-[#0D0722] shadow-[0_18px_48px_rgba(168,85,247,0.58),0_0_32px_rgba(250,204,21,0.4),0_0_18px_rgba(34,211,238,0.3),inset_0_1px_0_rgba(255,255,255,0.55)]',
+    labelClass: 'text-yellow-200',
+    digitGradient:
+      'linear-gradient(180deg, #FFFFFF 0%, #FEF08A 34%, #67E8F9 68%, #E879F9 100%)',
+    digitGlow: 'drop-shadow(0 0 22px rgba(250,204,21,0.88))',
+    beamGradient:
+      'linear-gradient(110deg, transparent 12%, rgba(254,240,138,0.68) 40%, rgba(103,232,249,0.58) 54%, rgba(232,121,249,0.52) 66%, transparent 88%)',
+    streakActiveClass:
+      'border-yellow-200/90 bg-gradient-to-b from-fuchsia-500/40 via-cyan-500/30 to-yellow-400/35 text-white shadow-[0_0_28px_rgba(232,121,249,0.58)]',
+    sparkColors: ['#FEF08A', '#67E8F9', '#F0ABFC', '#FFFFFF'],
+  },
 };
 
 /** Returns stage-matched visual tokens for the Block Blast scoreboard header. */
@@ -102,8 +163,9 @@ export function buildScoreSparks(
   tier: ScorePulseTier,
   points: number,
   stageId: StageThemeId,
+  stageTier = 1,
 ): ScoreSparkSpec[] {
-  const count =
+  const baseCount =
     tier === 'allClear'
       ? 12
       : tier === 'combo' || tier === 'bomb'
@@ -113,7 +175,9 @@ export function buildScoreSparks(
           : points >= 40
             ? 4
             : 0;
-  if (count === 0) return [];
+  if (baseCount === 0) return [];
+  const tierBonus = stageTier >= 8 ? 4 : stageTier >= 6 ? 2 : 0;
+  const count = baseCount + tierBonus;
 
   const colors = getStageScoreVisual(stageId).sparkColors;
   const sparks: ScoreSparkSpec[] = [];

@@ -40,6 +40,8 @@ import {
   computeRoomStandings,
   electRoomHost,
   isRoomMatchComplete,
+  shouldApplyProgressEvent,
+  shouldMarkPeerDisconnected,
 } from './ranking.ts';
 
 export type BbConnectionStatus =
@@ -285,8 +287,14 @@ export function useBlockBlastRoom() {
       if (!rosterPeerIdsRef.current.includes(evt.peerId)) return;
 
       const prev = progressByPeerRef.current[evt.peerId];
-      if (prev && evt.seq < prev.seq && evt.status !== 'finished') {
+      if (!shouldApplyProgressEvent(prev, evt)) {
         return;
+      }
+
+      const pendingTimer = disconnectTimersRef.current.get(evt.peerId);
+      if (pendingTimer !== undefined) {
+        window.clearTimeout(pendingTimer);
+        disconnectTimersRef.current.delete(evt.peerId);
       }
 
       const nextEntry: BbPlayerProgress = {
@@ -308,6 +316,12 @@ export function useBlockBlastRoom() {
     (evt: BbFinishEvent) => {
       if (!evt.matchId || evt.matchId !== matchIdRef.current) return;
       if (!rosterPeerIdsRef.current.includes(evt.peerId)) return;
+
+      const pendingTimer = disconnectTimersRef.current.get(evt.peerId);
+      if (pendingTimer !== undefined) {
+        window.clearTimeout(pendingTimer);
+        disconnectTimersRef.current.delete(evt.peerId);
+      }
 
       const nextReceipts: Record<string, MatchReceipt> = {
         ...receiptsByPeerRef.current,
@@ -340,6 +354,18 @@ export function useBlockBlastRoom() {
       checkAndFinalizeMatch(nextMap);
     },
     [checkAndFinalizeMatch],
+  );
+
+  const applyEmote = useCallback(
+    (evt: BbEmoteEvent) => {
+      clearEmoteTimer();
+      setLastEmote(evt);
+      emoteTimerRef.current = window.setTimeout(() => {
+        emoteTimerRef.current = null;
+        setLastEmote((curr) => (curr?.at === evt.at ? null : curr));
+      }, 2800);
+    },
+    [clearEmoteTimer],
   );
 
   const applyMatchStart = useCallback(
@@ -513,7 +539,7 @@ export function useBlockBlastRoom() {
 
       const channel = client.channel(`bb-room:${code}`, {
         config: {
-          broadcast: { self: true },
+          broadcast: { self: false },
           presence: { key: myPeerId },
         },
       });
@@ -556,7 +582,7 @@ export function useBlockBlastRoom() {
             setHostId(nextHost);
           }
 
-          // Track disconnects with 5s grace period during active matches
+          // Track disconnects with grace period during active matches
           if (
             phaseRef.current === 'countdown' ||
             phaseRef.current === 'playing'
@@ -565,6 +591,8 @@ export function useBlockBlastRoom() {
             const capturedMatchId = matchIdRef.current;
 
             for (const rosterId of rosterPeerIdsRef.current) {
+              if (rosterId === myPeerId) continue;
+
               if (presentIds.has(rosterId)) {
                 const pendingTimer = disconnectTimersRef.current.get(rosterId);
                 if (pendingTimer !== undefined) {
@@ -583,7 +611,17 @@ export function useBlockBlastRoom() {
                   disconnectTimersRef.current.delete(rosterId);
                   if (matchIdRef.current !== capturedMatchId) return;
                   const latest = progressByPeerRef.current[rosterId];
-                  if (!latest || latest.status !== 'playing') return;
+                  if (
+                    !shouldMarkPeerDisconnected(
+                      rosterId,
+                      myPeerId,
+                      latest,
+                      Date.now(),
+                      BB_DISCONNECT_GRACE_MS,
+                    )
+                  ) {
+                    return;
+                  }
 
                   const nextMap: Record<string, BbPlayerProgress> = {
                     ...progressByPeerRef.current,
@@ -621,12 +659,7 @@ export function useBlockBlastRoom() {
         .on('broadcast', { event: 'bb_emote' }, ({ payload }) => {
           const evt = payload as BbEmoteEvent | undefined;
           if (!evt) return;
-          clearEmoteTimer();
-          setLastEmote(evt);
-          emoteTimerRef.current = window.setTimeout(() => {
-            emoteTimerRef.current = null;
-            setLastEmote((curr) => (curr?.at === evt.at ? null : curr));
-          }, 2800);
+          applyEmote(evt);
         })
         .on('broadcast', { event: 'bb_return_lobby' }, ({ payload }) => {
           const evt = payload as BbReturnLobbyEvent | undefined;
@@ -694,12 +727,12 @@ export function useBlockBlastRoom() {
       });
     },
     [
+      applyEmote,
       applyFinishSubmission,
       applyMatchStart,
       applyProgressUpdate,
       applyRoomSync,
       checkAndFinalizeMatch,
-      clearEmoteTimer,
       myPeerId,
       resetMatchState,
       teardownChannel,
@@ -926,6 +959,7 @@ export function useBlockBlastRoom() {
         text,
         at: Date.now(),
       };
+      applyEmote(evt);
       if (channel) {
         void channel.send({
           type: 'broadcast',
@@ -934,7 +968,7 @@ export function useBlockBlastRoom() {
         });
       }
     },
-    [myPeerId],
+    [applyEmote, myPeerId],
   );
 
   useEffect(() => {

@@ -1,4 +1,4 @@
-import { Fragment, useMemo, type CSSProperties, type RefObject } from 'react';
+import { Fragment, memo, useMemo, type CSSProperties, type RefObject } from 'react';
 import { Crosshair } from 'lucide-react';
 import {
   BOARD_SIZE,
@@ -121,7 +121,7 @@ function clampPct(value: number, min: number, max: number): number {
  * ghost placement preview, full-line sweep beams, Candy Bomb 3x3 aiming overlay,
  * and decoupled multi-layer burst VFX.
  */
-export function BlockBoard({
+export const BlockBoard = memo(function BlockBoard({
   boardRef,
   grid,
   preview,
@@ -184,6 +184,18 @@ export function BlockBoard({
     >
       <StageFrameOrnaments stageId={stageTheme.id} />
 
+      {/* Compositor-only breathing ambient halo unlocked on high stages (Stage 6+) */}
+      {stageTheme.tier >= 6 && (
+        <div
+          aria-hidden="true"
+          className={`bb-stage-aura${motionFlagClass} pointer-events-none absolute -inset-1 rounded-[28px]`}
+          style={{
+            boxShadow: `0 0 ${24 + (stageTheme.tier - 5) * 4}px ${stageTheme.accentHex}66, inset 0 0 18px ${stageTheme.sweepColorHex}44`,
+            border: `1px solid ${stageTheme.accentHex}77`,
+          }}
+        />
+      )}
+
       {/* Recessed 8x8 board well */}
       <div
         className={`relative z-10 rounded-2xl border p-1 shadow-[inset_0_4px_12px_rgba(0,0,0,0.75)] transition-[background-color,border-color,box-shadow] duration-500 sm:p-2 ${stageTheme.wellClass} ${stageTheme.wellAmbientClass}`}
@@ -200,9 +212,7 @@ export function BlockBoard({
                 : undefined
             }
             onPointerLeave={onBoardPointerLeave}
-            className={`grid grid-cols-8 gap-[3px] sm:gap-1.5 ${
-              bombAiming ? 'touch-none' : 'touch-manipulation'
-            }`}
+            className="grid touch-none select-none grid-cols-8 gap-[3px] sm:gap-1.5"
           >
             {grid.map((row, r) =>
               row.map((cell, c) => {
@@ -338,7 +348,7 @@ export function BlockBoard({
           >
             {bursts.map((burst) => {
               const ringCount = burst.shockwaveCount
-                ? Math.min(3, Math.max(0, Math.floor(burst.shockwaveCount)))
+                ? Math.min(5, Math.max(0, Math.floor(burst.shockwaveCount)))
                 : 0;
               const callout = burst.callout;
               const fallbackLabel = !callout ? burst.label : undefined;
@@ -535,4 +545,4 @@ export function BlockBoard({
       </div>
     </div>
   );
-}
+});

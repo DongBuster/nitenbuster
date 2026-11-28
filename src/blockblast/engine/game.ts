@@ -26,6 +26,9 @@ interface ScoredPlacement {
 const SLOT_PRIMARY_WEIGHTS = [40, 26, 16, 10, 8] as const;
 const ALL_CLEAR_WEIGHT_MULTIPLIER = 4;
 const TACTICAL_FIT_SCORE_THRESHOLD = 85;
+const SINGLE_ALL_CLEAR_MAX_OCCUPIED = 22;
+const MULTI_ALL_CLEAR_MAX_OCCUPIED = 20;
+const CLEANUP_BIAS_MAX_OCCUPIED = 22;
 const ORTHOGONAL_DIRS: readonly (readonly [number, number])[] = [
   [-1, 0],
   [1, 0],
@@ -462,13 +465,28 @@ function scorePlacementFit(
 
   const isAllClear =
     clearCount > 0 &&
-    occupiedBefore <= 16 &&
+    occupiedBefore <= SINGLE_ALL_CLEAR_MAX_OCCUPIED &&
     isGridEmptyAfterClear(grid, defPiece, row, col, clearedRowMask, clearedColMask);
   const allClearBonus = isAllClear ? 220 : 0;
 
+  let cleanupBias = 0;
+  if (occupiedBefore >= 1 && occupiedBefore <= CLEANUP_BIAS_MAX_OCCUPIED && clearCount > 0) {
+    let leftoverSelfCells = 0;
+    for (const cell of defPiece.cells) {
+      const r = row + cell.dr;
+      const c = col + cell.dc;
+      if ((clearedRowMask & (1 << r)) === 0 && (clearedColMask & (1 << c)) === 0) {
+        leftoverSelfCells++;
+      }
+    }
+    cleanupBias = leftoverSelfCells === 0 ? 24 : -leftoverSelfCells * 5;
+  }
+
   const largeCrowdingPenalty =
-    clearCount === 0 && defPiece.group === 'large' && occupiedBefore >= 12
-      ? 24
+    clearCount === 0 && defPiece.group === 'large' && occupiedBefore >= 8
+      ? occupiedBefore <= CLEANUP_BIAS_MAX_OCCUPIED
+        ? 30
+        : 24
       : 0;
 
   // Favor line clears & block adjacency over unanchored wall/size scores so tight pockets win.
@@ -479,6 +497,7 @@ function scorePlacementFit(
     defPiece.cells.length -
     newlyIsolated * 14 -
     largeCrowdingPenalty +
+    cleanupBias +
     allClearBonus;
   return { score, isAllClear };
 }
@@ -746,6 +765,236 @@ function pickSmartPieceForSlot(
   };
 }
 
+interface CleanupMove {
+  defPiece: PieceDef;
+  row: number;
+  col: number;
+  score: number;
+}
+
+function findAllClearFinishers(
+  grid: Grid,
+  usedIds: ReadonlySet<string>,
+): { defPiece: PieceDef; row: number; col: number }[] {
+  const occupied = countOccupiedCells(grid);
+  if (occupied === 0 || occupied > SINGLE_ALL_CLEAR_MAX_OCCUPIED) return [];
+  const { rowEmpty, colEmpty } = buildLineEmptyCounts(grid);
+  const finishers: { defPiece: PieceDef; row: number; col: number }[] = [];
+
+  for (const defPiece of BLOCK_PIECES) {
+    if (usedIds.has(defPiece.id)) continue;
+    let found: { row: number; col: number } | null = null;
+    for (let r = 0; r <= BOARD_SIZE - defPiece.height && !found; r++) {
+      for (let c = 0; c <= BOARD_SIZE - defPiece.width && !found; c++) {
+        if (!canPlaceCells(grid, defPiece.cells, r, c)) continue;
+        const { clearedRowMask, clearedColMask, clearCount } = countClearedLineMasks(
+          defPiece,
+          r,
+          c,
+          rowEmpty,
+          colEmpty,
+        );
+        if (
+          clearCount > 0 &&
+          isGridEmptyAfterClear(grid, defPiece, r, c, clearedRowMask, clearedColMask)
+        ) {
+          found = { row: r, col: c };
+        }
+      }
+    }
+    if (found) {
+      finishers.push({ defPiece, row: found.row, col: found.col });
+    }
+  }
+
+  finishers.sort((a, b) => a.defPiece.cells.length - b.defPiece.cells.length);
+  return finishers;
+}
+
+function findCleanupCandidates(
+  grid: Grid,
+  usedIds: ReadonlySet<string>,
+  limit: number,
+): CleanupMove[] {
+  const occupied = countOccupiedCells(grid);
+  if (occupied === 0) return [];
+  const { rowEmpty, colEmpty } = buildLineEmptyCounts(grid);
+  const candidates: CleanupMove[] = [];
+
+  for (const defPiece of BLOCK_PIECES) {
+    if (usedIds.has(defPiece.id)) continue;
+    let bestForPiece: CleanupMove | null = null;
+
+    for (let r = 0; r <= BOARD_SIZE - defPiece.height; r++) {
+      for (let c = 0; c <= BOARD_SIZE - defPiece.width; c++) {
+        if (!canPlaceCells(grid, defPiece.cells, r, c)) continue;
+        const { clearedRowMask, clearedColMask, clearCount } = countClearedLineMasks(
+          defPiece,
+          r,
+          c,
+          rowEmpty,
+          colEmpty,
+        );
+
+        let leftoverSelfCells = 0;
+        let clutterOnEmptyLines = 0;
+        for (const cell of defPiece.cells) {
+          const rr = r + cell.dr;
+          const cc = c + cell.dc;
+          const isCleared =
+            (clearedRowMask & (1 << rr)) !== 0 || (clearedColMask & (1 << cc)) !== 0;
+          if (!isCleared) {
+            leftoverSelfCells++;
+            if (rowEmpty[rr] === BOARD_SIZE && colEmpty[cc] === BOARD_SIZE) {
+              clutterOnEmptyLines++;
+            }
+          }
+        }
+        if (clutterOnEmptyLines > 0) continue;
+
+        let moveScore = -1;
+        if (clearCount > 0) {
+          let clearedExisting = 0;
+          for (let rr = 0; rr < BOARD_SIZE; rr++) {
+            if ((clearedRowMask & (1 << rr)) !== 0) {
+              clearedExisting += BOARD_SIZE - rowEmpty[rr];
+            }
+          }
+          for (let cc = 0; cc < BOARD_SIZE; cc++) {
+            if ((clearedColMask & (1 << cc)) !== 0) {
+              clearedExisting += BOARD_SIZE - colEmpty[cc];
+              for (let rr = 0; rr < BOARD_SIZE; rr++) {
+                if ((clearedRowMask & (1 << rr)) !== 0 && grid[rr][cc] !== null) {
+                  clearedExisting--;
+                }
+              }
+            }
+          }
+          const remainingAfter = occupied - clearedExisting + leftoverSelfCells;
+          if (remainingAfter < occupied) {
+            moveScore =
+              220 +
+              (occupied - remainingAfter) * 18 -
+              leftoverSelfCells * 14 +
+              clearCount * 30;
+          }
+        } else {
+          // Allow zero-clutter tightening moves that advance an active row or col toward clearing.
+          const firstR = r + defPiece.cells[0].dr;
+          const firstC = c + defPiece.cells[0].dc;
+          const singleActiveRow =
+            rowEmpty[firstR] < BOARD_SIZE &&
+            defPiece.cells.every((cell) => r + cell.dr === firstR);
+          const singleActiveCol =
+            colEmpty[firstC] < BOARD_SIZE &&
+            defPiece.cells.every((cell) => c + cell.dc === firstC);
+
+          if (singleActiveRow || singleActiveCol) {
+            const emptyLeft = singleActiveRow
+              ? rowEmpty[firstR] - defPiece.cells.length
+              : colEmpty[firstC] - defPiece.cells.length;
+            if (emptyLeft >= 1 && emptyLeft <= 5) {
+              moveScore = 115 + defPiece.cells.length * 10 - emptyLeft * 12;
+            }
+          }
+        }
+
+        if (moveScore > 0 && (bestForPiece === null || moveScore > bestForPiece.score)) {
+          bestForPiece = { defPiece, row: r, col: c, score: moveScore };
+        }
+      }
+    }
+
+    if (bestForPiece) {
+      candidates.push(bestForPiece);
+    }
+  }
+
+  candidates.sort((a, b) => b.score - a.score);
+  return candidates.slice(0, limit);
+}
+
+/**
+ * Searches for a deterministic 1-, 2-, or 3-piece non-duplicate tray plan that can
+ * completely clear a tidy board (All Clear), rewarding deliberate board cleanup.
+ */
+function findAllClearTrayPlan(
+  grid: Grid,
+  trayCounter: number,
+  prngState: number,
+): { planDefs: PieceDef[]; nextPrng: number } | null {
+  const occupied = countOccupiedCells(grid);
+  if (occupied === 0 || occupied > SINGLE_ALL_CLEAR_MAX_OCCUPIED) return null;
+
+  let rng = prngState;
+  const emptySet = new Set<string>();
+  const finishers1 = findAllClearFinishers(grid, emptySet);
+  if (finishers1.length > 0) {
+    const top = finishers1.slice(0, 3);
+    const roll = nextRandom(rng);
+    rng = roll.nextState;
+    const chosen = top[Math.min(top.length - 1, Math.floor(roll.value * top.length))];
+    return { planDefs: [chosen.defPiece], nextPrng: rng };
+  }
+
+  if (occupied > MULTI_ALL_CLEAR_MAX_OCCUPIED) return null;
+
+  const { rowEmpty, colEmpty } = buildLineEmptyCounts(grid);
+  let maxLineFilled = 0;
+  for (let i = 0; i < BOARD_SIZE; i++) {
+    maxLineFilled = Math.max(maxLineFilled, BOARD_SIZE - rowEmpty[i], BOARD_SIZE - colEmpty[i]);
+  }
+  // Avoid gifting multi-step clears on tray 2 unless the player actively lined up >=4 blocks on a line.
+  if (trayCounter < 3 && !(occupied <= 14 && maxLineFilled >= 4)) {
+    return null;
+  }
+
+  const d1Moves = findCleanupCandidates(grid, emptySet, 6);
+  if (d1Moves.length === 0) return null;
+
+  const g1States: { move: CleanupMove; grid: Grid }[] = [];
+  const plans2: PieceDef[][] = [];
+  for (const m1 of d1Moves) {
+    const g1 = simulatePlacementOnGrid(grid, m1.defPiece, m1.row, m1.col, 'amber');
+    g1States.push({ move: m1, grid: g1 });
+    const finishers2 = findAllClearFinishers(g1, new Set([m1.defPiece.id]));
+    if (finishers2.length > 0) {
+      plans2.push([m1.defPiece, finishers2[0].defPiece]);
+    }
+  }
+
+  if (plans2.length > 0) {
+    const roll = nextRandom(rng);
+    rng = roll.nextState;
+    const chosen = plans2[Math.min(plans2.length - 1, Math.floor(roll.value * plans2.length))];
+    return { planDefs: chosen, nextPrng: rng };
+  }
+
+  const plans3: PieceDef[][] = [];
+  for (const { move: m1, grid: g1 } of g1States.slice(0, 4)) {
+    const used1 = new Set([m1.defPiece.id]);
+    const d2Moves = findCleanupCandidates(g1, used1, 3);
+    for (const m2 of d2Moves) {
+      const g2 = simulatePlacementOnGrid(g1, m2.defPiece, m2.row, m2.col, 'amber');
+      const finishers3 = findAllClearFinishers(g2, new Set([m1.defPiece.id, m2.defPiece.id]));
+      if (finishers3.length > 0) {
+        plans3.push([m1.defPiece, m2.defPiece, finishers3[0].defPiece]);
+        if (plans3.length >= 4) break;
+      }
+    }
+    if (plans3.length >= 4) break;
+  }
+
+  if (plans3.length > 0) {
+    const roll = nextRandom(rng);
+    rng = roll.nextState;
+    const chosen = plans3[Math.min(plans3.length - 1, Math.floor(roll.value * plans3.length))];
+    return { planDefs: chosen, nextPrng: rng };
+  }
+
+  return null;
+}
+
 /** Spawns 3 deterministic stage-colored polyomino pieces using sequential gap-fitting simulation. */
 export function spawnSmartTray(
   grid: Grid,
@@ -754,12 +1003,77 @@ export function spawnSmartTray(
   allClears = 0,
 ): { tray: TrayPiece[]; nextPrng: number; nextTrayCounter: number } {
   let rng = prngState;
-  let simGrid = cloneGrid(grid);
   const stage = getStageNumber(allClears);
-  const tray: TrayPiece[] = [];
   const usedIds = new Set<string>();
   let largeCount = 0;
   let smallCount = 0;
+
+  const allClearPlan = findAllClearTrayPlan(grid, trayCounter, rng);
+  if (allClearPlan) {
+    rng = allClearPlan.nextPrng;
+    const chosenDefs: PieceDef[] = [...allClearPlan.planDefs];
+    for (const defPiece of chosenDefs) {
+      usedIds.add(defPiece.id);
+      if (defPiece.group === 'large') largeCount++;
+      if (defPiece.group === 'small') smallCount++;
+    }
+
+    let emptySim = createEmptyGrid();
+    for (let i = chosenDefs.length; i < 3; i++) {
+      const picked = pickSmartPieceForSlot(
+        emptySim,
+        emptySim,
+        rng,
+        i,
+        trayCounter,
+        stage,
+        largeCount,
+        smallCount,
+        usedIds,
+      );
+      rng = picked.nextPrng;
+      usedIds.add(picked.defPiece.id);
+      if (picked.defPiece.group === 'large') largeCount++;
+      if (picked.defPiece.group === 'small') smallCount++;
+      chosenDefs.push(picked.defPiece);
+      if (picked.placement && i < 2) {
+        emptySim = simulatePlacementOnGrid(
+          emptySim,
+          picked.defPiece,
+          picked.placement.row,
+          picked.placement.col,
+          'amber',
+        );
+      }
+    }
+
+    // Shuffle slot order deterministically so the player still solves the piece sequence.
+    for (let i = chosenDefs.length - 1; i > 0; i--) {
+      const swapRoll = nextRandom(rng);
+      rng = swapRoll.nextState;
+      const j = Math.min(i, Math.floor(swapRoll.value * (i + 1)));
+      const tmp = chosenDefs[i];
+      chosenDefs[i] = chosenDefs[j];
+      chosenDefs[j] = tmp;
+    }
+
+    const tray: TrayPiece[] = [];
+    for (let i = 0; i < chosenDefs.length; i++) {
+      const colorPick = pickStageColor(allClears, rng);
+      rng = colorPick.nextState;
+      tray.push(
+        createTrayPieceFromDef(
+          chosenDefs[i],
+          `t${trayCounter}_${i}_${chosenDefs[i].id}`,
+          colorPick.color,
+        ),
+      );
+    }
+    return { tray, nextPrng: rng, nextTrayCounter: trayCounter + 1 };
+  }
+
+  let simGrid = cloneGrid(grid);
+  const tray: TrayPiece[] = [];
 
   for (let i = 0; i < 3; i++) {
     const colorPick = pickStageColor(allClears, rng);

@@ -3,9 +3,9 @@ import type { MatchReceipt } from '../engine/verify.ts';
 
 export const BB_MAX_ROOM_PLAYERS = 8;
 export const BB_MIN_START_PLAYERS = 2;
-export const BB_DISCONNECT_GRACE_MS = 5000;
+export const BB_DISCONNECT_GRACE_MS = 15000;
 export const BB_COUNTDOWN_MS = 2600;
-export const BB_PROGRESS_THROTTLE_MS = 200;
+export const BB_PROGRESS_THROTTLE_MS = 350;
 
 export const BB_ROOM_EMOTES = [
   { emote: '🔥', text: 'Căng quá!' },

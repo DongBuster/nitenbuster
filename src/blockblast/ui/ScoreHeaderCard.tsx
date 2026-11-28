@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
-import { Flame, Sparkles, Trophy } from 'lucide-react';
+import { Crown, Flame, Sparkles, Trophy } from 'lucide-react';
 import type { BoardStageTheme } from '../engine/stages.ts';
 import {
   buildScoreSparks,
@@ -164,9 +164,10 @@ export function ScoreHeaderCard({
             visiblePulse.tier,
             visiblePulse.points,
             stageTheme.id,
+            stageTheme.tier,
           )
         : [],
-    [stageTheme.id, visiblePulse],
+    [stageTheme.id, stageTheme.tier, visiblePulse],
   );
 
   const haloStyle: CSSProperties | undefined = showHalo
@@ -331,6 +332,19 @@ export function ScoreHeaderCard({
           <div
             className={`inline-flex items-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-[11px] font-black transition-colors duration-500 sm:rounded-2xl sm:text-xs ${stageTheme.badgeClass}`}
           >
+            {stageTheme.tier >= 8 ? (
+              <Crown
+                aria-hidden="true"
+                className="h-3.5 w-3.5 shrink-0"
+                style={{ color: stageTheme.accentHex }}
+              />
+            ) : stageTheme.tier >= 6 ? (
+              <Sparkles
+                aria-hidden="true"
+                className="h-3.5 w-3.5 shrink-0"
+                style={{ color: stageTheme.accentHex }}
+              />
+            ) : null}
             <span>Stage {stageNumber}</span>
           </div>
         </div>

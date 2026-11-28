@@ -411,8 +411,8 @@ describe('blockblast anti-cheat replay verifier', () => {
 });
 
 describe('blockblast stage themes & palette discipline', () => {
-  it('defines 5 progressive themes with 2-3 harmonious colors and escalating VFX', () => {
-    assert.equal(STAGE_THEMES.length, 5);
+  it('defines 10 progressive themes with 2 harmonious colors and escalating VFX', () => {
+    assert.equal(STAGE_THEMES.length, 10);
     const seenIds = new Set<string>();
     for (let i = 0; i < STAGE_THEMES.length; i++) {
       const theme = STAGE_THEMES[i];
@@ -436,6 +436,7 @@ describe('blockblast stage themes & palette discipline', () => {
       if (i > 0) {
         assert.ok(theme.particleCount > STAGE_THEMES[i - 1].particleCount);
         assert.ok(theme.allClearParticleCount >= STAGE_THEMES[i - 1].allClearParticleCount);
+        assert.ok(theme.shockwaveRings >= STAGE_THEMES[i - 1].shockwaveRings);
       }
     }
     assert.equal(getStageTheme(0).id, 'timber');
@@ -443,7 +444,12 @@ describe('blockblast stage themes & palette discipline', () => {
     assert.equal(getStageTheme(2).id, 'sakura');
     assert.equal(getStageTheme(3).id, 'royal');
     assert.equal(getStageTheme(4).id, 'celestial');
-    assert.equal(getStageTheme(9).id, 'celestial');
+    assert.equal(getStageTheme(5).id, 'inferno');
+    assert.equal(getStageTheme(6).id, 'emerald_jade');
+    assert.equal(getStageTheme(7).id, 'cyber_neon');
+    assert.equal(getStageTheme(8).id, 'eclipse');
+    assert.equal(getStageTheme(9).id, 'prism_eternal');
+    assert.equal(getStageTheme(15).id, 'prism_eternal');
     assert.equal(getStageNumber(-2), 1);
     assert.equal(getStageNumber(0), 1);
     assert.equal(getStageNumber(9), 10);
@@ -460,10 +466,15 @@ describe('blockblast stage themes & palette discipline', () => {
     const celestialTheme = getStageTheme(4);
     assert.equal(resolveStageColorToken('violet', celestialTheme).bgHex, '#6366F1');
     assert.equal(resolveStageColorToken('sky', celestialTheme).bgHex, '#06B6D4');
+
+    const prismTheme = getStageTheme(9);
+    assert.equal(resolveStageColorToken('amber', prismTheme).bgHex, '#FACC15');
+    assert.equal(resolveStageColorToken('violet', prismTheme).bgHex, '#A855F7');
+    assert.equal(resolveStageColorToken('violet', prismTheme).patternGlyph, COLOR_TOKENS.violet.patternGlyph);
   });
 
   it('picks colors strictly from the active stage palette across PRNG draws', () => {
-    for (let allClears = 0; allClears <= 5; allClears++) {
+    for (let allClears = 0; allClears <= 10; allClears++) {
       const palette = getStageTheme(allClears).palette;
       let rng = 100 + allClears * 37;
       for (let step = 0; step < 25; step++) {
@@ -754,6 +765,92 @@ describe('blockblast board-aware smart spawner & stage progression', () => {
     assert.ok(pieceCounts.size >= 26, `expected broad shape rotation, only saw ${pieceCounts.size}/29`);
     for (const [id, count] of pieceCounts) {
       assert.ok(count / totalPieces <= 0.12, `piece ${id} monopolized ${count}/${totalPieces} spawns`);
+    }
+  });
+
+  it('spawns solvable 2-piece and 3-piece All Clear trays on tidy boards without duplicate shapes', () => {
+    const dummyAnchor = createTrayPieceFromDef(getPieceDefById('dot_1')!, 'anchor', 'amber');
+    function canTrayAllClearInOrder(
+      grid: ReturnType<typeof createEmptyGrid>,
+      tray: ReturnType<typeof spawnSmartTray>['tray'],
+    ): boolean {
+      const baseState = createInitialState(1);
+      function search(curGrid: ReturnType<typeof createEmptyGrid>, remaining: typeof tray): boolean {
+        const activeRows = new Set<number>();
+        const activeCols = new Set<number>();
+        for (let r = 0; r < 8; r++) {
+          for (let c = 0; c < 8; c++) {
+            if (curGrid[r][c] !== null) {
+              activeRows.add(r);
+              activeCols.add(c);
+            }
+          }
+        }
+        for (let i = 0; i < remaining.length; i++) {
+          const piece = remaining[i];
+          const nextRemaining = remaining.filter((_, idx) => idx !== i);
+          for (let r = 0; r <= 8 - piece.height; r++) {
+            for (let c = 0; c <= 8 - piece.width; c++) {
+              if (!canPlacePiece(curGrid, piece, r, c)) continue;
+              const touchesActiveLine = piece.cells.every(
+                (cell) => activeRows.has(r + cell.dr) || activeCols.has(c + cell.dc),
+              );
+              if (!touchesActiveLine) continue;
+              const preview = getPlacementPreview(curGrid, piece, r, c);
+              if (
+                preview.clearedRows.length === 0 &&
+                preview.clearedCols.length === 0 &&
+                nextRemaining.length === 0
+              ) {
+                continue;
+              }
+              const outcome = placePiece(
+                { ...baseState, grid: curGrid, tray: [piece, dummyAnchor, null] },
+                0,
+                r,
+                c,
+                false,
+              );
+              if (!outcome) continue;
+              if (outcome.allClear) return true;
+              if (nextRemaining.length > 0 && search(outcome.nextState.grid, nextRemaining)) {
+                return true;
+              }
+            }
+          }
+        }
+        return false;
+      }
+      return search(grid, tray);
+    }
+
+    // Case 1: Single lonely cell at (4,4) -> solvable in 2 pieces (e.g., bar_h4 + bar_h3)
+    const lonelyGrid = createEmptyGrid();
+    lonelyGrid[4][4] = { color: 'amber' };
+    for (const seed of [101, 202, 303]) {
+      const { tray } = spawnSmartTray(lonelyGrid, seed, 4, 0);
+      assert.equal(new Set(tray.map((p) => p.defId)).size, 3, 'tray must have 3 unique shapes');
+      assert.equal(
+        canTrayAllClearInOrder(lonelyGrid, tray),
+        true,
+        `expected 2-piece All Clear solution for lonely cell on seed ${seed}`,
+      );
+    }
+
+    // Case 2: Two rows each needing 3 cells -> requires 3 distinct pieces (e.g., bar_h3 + bar_h2 + dot_1)
+    const twoRowGrid = createEmptyGrid();
+    for (let c = 0; c < 5; c++) {
+      twoRowGrid[0][c] = { color: 'sky' };
+      twoRowGrid[6][c] = { color: 'emerald' };
+    }
+    for (const seed of [111, 222, 333]) {
+      const { tray } = spawnSmartTray(twoRowGrid, seed, 5, 1);
+      assert.equal(new Set(tray.map((p) => p.defId)).size, 3, 'tray must have 3 unique shapes');
+      assert.equal(
+        canTrayAllClearInOrder(twoRowGrid, tray),
+        true,
+        `expected 3-piece All Clear solution for two-row board on seed ${seed}`,
+      );
     }
   });
 });
