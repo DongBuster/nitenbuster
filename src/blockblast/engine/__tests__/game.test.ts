@@ -24,10 +24,16 @@ import {
 } from '../game.ts';
 import {
   getStageNumber,
+  getStageScoreMultiplier,
   getStageTheme,
   resolveStageColorToken,
   STAGE_THEMES,
 } from '../stages.ts';
+import {
+  AVATAR_FRAMES,
+  getNextAvatarFrameMilestone,
+  getUnlockedAvatarFramesForStage,
+} from '../avatarFrames.ts';
 import {
   verifyMatchReceipt,
   type MatchAction,
@@ -411,8 +417,8 @@ describe('blockblast anti-cheat replay verifier', () => {
 });
 
 describe('blockblast stage themes & palette discipline', () => {
-  it('defines 10 progressive themes with 2 harmonious colors and escalating VFX', () => {
-    assert.equal(STAGE_THEMES.length, 10);
+  it('defines 20 progressive themes with 2 harmonious colors, escalating VFX, and stage score multiplier', () => {
+    assert.equal(STAGE_THEMES.length, 20);
     const seenIds = new Set<string>();
     for (let i = 0; i < STAGE_THEMES.length; i++) {
       const theme = STAGE_THEMES[i];
@@ -440,19 +446,46 @@ describe('blockblast stage themes & palette discipline', () => {
       }
     }
     assert.equal(getStageTheme(0).id, 'timber');
-    assert.equal(getStageTheme(1).id, 'aurora');
-    assert.equal(getStageTheme(2).id, 'sakura');
-    assert.equal(getStageTheme(3).id, 'royal');
     assert.equal(getStageTheme(4).id, 'celestial');
-    assert.equal(getStageTheme(5).id, 'inferno');
-    assert.equal(getStageTheme(6).id, 'emerald_jade');
-    assert.equal(getStageTheme(7).id, 'cyber_neon');
-    assert.equal(getStageTheme(8).id, 'eclipse');
     assert.equal(getStageTheme(9).id, 'prism_eternal');
-    assert.equal(getStageTheme(15).id, 'prism_eternal');
+    assert.equal(getStageTheme(14).id, 'solar_phoenix');
+    assert.equal(getStageTheme(19).id, 'astral_sovereign');
+    assert.equal(getStageTheme(25).id, 'astral_sovereign');
     assert.equal(getStageNumber(-2), 1);
     assert.equal(getStageNumber(0), 1);
-    assert.equal(getStageNumber(9), 10);
+    assert.equal(getStageNumber(19), 20);
+
+    // Stage score multiplier scales linearly +0.5x per stage while keeping Stage 1 at 1.0x
+    assert.equal(getStageScoreMultiplier(1), 1);
+    assert.equal(getStageScoreMultiplier(2), 1.5);
+    assert.equal(getStageScoreMultiplier(5), 3);
+    assert.equal(getStageScoreMultiplier(10), 5.5);
+    assert.equal(getStageScoreMultiplier(20), 10.5);
+
+    // Higher stage multiplies placement, line clear, and All Clear bonuses cleanly
+    const s10 = createInitialState(77);
+    s10.allClears = 9; // Stage 10 (5.5x multiplier)
+    const dot1 = createTrayPieceFromDef(getPieceDefById('dot_1')!, 'p0', 'amber');
+    for (let c = 0; c < 7; c++) s10.grid[0][c] = { color: 'amber' };
+    s10.tray = [dot1, null, null];
+    const s10Out = placePiece(s10, 0, 0, 7, false)!;
+    assert.equal(s10Out.allClear, true);
+    // Raw: 10 (cell) + 100 (1 line) + 10_000 (1000 * stage 10) = 10_110 -> * 5.5 = 55_605
+    assert.equal(s10Out.pointsEarned, 55605);
+
+    // Avatar frame milestone helpers at Stage 5, 10, 15, 20
+    assert.equal(AVATAR_FRAMES.length, 4);
+    assert.deepEqual(getUnlockedAvatarFramesForStage(4), []);
+    assert.deepEqual(getUnlockedAvatarFramesForStage(5), ['frame_stage_5']);
+    assert.deepEqual(getUnlockedAvatarFramesForStage(10), ['frame_stage_5', 'frame_stage_10']);
+    assert.deepEqual(getUnlockedAvatarFramesForStage(20), [
+      'frame_stage_5',
+      'frame_stage_10',
+      'frame_stage_15',
+      'frame_stage_20',
+    ]);
+    assert.equal(getNextAvatarFrameMilestone(['frame_stage_5'])?.id, 'frame_stage_10');
+    assert.equal(getNextAvatarFrameMilestone(getUnlockedAvatarFramesForStage(20)), null);
 
     // Stage-specific visual color overrides preserve unique colorblind glyphs
     const royalTheme = getStageTheme(3);
@@ -467,14 +500,14 @@ describe('blockblast stage themes & palette discipline', () => {
     assert.equal(resolveStageColorToken('violet', celestialTheme).bgHex, '#6366F1');
     assert.equal(resolveStageColorToken('sky', celestialTheme).bgHex, '#06B6D4');
 
-    const prismTheme = getStageTheme(9);
-    assert.equal(resolveStageColorToken('amber', prismTheme).bgHex, '#FACC15');
-    assert.equal(resolveStageColorToken('violet', prismTheme).bgHex, '#A855F7');
-    assert.equal(resolveStageColorToken('violet', prismTheme).patternGlyph, COLOR_TOKENS.violet.patternGlyph);
+    const sovereignTheme = getStageTheme(19);
+    assert.equal(resolveStageColorToken('amber', sovereignTheme).bgHex, '#FACC15');
+    assert.equal(resolveStageColorToken('emerald', sovereignTheme).bgHex, '#10B981');
+    assert.equal(resolveStageColorToken('emerald', sovereignTheme).patternGlyph, COLOR_TOKENS.emerald.patternGlyph);
   });
 
   it('picks colors strictly from the active stage palette across PRNG draws', () => {
-    for (let allClears = 0; allClears <= 10; allClears++) {
+    for (let allClears = 0; allClears <= 20; allClears++) {
       const palette = getStageTheme(allClears).palette;
       let rng = 100 + allClears * 37;
       for (let step = 0; step < 25; step++) {

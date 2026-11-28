@@ -278,6 +278,91 @@ function renderCornerArtwork(stageId: StageThemeId): ReactNode {
           <circle cx="11" cy="11" r="2" fill="#FFFFFF" />
         </>
       );
+    case 'abyss_ocean':
+      return (
+        <>
+          <path d="M4 31 C4 14 14 4 31 4" fill="none" stroke="#38BDF8" strokeWidth="2.2" strokeLinecap="round" />
+          <path d="M9 24 Q12 12 24 9" fill="none" stroke="#5EEAD4" strokeWidth="1.5" strokeLinecap="round" />
+          <circle cx="11" cy="11" r="4.5" fill="#0284C7" stroke="#CCFBF1" strokeWidth="1.2" />
+          <circle cx="11" cy="11" r="1.8" fill="#5EEAD4" />
+        </>
+      );
+    case 'golden_pharaoh':
+      return (
+        <>
+          <path d="M4 31 V8 H8 V4 H31" fill="none" stroke="#FBBF24" strokeWidth="2.3" strokeLinecap="square" />
+          <polygon points="11,4 18,16 4,16" fill="#D97706" stroke="#FEF3C7" strokeWidth="1.2" />
+          <circle cx="11" cy="12" r="2" fill="#2563EB" stroke="#93C5FD" strokeWidth="0.9" />
+        </>
+      );
+    case 'crimson_samurai':
+      return (
+        <>
+          <path d="M4 31 V10 L10 4 H31" fill="none" stroke="#FB7185" strokeWidth="2.3" strokeLinecap="round" />
+          <path d="M6 20 L18 8 M8 6 L20 18" stroke="#FDE68A" strokeWidth="1.4" strokeLinecap="round" />
+          <polygon points="11,6 16,11 11,16 6,11" fill="#DC2626" stroke="#FEF9C3" strokeWidth="1.2" />
+        </>
+      );
+    case 'frost_valkyrie':
+      return (
+        <>
+          <path d="M4 31 V10 L10 4 H31" fill="none" stroke="#BAE6FD" strokeWidth="2.1" strokeLinecap="round" />
+          <path d="M11 3 V19 M3 11 H19 M5.5 5.5 L16.5 16.5 M16.5 5.5 L5.5 16.5" stroke="#E0F2FE" strokeWidth="1.2" strokeLinecap="round" />
+          <circle cx="11" cy="11" r="2.2" fill="#818CF8" stroke="#FFFFFF" strokeWidth="1" />
+        </>
+      );
+    case 'solar_phoenix':
+      return (
+        <>
+          <path d="M4 32 V11 Q4 4 11 4 H32" fill="none" stroke="#FB923C" strokeWidth="2.4" strokeLinecap="round" />
+          <path d="M5 24 C5 12 10 6 20 5 C14 11 15 15 21 13 C16 19 11 21 5 24 Z" fill="#FACC15" stroke="#EA580C" strokeWidth="1.1" />
+          <circle cx="11" cy="11" r="2.1" fill="#FFFFFF" />
+        </>
+      );
+    case 'void_nebula':
+      return (
+        <>
+          <path d="M4 31 V10 L10 4 H31" fill="none" stroke="#C084FC" strokeWidth="2.1" strokeLinecap="round" />
+          <circle cx="11" cy="11" r="6" fill="#2E1065" stroke="#F472B6" strokeWidth="1.3" strokeDasharray="3 2" />
+          <circle cx="11" cy="11" r="2.6" fill="#F9A8D4" />
+        </>
+      );
+    case 'jade_dragon':
+      return (
+        <>
+          <path d="M4 31 C4 14 14 4 31 4" fill="none" stroke="#34D399" strokeWidth="2.4" strokeLinecap="round" />
+          <path d="M8 22 Q12 12 22 8" fill="none" stroke="#67E8F9" strokeWidth="1.6" />
+          <polygon points="11,4 17,9 15,16 7,16 5,9" fill="#059669" stroke="#D1FAE5" strokeWidth="1.2" />
+          <circle cx="11" cy="10.5" r="1.8" fill="#67E8F9" />
+        </>
+      );
+    case 'arcane_clockwork':
+      return (
+        <>
+          <path d="M4 31 V10 H10 V4 H31" fill="none" stroke="#F59E0B" strokeWidth="2.2" />
+          <circle cx="11" cy="11" r="6" fill="none" stroke="#FCD34D" strokeWidth="2" strokeDasharray="2.5 2" />
+          <circle cx="11" cy="11" r="2.8" fill="#6D28D9" stroke="#EDE9FE" strokeWidth="1" />
+        </>
+      );
+    case 'supernova_core':
+      return (
+        <>
+          <path d="M4 32 V10 L10 4 H32" fill="none" stroke="#FB7185" strokeWidth="2.3" strokeLinecap="round" />
+          <polygon points="11,1 13.5,8.5 21,11 13.5,13.5 11,21 8.5,13.5 1,11 8.5,8.5" fill="#67E8F9" stroke="#F43F5E" strokeWidth="1.1" />
+          <circle cx="11" cy="11" r="2.4" fill="#FFFFFF" />
+        </>
+      );
+    case 'astral_sovereign':
+      return (
+        <>
+          <path d="M3 32 V10 L10 3 H32" fill="none" stroke="#FEF08A" strokeWidth="2.6" strokeLinecap="round" />
+          <path d="M8 27 V13 L13 8 H27" fill="none" stroke="#6EE7B7" strokeWidth="1.5" />
+          <polygon points="11,1 14,8 21,11 14,14 11,21 8,14 1,11 8,8" fill="#FEF08A" stroke="#10B981" strokeWidth="1.1" />
+          <circle cx="11" cy="11" r="2.6" fill="#FFFFFF" />
+          <circle cx="24" cy="6.5" r="1.7" fill="#6EE7B7" />
+          <circle cx="6.5" cy="24" r="1.7" fill="#6EE7B7" />
+        </>
+      );
   }
 }
 
@@ -451,6 +536,88 @@ function renderCrestSvg(stageId: StageThemeId): ReactNode {
           />
           <polygon points="60,6 66,12 60,18 54,12" fill="#FACC15" />
           <circle cx="60" cy="12" r="2.2" fill="#FFFFFF" />
+        </svg>
+      );
+    case 'abyss_ocean':
+      return (
+        <svg className="h-[22px] w-[126px] sm:h-[24px] sm:w-[148px]" viewBox="0 0 116 22" overflow="visible">
+          <path d="M6 12 Q24 4 42 12 Q58 18 74 12 Q92 4 110 12" fill="none" stroke="#38BDF8" strokeWidth="2" strokeLinecap="round" />
+          <circle cx="58" cy="11" r="6" fill="#0284C7" stroke="#5EEAD4" strokeWidth="1.6" />
+          <circle cx="58" cy="11" r="2.2" fill="#CCFBF1" />
+        </svg>
+      );
+    case 'golden_pharaoh':
+      return (
+        <svg className="h-[22px] w-[126px] sm:h-[24px] sm:w-[148px]" viewBox="0 0 116 22" overflow="visible">
+          <path d="M8 15 H42 L58 3 L74 15 H108" fill="none" stroke="#FBBF24" strokeWidth="2.1" strokeLinejoin="round" />
+          <polygon points="58,5 68,17 48,17" fill="#D97706" stroke="#FEF3C7" strokeWidth="1.2" />
+          <circle cx="58" cy="13" r="2.3" fill="#2563EB" stroke="#93C5FD" strokeWidth="0.9" />
+        </svg>
+      );
+    case 'crimson_samurai':
+      return (
+        <svg className="h-[22px] w-[126px] sm:h-[24px] sm:w-[148px]" viewBox="0 0 116 22" overflow="visible">
+          <path d="M8 11 H44 M72 11 H108" stroke="#FB7185" strokeWidth="2.2" strokeLinecap="round" />
+          <path d="M44 5 L72 17 M72 5 L44 17" stroke="#FDE68A" strokeWidth="1.6" strokeLinecap="round" />
+          <polygon points="58,3 65,11 58,19 51,11" fill="#DC2626" stroke="#FEF9C3" strokeWidth="1.3" />
+        </svg>
+      );
+    case 'frost_valkyrie':
+      return (
+        <svg className="h-[22px] w-[128px] sm:h-[24px] sm:w-[150px]" viewBox="0 0 116 22" overflow="visible">
+          <path d="M8 11 L38 11 L48 5 L58 11 L68 5 L78 11 L108 11" fill="none" stroke="#BAE6FD" strokeWidth="1.9" strokeLinecap="round" />
+          <polygon points="58,2 64,11 58,20 52,11" fill="#E0F2FE" stroke="#818CF8" strokeWidth="1.3" />
+          <circle cx="58" cy="11" r="2" fill="#FFFFFF" />
+        </svg>
+      );
+    case 'solar_phoenix':
+      return (
+        <svg className="h-[24px] w-[134px] sm:h-[26px] sm:w-[156px]" viewBox="0 0 120 24" overflow="visible">
+          <path d="M8 14 Q28 4 46 12 Q60 18 74 12 Q92 4 112 14" fill="none" stroke="#FB923C" strokeWidth="2.3" strokeLinecap="round" />
+          <path d="M60 2 C66 8 68 13 60 21 C52 13 54 8 60 2 Z" fill="#FACC15" stroke="#EA580C" strokeWidth="1.3" />
+          <circle cx="60" cy="12" r="2.3" fill="#FFFFFF" />
+        </svg>
+      );
+    case 'void_nebula':
+      return (
+        <svg className="h-[24px] w-[134px] sm:h-[26px] sm:w-[156px]" viewBox="0 0 120 24" overflow="visible">
+          <line x1="8" y1="12" x2="44" y2="12" stroke="#C084FC" strokeWidth="1.6" strokeDasharray="4 2.5" />
+          <line x1="76" y1="12" x2="112" y2="12" stroke="#C084FC" strokeWidth="1.6" strokeDasharray="4 2.5" />
+          <ellipse cx="60" cy="12" rx="14" ry="5" fill="none" stroke="#F472B6" strokeWidth="1.5" transform="rotate(-14 60 12)" />
+          <circle cx="60" cy="12" r="5" fill="#2E1065" stroke="#F3E8FF" strokeWidth="1.3" />
+        </svg>
+      );
+    case 'jade_dragon':
+      return (
+        <svg className="h-[24px] w-[134px] sm:h-[26px] sm:w-[156px]" viewBox="0 0 120 24" overflow="visible">
+          <path d="M8 12 Q28 5 46 12 M74 12 Q92 5 112 12" fill="none" stroke="#34D399" strokeWidth="2.1" strokeLinecap="round" />
+          <polygon points="60,2 68,8 66,18 54,18 52,8" fill="#059669" stroke="#67E8F9" strokeWidth="1.4" />
+          <circle cx="60" cy="11" r="2.4" fill="#D1FAE5" />
+        </svg>
+      );
+    case 'arcane_clockwork':
+      return (
+        <svg className="h-[24px] w-[134px] sm:h-[26px] sm:w-[156px]" viewBox="0 0 120 24" overflow="visible">
+          <path d="M8 12 H44 M76 12 H112" stroke="#F59E0B" strokeWidth="2" />
+          <circle cx="60" cy="12" r="8" fill="#1B1209" stroke="#FCD34D" strokeWidth="2.2" strokeDasharray="3 2" />
+          <circle cx="60" cy="12" r="3.5" fill="#6D28D9" stroke="#EDE9FE" strokeWidth="1.2" />
+        </svg>
+      );
+    case 'supernova_core':
+      return (
+        <svg className="h-[24px] w-[138px] sm:h-[26px] sm:w-[160px]" viewBox="0 0 124 24" overflow="visible">
+          <path d="M6 12 H44 M80 12 H118" stroke="#67E8F9" strokeWidth="2" strokeLinecap="round" />
+          <polygon points="62,1 66.5,8.5 74,12 66.5,15.5 62,23 57.5,15.5 50,12 57.5,8.5" fill="#F43F5E" stroke="#E0F2FE" strokeWidth="1.3" />
+          <circle cx="62" cy="12" r="2.6" fill="#FFFFFF" />
+        </svg>
+      );
+    case 'astral_sovereign':
+      return (
+        <svg className="h-[26px] w-[144px] sm:h-[28px] sm:w-[168px]" viewBox="0 0 128 26" overflow="visible">
+          <path d="M6 14 H38 L48 5 L56 12 L64 2 L72 12 L80 5 L90 14 H122" fill="none" stroke="#FEF08A" strokeWidth="2.3" strokeLinejoin="round" strokeLinecap="round" />
+          <path d="M18 19 H48 M80 19 H110" stroke="#6EE7B7" strokeWidth="1.5" strokeLinecap="round" />
+          <polygon points="64,6 70,13 64,20 58,13" fill="#10B981" stroke="#FFFFFF" strokeWidth="1.3" />
+          <circle cx="64" cy="13" r="2.4" fill="#FEF08A" />
         </svg>
       );
   }

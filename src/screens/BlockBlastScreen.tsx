@@ -14,6 +14,7 @@ import {
   AlertTriangle,
   ArrowLeft,
   Cookie,
+  Crown,
   Eye,
   EyeOff,
   HelpCircle,
@@ -39,6 +40,11 @@ import {
   rerollTray,
 } from '../blockblast/engine/game';
 import {
+  AVATAR_FRAME_MILESTONE_STAGES,
+  getAvatarFrameMeta,
+  type AvatarFrameId,
+} from '../blockblast/engine/avatarFrames';
+import {
   getStageNumber,
   getStageTheme,
   resolveStageColorToken,
@@ -55,6 +61,13 @@ import {
 } from '../blockblast/engine/types';
 import type { MatchAction, MatchReceipt } from '../blockblast/engine/verify';
 import type { BbEmoteEvent } from '../blockblast/online/protocol';
+import { useBlockBlastGlobalChat } from '../blockblast/online/useBlockBlastGlobalChat';
+import { AvatarFramePickerModal } from '../blockblast/ui/AvatarFramePickerModal';
+import {
+  BlockBlastChatPanel,
+  type ChatChannelFeed,
+} from '../blockblast/ui/BlockBlastChatPanel';
+import { AnimalAvatar } from '../components/AnimalAvatar';
 import {
   GameOverDialog,
   HelpDialog,
@@ -86,6 +99,7 @@ export interface BlockBlastRoomModeConfig {
   leaderboardDesktop: ReactNode;
   leaderboardMobile: ReactNode;
   lastEmote: BbEmoteEvent | null;
+  roomChatFeed?: ChatChannelFeed;
   onProgress: (state: BlastGameState) => void;
   onFinish: (
     receipt: MatchReceipt,
@@ -526,6 +540,9 @@ export default function BlockBlastScreen({
   const {
     cookies,
     blockBlastBestScore,
+    blockBlastBestStage,
+    unlockedAvatarFrames,
+    equippedAvatarFrame,
     selectedAnimal,
     equippedAccessory,
     settings,
@@ -533,6 +550,8 @@ export default function BlockBlastScreen({
     dismissIntegrityWarning,
     updateSettings,
     recordBlockBlastResult,
+    unlockAvatarFramesForStage,
+    equipAvatarFrame,
   } = useProfileStore();
 
   const isDesktop = useIsDesktopLg();
@@ -551,6 +570,41 @@ export default function BlockBlastScreen({
   const stageNumber = getStageNumber(state.allClears);
   const stageTheme = getStageTheme(state.allClears);
   const occupiedCells = useMemo(() => countOccupiedCells(state.grid), [state.grid]);
+
+  const [showFramePicker, setShowFramePicker] = useState(false);
+  const [frameUnlockToast, setFrameUnlockToast] = useState<AvatarFrameId | null>(null);
+
+  const savedChatName = useMemo(() => {
+    if (typeof window === 'undefined') return 'Người chơi';
+    try {
+      return window.localStorage.getItem('paws_online_display_name_v1') || 'Người chơi';
+    } catch {
+      return 'Người chơi';
+    }
+  }, []);
+
+  const globalChat = useBlockBlastGlobalChat(
+    {
+      name: savedChatName,
+      animal: selectedAnimal,
+      avatarFrame: equippedAvatarFrame,
+    },
+    true,
+  );
+
+  // Immediately unlock milestone Avatar Frames upon reaching Stage 5, 10, 15, or 20
+  useEffect(() => {
+    if (stageNumber <= 1) return;
+    const newlyUnlocked = unlockAvatarFramesForStage(stageNumber);
+    if (newlyUnlocked.length > 0) {
+      const latestFrame = newlyUnlocked[newlyUnlocked.length - 1];
+      setFrameUnlockToast(latestFrame);
+      const timer = window.setTimeout(() => {
+        setFrameUnlockToast((cur) => (cur === latestFrame ? null : cur));
+      }, 4800);
+      return () => window.clearTimeout(timer);
+    }
+  }, [stageNumber, unlockAvatarFramesForStage]);
 
   const matchRef = useRef<MatchBundle>(match);
   useEffect(() => {
@@ -873,8 +927,8 @@ export default function BlockBlastScreen({
               isAllClearBurst,
             ),
             shockwaveCount: isAllClearBurst
-              ? Math.min(5, Math.max(3, stageThemeAfter.shockwaveRings))
-              : Math.max(2, Math.min(5, stageThemeAfter.shockwaveRings)),
+              ? Math.min(6, Math.max(3, stageThemeAfter.shockwaveRings))
+              : Math.max(2, Math.min(6, stageThemeAfter.shockwaveRings)),
             callout,
             isAllClear: isAllClearBurst,
           },
@@ -900,9 +954,9 @@ export default function BlockBlastScreen({
                 (outcome.streakAfter >= 2 ? 4 : 0),
             );
         const shockwaveCount = isAllClearBurst
-          ? Math.min(5, Math.max(3, stageThemeAfter.shockwaveRings))
+          ? Math.min(6, Math.max(3, stageThemeAfter.shockwaveRings))
           : lineCount >= 2 || outcome.streakAfter >= 3
-            ? Math.min(5, Math.max(2, stageThemeAfter.shockwaveRings))
+            ? Math.min(6, Math.max(2, stageThemeAfter.shockwaveRings))
             : stageThemeAfter.shockwaveRings;
         spawnBurst(
           {
@@ -1813,9 +1867,9 @@ export default function BlockBlastScreen({
                 </span>
               </div>
 
-              {/* 10-Stage Milestone Track */}
+              {/* 20-Stage Milestone Track (2 rows x 10 stages, highlighting Avatar Frame unlocks 5/10/15/20) */}
               <div
-                className="mt-2 flex items-center gap-1"
+                className="mt-2 grid grid-cols-10 gap-1"
                 role="img"
                 aria-label={`Đang ở Stage ${stageNumber} trên ${STAGE_THEMES.length} chủ đề`}
               >
@@ -1825,17 +1879,28 @@ export default function BlockBlastScreen({
                     stageNumber === theme.tier ||
                     (stageNumber > STAGE_THEMES.length &&
                       theme.tier === STAGE_THEMES.length);
+                  const isFrameMilestone = (
+                    AVATAR_FRAME_MILESTONE_STAGES as readonly number[]
+                  ).includes(theme.tier);
                   return (
                     <span
                       key={theme.id}
-                      title={`Stage ${theme.tier}: ${theme.name}`}
-                      className={`h-1.5 flex-1 rounded-full transition-all duration-300 ${
-                        isCurrent ? 'scale-y-125 ring-1 ring-white/75' : ''
+                      title={`Stage ${theme.tier}: ${theme.name}${
+                        isFrameMilestone ? ' (Mốc nhận Khung Avatar)' : ''
+                      }`}
+                      className={`h-2 rounded-full transition-all duration-300 ${
+                        isCurrent
+                          ? 'scale-y-125 ring-1 ring-white/85'
+                          : isFrameMilestone
+                            ? 'ring-1 ring-yellow-300/60'
+                            : ''
                       }`}
                       style={{
                         backgroundColor: unlocked
                           ? theme.accentHex
-                          : 'rgba(255,255,255,0.12)',
+                          : isFrameMilestone
+                            ? 'rgba(250,204,21,0.2)'
+                            : 'rgba(255,255,255,0.12)',
                         boxShadow: isCurrent
                           ? `0 0 10px ${theme.accentHex}`
                           : undefined,
@@ -1843,6 +1908,36 @@ export default function BlockBlastScreen({
                     />
                   );
                 })}
+              </div>
+
+              {/* Avatar Frame Showcase & Picker Trigger */}
+              <div className="mt-2 flex items-center justify-between gap-2 rounded-xl border border-amber-500/20 bg-[#190f0a] px-2.5 py-1.5">
+                <div className="flex min-w-0 items-center gap-2">
+                  <AnimalAvatar
+                    animal={selectedAnimal}
+                    size="sm"
+                    frameId={equippedAvatarFrame}
+                  />
+                  <div className="min-w-0 text-[11px] leading-tight">
+                    <div className="truncate font-black text-amber-100">
+                      {getAvatarFrameMeta(equippedAvatarFrame)?.name ?? 'Chưa đeo khung'}
+                    </div>
+                    <div className="text-[10px] font-bold text-amber-200/65">
+                      Khung mốc 5·10·15·20 ({unlockedAvatarFrames.length}/4)
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    playSfx('click');
+                    setShowFramePicker(true);
+                  }}
+                  className={`inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-lg border border-amber-400/45 bg-amber-500/15 px-2 py-1 text-[10px] font-black text-amber-100 hover:border-amber-300 ${FOCUS_RING_CLASS}`}
+                >
+                  <Crown aria-hidden="true" className="h-3 w-3 text-yellow-300" />
+                  <span>Khung</span>
+                </button>
               </div>
 
               <div className="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-amber-900/45 pt-1.5 text-xs font-bold text-amber-200/80 sm:mt-2.5 sm:pt-2">
@@ -2104,6 +2199,70 @@ export default function BlockBlastScreen({
         currentScore={state.score}
         onConfirmRestart={startNewMatch}
         onCancel={() => setShowRestartConfirm(false)}
+      />
+
+      <AvatarFramePickerModal
+        open={showFramePicker}
+        animal={selectedAnimal}
+        bestStage={Math.max(blockBlastBestStage, stageNumber)}
+        unlockedFrames={unlockedAvatarFrames}
+        equippedFrame={equippedAvatarFrame}
+        onEquip={equipAvatarFrame}
+        onClose={() => setShowFramePicker(false)}
+      />
+
+      {/* Celebratory Toast on Milestone Avatar Frame Unlock */}
+      {frameUnlockToast && (() => {
+        const meta = getAvatarFrameMeta(frameUnlockToast);
+        if (!meta) return null;
+        return (
+          <div
+            role="status"
+            className="fixed left-1/2 top-4 z-50 flex w-[min(92vw,420px)] -translate-x-1/2 items-center justify-between gap-3 rounded-2xl border-2 border-yellow-300/80 bg-[#26140c]/95 px-4 py-3 text-amber-50 shadow-[0_16px_42px_rgba(250,204,21,0.35)] backdrop-blur-sm"
+          >
+            <div className="flex items-center gap-3">
+              <AnimalAvatar
+                animal={selectedAnimal}
+                size="md"
+                frameId={meta.id}
+              />
+              <div>
+                <div className="text-[10px] font-black uppercase tracking-wider text-yellow-300">
+                  Mở Khóa Khung Avatar · Stage {meta.requiredStage}
+                </div>
+                <div className="font-display text-sm font-black text-white">
+                  {meta.name}
+                </div>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                playSfx('click');
+                setFrameUnlockToast(null);
+                setShowFramePicker(true);
+              }}
+              className={`shrink-0 cursor-pointer rounded-xl border border-yellow-300/70 bg-amber-500/25 px-2.5 py-1 text-xs font-black text-yellow-100 hover:bg-amber-500/35 ${FOCUS_RING_CLASS}`}
+            >
+              Xem khung
+            </button>
+          </div>
+        );
+      })()}
+
+      {/* Floating Online Chat Drawer (Room + Global Chat) */}
+      <BlockBlastChatPanel
+        mode="drawer"
+        roomCode={roomMode?.roomCode}
+        roomFeed={roomMode?.roomChatFeed ?? null}
+        globalFeed={{
+          configured: globalChat.configured,
+          connected: globalChat.connected,
+          myPeerId: globalChat.myPeerId,
+          messages: globalChat.messages,
+          rateLimited: globalChat.rateLimited,
+          onSend: globalChat.sendMessage,
+        }}
       />
     </div>
   );

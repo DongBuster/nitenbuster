@@ -5,6 +5,7 @@ import {
   placePiece,
   rerollTray,
 } from './game.ts';
+import { getStageNumber } from './stages.ts';
 
 export const MAX_MATCH_ACTIONS = 2000;
 export const MIN_MS_PER_ACTION = 80;
@@ -31,10 +32,20 @@ export interface VerifyResult {
   verifiedScore: number;
   linesCleared: number;
   maxStreak: number;
+  allClears: number;
+  stageReached: number;
 }
 
 function fail(reason: string): VerifyResult {
-  return { valid: false, reason, verifiedScore: 0, linesCleared: 0, maxStreak: 0 };
+  return {
+    valid: false,
+    reason,
+    verifiedScore: 0,
+    linesCleared: 0,
+    maxStreak: 0,
+    allClears: 0,
+    stageReached: 1,
+  };
 }
 
 export function verifyMatchReceipt(receipt: MatchReceipt): VerifyResult {
@@ -109,5 +120,7 @@ export function verifyMatchReceipt(receipt: MatchReceipt): VerifyResult {
     verifiedScore: state.score,
     linesCleared: state.linesCleared,
     maxStreak: state.maxStreak,
+    allClears: state.allClears,
+    stageReached: getStageNumber(state.allClears),
   };
 }

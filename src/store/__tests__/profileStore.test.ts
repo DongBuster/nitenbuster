@@ -8,6 +8,7 @@ import {
   MAX_GAMES,
   MAX_GLASS_TIME_SEC,
   MAX_SETTLED_MATCH_IDS,
+  applyBlockBlastStageProgress,
   sanitizeProfileData,
   settleBlockBlastMatch,
   settleCoopMatch,
@@ -390,6 +391,38 @@ describe('settleBlockBlastMatch anti-cheat settlement', () => {
     assert.equal(settled.nextProfile.settledMatchIds.length, MAX_SETTLED_MATCH_IDS);
     assert.equal(settled.nextProfile.settledMatchIds[0], 'prev-match-01');
     assert.equal(settled.nextProfile.settledMatchIds[MAX_SETTLED_MATCH_IDS - 1], 'bb-non-best-21');
+  });
+
+  it('unlocks Stage 5/10/15/20 avatar frames via applyBlockBlastStageProgress and sanitizes equipped frame', () => {
+    const s4 = applyBlockBlastStageProgress(DEFAULT_PROFILE, 4);
+    assert.equal(s4.nextProfile.blockBlastBestStage, 4);
+    assert.deepEqual(s4.newlyUnlockedFrames, []);
+    assert.equal(s4.nextProfile.equippedAvatarFrame, null);
+
+    const s5 = applyBlockBlastStageProgress(s4.nextProfile, 5);
+    assert.deepEqual(s5.newlyUnlockedFrames, ['frame_stage_5']);
+    assert.deepEqual(s5.nextProfile.unlockedAvatarFrames, ['frame_stage_5']);
+    assert.equal(s5.nextProfile.equippedAvatarFrame, 'frame_stage_5');
+
+    const s15 = applyBlockBlastStageProgress(s5.nextProfile, 15);
+    assert.deepEqual(s15.newlyUnlockedFrames, ['frame_stage_10', 'frame_stage_15']);
+    assert.deepEqual(s15.nextProfile.unlockedAvatarFrames, [
+      'frame_stage_5',
+      'frame_stage_10',
+      'frame_stage_15',
+    ]);
+    // Keeps user's previously equipped frame rather than clobbering their choice
+    assert.equal(s15.nextProfile.equippedAvatarFrame, 'frame_stage_5');
+
+    // Sanitizer rejects locked or forged equippedAvatarFrame
+    const tampered = sanitizeProfileData({
+      ...DEFAULT_PROFILE,
+      blockBlastBestStage: 2,
+      unlockedAvatarFrames: ['bogus_frame'],
+      equippedAvatarFrame: 'frame_stage_20',
+    });
+    assert.deepEqual(tampered.unlockedAvatarFrames, []);
+    assert.equal(tampered.equippedAvatarFrame, null);
   });
 });
 

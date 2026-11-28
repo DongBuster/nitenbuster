@@ -42,19 +42,25 @@ export function electRoomHost(members: readonly BbRoomMember[]): string {
  * Trustlessly verifies a competitor's MatchReceipt against the room's shared
  * matchId, seed, and Pure Skill policy (no paid Candy Bomb rescue allowed).
  */
+function invalidRoomResult(reason: string): VerifyResult {
+  return {
+    valid: false,
+    reason,
+    verifiedScore: 0,
+    linesCleared: 0,
+    maxStreak: 0,
+    allClears: 0,
+    stageReached: 1,
+  };
+}
+
 export function verifyRoomSubmission(
   receipt: MatchReceipt,
   expectedMatchId: string,
   expectedSeed: number,
 ): VerifyResult {
   if (!receipt || typeof receipt !== 'object') {
-    return {
-      valid: false,
-      reason: 'Invalid receipt',
-      verifiedScore: 0,
-      linesCleared: 0,
-      maxStreak: 0,
-    };
+    return invalidRoomResult('Invalid receipt');
   }
 
   const cacheKey = `${expectedMatchId}:${expectedSeed}`;
@@ -64,29 +70,13 @@ export function verifyRoomSubmission(
 
   let result: VerifyResult;
   if (receipt.matchId !== expectedMatchId) {
-    result = {
-      valid: false,
-      reason: 'Match ID mismatch',
-      verifiedScore: 0,
-      linesCleared: 0,
-      maxStreak: 0,
-    };
+    result = invalidRoomResult('Match ID mismatch');
   } else if (receipt.seed !== expectedSeed) {
-    result = {
-      valid: false,
-      reason: 'Seed mismatch',
-      verifiedScore: 0,
-      linesCleared: 0,
-      maxStreak: 0,
-    };
+    result = invalidRoomResult('Seed mismatch');
   } else if (receipt.rescueEligible !== false || receipt.bombPaidCount !== 0) {
-    result = {
-      valid: false,
-      reason: 'Paid Candy Bomb rescue is disabled in competitive rooms',
-      verifiedScore: 0,
-      linesCleared: 0,
-      maxStreak: 0,
-    };
+    result = invalidRoomResult(
+      'Paid Candy Bomb rescue is disabled in competitive rooms',
+    );
   } else {
     result = verifyMatchReceipt(receipt);
   }
@@ -189,6 +179,7 @@ export function computeRoomStandings(
       name: info?.name ?? 'Người chơi',
       animal: info?.animal ?? 'dog',
       accessory: info?.accessory ?? [],
+      avatarFrame: info?.avatarFrame ?? null,
       joinedAt: info?.joinedAt ?? 0,
       status,
       verification,

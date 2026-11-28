@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { AnimalId } from '../engine/types.ts';
 import { setAudioPreferences } from '../audio/soundEngine.ts';
 import { CANDY_BOMB_COST } from '../blockblast/engine/types.ts';
+import type { AvatarFrameId } from '../blockblast/engine/avatarFrames.ts';
 import type { MatchReceipt } from '../blockblast/engine/verify.ts';
 import {
   SHOP_ITEMS,
@@ -17,6 +18,7 @@ import type { SurvivalMapId } from '../survival/sim/types.ts';
 import { unwrapSignedProfile, wrapSignedProfile } from './profileIntegrity.ts';
 import {
   DEFAULT_PROFILE,
+  applyBlockBlastStageProgress,
   sanitizeProfileData,
   settleBlockBlastMatch,
   settleCoopMatch,
@@ -34,6 +36,7 @@ import {
 
 export {
   SHOP_ITEMS,
+  applyBlockBlastStageProgress,
   settleBlockBlastMatch,
   settleCoopMatch,
   settleEventMatch,
@@ -223,6 +226,7 @@ export function useProfileStore() {
       reward: number;
       isNewBest: boolean;
       verifiedScore: number;
+      newlyUnlockedFrames: AvatarFrameId[];
     } => {
       const matchId =
         receipt && typeof receipt === 'object' && typeof receipt.matchId === 'string'
@@ -245,10 +249,36 @@ export function useProfileStore() {
         reward: settlement.reward,
         isNewBest: settlement.isNewBest,
         verifiedScore: settlement.verifiedScore,
+        newlyUnlockedFrames: settlement.newlyUnlockedFrames,
       };
     },
     [],
   );
+
+  const unlockAvatarFramesForStage = useCallback(
+    (stageReached: number): AvatarFrameId[] => {
+      const progress = applyBlockBlastStageProgress(currentProfile, stageReached);
+      if (progress.nextProfile !== currentProfile) {
+        persistAndNotify(progress.nextProfile);
+      }
+      return progress.newlyUnlockedFrames;
+    },
+    [],
+  );
+
+  const equipAvatarFrame = useCallback((frameId: AvatarFrameId | null) => {
+    if (
+      frameId !== null &&
+      !currentProfile.unlockedAvatarFrames.includes(frameId)
+    ) {
+      return;
+    }
+    if (currentProfile.equippedAvatarFrame === frameId) return;
+    persistAndNotify({
+      ...currentProfile,
+      equippedAvatarFrame: frameId,
+    });
+  }, []);
 
   const recordGlassMatchResult = useCallback(
     (payload: { matchId: string; elapsedSec: number; shatters: number }) => {
@@ -384,6 +414,8 @@ export function useProfileStore() {
     recordBrawlResult,
     spendBlockBlastBomb,
     recordBlockBlastResult,
+    unlockAvatarFramesForStage,
+    equipAvatarFrame,
     recordGlassMatchResult,
     recordCoopMatchResult,
     recordEventResult,

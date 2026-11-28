@@ -5,6 +5,12 @@ import {
   type AccessorySelection,
 } from '../scene3d/accessoryCatalog.ts';
 import { calculateCookieReward } from '../blockblast/engine/game.ts';
+import {
+  getUnlockedAvatarFramesForStage,
+  isAvatarFrameId,
+  sanitizeAvatarFrameList,
+  type AvatarFrameId,
+} from '../blockblast/engine/avatarFrames.ts';
 import { verifyMatchReceipt, type MatchReceipt } from '../blockblast/engine/verify.ts';
 import {
   ALL_PLAYABLE_STAGE_KEYS,
@@ -31,6 +37,7 @@ import type { SurvivalMapId } from '../survival/sim/types.ts';
 
 export const MAX_COOKIES = 1_000_000;
 export const MAX_BLOCK_BLAST_SCORE = 10_000_000;
+export const MAX_BLOCK_BLAST_STAGE = 999;
 export const MAX_GAMES = 1_000_000;
 export const MAX_SETTLED_MATCH_IDS = 20;
 export const MAX_GLASS_TIME_SEC = 86_400;
@@ -50,6 +57,9 @@ export interface PlayerProfile {
   gamesPlayed: number;
   gamesWon: number;
   blockBlastBestScore: number;
+  blockBlastBestStage: number;
+  unlockedAvatarFrames: AvatarFrameId[];
+  equippedAvatarFrame: AvatarFrameId | null;
   glassBestTimeSec: number | null;
   glassBestStars: number;
   coopRecords: Partial<Record<CoopMapId, CoopMapRecord>>;
@@ -70,6 +80,7 @@ export interface BlockBlastSettlementResult {
   reward: number;
   isNewBest: boolean;
   verifiedScore: number;
+  newlyUnlockedFrames: AvatarFrameId[];
 }
 
 export interface GlassSettlementResult {
@@ -123,6 +134,9 @@ export const DEFAULT_PROFILE: PlayerProfile = {
   gamesPlayed: 0,
   gamesWon: 0,
   blockBlastBestScore: 0,
+  blockBlastBestStage: 1,
+  unlockedAvatarFrames: [],
+  equippedAvatarFrame: null,
   glassBestTimeSec: null,
   glassBestStars: 0,
   coopRecords: {},
@@ -368,6 +382,21 @@ export function sanitizeProfileData(
     }
   }
 
+  const blockBlastBestStage = Math.max(
+    1,
+    clampNonNegInt(safeRaw.blockBlastBestStage, MAX_BLOCK_BLAST_STAGE, 1),
+  );
+  const frameSet = new Set<AvatarFrameId>([
+    ...sanitizeAvatarFrameList(safeRaw.unlockedAvatarFrames),
+    ...getUnlockedAvatarFramesForStage(blockBlastBestStage),
+  ]);
+  const unlockedAvatarFrames = Array.from(frameSet);
+  const equippedAvatarFrame =
+    isAvatarFrameId(safeRaw.equippedAvatarFrame) &&
+    frameSet.has(safeRaw.equippedAvatarFrame)
+      ? safeRaw.equippedAvatarFrame
+      : null;
+
   return {
     cookies: clampNonNegInt(
       safeRaw.cookies,
@@ -381,6 +410,9 @@ export function sanitizeProfileData(
       MAX_BLOCK_BLAST_SCORE,
       0,
     ),
+    blockBlastBestStage,
+    unlockedAvatarFrames,
+    equippedAvatarFrame,
     glassBestTimeSec: syncedGlassBestTimeSec,
     glassBestStars,
     coopRecords,
@@ -404,6 +436,41 @@ export function sanitizeProfileData(
   };
 }
 
+export function applyBlockBlastStageProgress(
+  profile: PlayerProfile,
+  stageReached: number,
+): { nextProfile: PlayerProfile; newlyUnlockedFrames: AvatarFrameId[] } {
+  const safeStage = Math.max(
+    1,
+    Math.min(MAX_BLOCK_BLAST_STAGE, Math.floor(Number.isFinite(stageReached) ? stageReached : 1)),
+  );
+  const nextBestStage = Math.max(profile.blockBlastBestStage, safeStage);
+  const earned = getUnlockedAvatarFramesForStage(nextBestStage);
+  const prevSet = new Set<AvatarFrameId>(profile.unlockedAvatarFrames);
+  const newlyUnlockedFrames = earned.filter((id) => !prevSet.has(id));
+
+  if (nextBestStage === profile.blockBlastBestStage && newlyUnlockedFrames.length === 0) {
+    return { nextProfile: profile, newlyUnlockedFrames: [] };
+  }
+
+  const nextUnlocked = [...profile.unlockedAvatarFrames, ...newlyUnlockedFrames];
+  const nextEquipped =
+    profile.equippedAvatarFrame ??
+    (newlyUnlockedFrames.length > 0
+      ? newlyUnlockedFrames[newlyUnlockedFrames.length - 1]
+      : null);
+
+  return {
+    nextProfile: {
+      ...profile,
+      blockBlastBestStage: nextBestStage,
+      unlockedAvatarFrames: nextUnlocked,
+      equippedAvatarFrame: nextEquipped,
+    },
+    newlyUnlockedFrames,
+  };
+}
+
 export function settleBlockBlastMatch(
   profile: PlayerProfile,
   receipt: MatchReceipt,
@@ -415,6 +482,7 @@ export function settleBlockBlastMatch(
     reward: 0,
     isNewBest: false,
     verifiedScore: 0,
+    newlyUnlockedFrames: [],
   };
 
   if (!receipt || typeof receipt !== 'object' || typeof receipt.matchId !== 'string') {
@@ -449,9 +517,10 @@ export function settleBlockBlastMatch(
     nextGamesPlayed,
     profile.gamesWon + (isNewBest ? 1 : 0),
   );
+  const stageProgress = applyBlockBlastStageProgress(profile, verified.stageReached);
 
   const nextProfile: PlayerProfile = {
-    ...profile,
+    ...stageProgress.nextProfile,
     cookies: Math.min(MAX_COOKIES, profile.cookies + reward),
     blockBlastBestScore: Math.min(
       MAX_BLOCK_BLAST_SCORE,
@@ -468,6 +537,7 @@ export function settleBlockBlastMatch(
     reward,
     isNewBest,
     verifiedScore: verified.verifiedScore,
+    newlyUnlockedFrames: stageProgress.newlyUnlockedFrames,
   };
 }
 

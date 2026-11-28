@@ -119,8 +119,8 @@ describe('Block Blast score effects helpers', () => {
     assert.equal(isBeatingBestScore(510, 500), true);
   });
 
-  it('5. provides distinct stage score visuals for all 10 stages and scales sparks by tier', () => {
-    assert.equal(STAGE_THEMES.length, 10);
+  it('5. provides distinct stage score visuals for all 20 stages and scales sparks by tier', () => {
+    assert.equal(STAGE_THEMES.length, 20);
     const gradients = new Set<string>();
     for (const theme of STAGE_THEMES) {
       const visual = getStageScoreVisual(theme.id);
@@ -138,5 +138,7 @@ describe('Block Blast score effects helpers', () => {
     assert.equal(buildScoreSparks('allClear', 1200, 'celestial', 5).length, 12);
     assert.equal(buildScoreSparks('allClear', 1200, 'inferno', 6).length, 14);
     assert.equal(buildScoreSparks('allClear', 1200, 'prism_eternal', 10).length, 16);
+    assert.equal(buildScoreSparks('allClear', 1200, 'abyss_ocean', 11).length, 18);
+    assert.equal(buildScoreSparks('allClear', 1200, 'astral_sovereign', 20).length, 20);
   });
 });

@@ -14,8 +14,20 @@ import {
   type AccessorySelection,
 } from '../../scene3d/accessoryCatalog.ts';
 import { getStageNumber } from '../engine/stages.ts';
+import {
+  isAvatarFrameId,
+  type AvatarFrameId,
+} from '../engine/avatarFrames.ts';
 import type { BlastGameState } from '../engine/types.ts';
 import type { MatchReceipt } from '../engine/verify.ts';
+import {
+  appendChatMessage,
+  canSendChatAt,
+  parseIncomingChatMessage,
+  sanitizeChatDisplayName,
+  sanitizeChatText,
+  type BbChatMessage,
+} from './chat.ts';
 import { EMPTY_COMPACT_GRID, encodeGrid } from './gridCodec.ts';
 import {
   BB_COUNTDOWN_MS,
@@ -94,6 +106,7 @@ function parsePresenceMembers(
         name: m.name,
         animal: (m.animal ?? 'dog') as AnimalId,
         accessory: normalizeAccessories(m.accessory as AccessorySelection),
+        avatarFrame: isAvatarFrameId(m.avatarFrame) ? m.avatarFrame : null,
         ready: Boolean(m.ready),
         joinedAt: typeof m.joinedAt === 'number' ? m.joinedAt : Date.now(),
       };
@@ -163,8 +176,11 @@ export function useBlockBlastRoom() {
     Record<string, MatchReceipt>
   >({});
   const [lastEmote, setLastEmote] = useState<BbEmoteEvent | null>(null);
+  const [chatMessages, setChatMessages] = useState<BbChatMessage[]>([]);
+  const [chatRateLimited, setChatRateLimited] = useState<boolean>(false);
 
   const channelRef = useRef<RealtimeChannel | null>(null);
+  const lastChatSentAtRef = useRef<number>(0);
   const myProfileRef = useRef<BbRoomMember | null>(null);
   const asHostRef = useRef<boolean>(false);
   const phaseRef = useRef<BbRoomPhase>('idle');
@@ -484,13 +500,19 @@ export function useBlockBlastRoom() {
     setHostId('');
     setRoundNumber(0);
     setLastEmote(null);
+    setChatMessages([]);
     resetMatchState('idle');
   }, [resetMatchState, teardownChannel]);
 
   const connectToRoom = useCallback(
     (
       rawCode: string,
-      profile: { name: string; animal: AnimalId; accessory: AccessorySelection },
+      profile: {
+        name: string;
+        animal: AnimalId;
+        accessory: AccessorySelection;
+        avatarFrame?: AvatarFrameId | null;
+      },
       asHost: boolean,
     ) => {
       const client = getSupabaseClient();
@@ -517,6 +539,7 @@ export function useBlockBlastRoom() {
       setError(null);
       setRoomCode(code);
       setRoundNumber(0);
+      setChatMessages([]);
       setConnectionStatus('connecting');
 
       const initialMember: BbRoomMember = {
@@ -524,6 +547,7 @@ export function useBlockBlastRoom() {
         name: profile.name.trim() || 'Người chơi',
         animal: profile.animal,
         accessory: normalizeAccessories(profile.accessory),
+        avatarFrame: isAvatarFrameId(profile.avatarFrame) ? profile.avatarFrame : null,
         ready: asHost,
         joinedAt: Date.now(),
       };
@@ -661,6 +685,11 @@ export function useBlockBlastRoom() {
           if (!evt) return;
           applyEmote(evt);
         })
+        .on('broadcast', { event: 'bb_chat' }, ({ payload }) => {
+          const parsed = parseIncomingChatMessage(payload, 'room');
+          if (!parsed) return;
+          setChatMessages((prev) => appendChatMessage(prev, parsed));
+        })
         .on('broadcast', { event: 'bb_return_lobby' }, ({ payload }) => {
           const evt = payload as BbReturnLobbyEvent | undefined;
           if (!evt) return;
@@ -740,7 +769,12 @@ export function useBlockBlastRoom() {
   );
 
   const createRoom = useCallback(
-    (profile: { name: string; animal: AnimalId; accessory: AccessorySelection }) => {
+    (profile: {
+      name: string;
+      animal: AnimalId;
+      accessory: AccessorySelection;
+      avatarFrame?: AvatarFrameId | null;
+    }) => {
       const code = generateRoomCode(6);
       connectToRoom(code, profile, true);
     },
@@ -750,7 +784,12 @@ export function useBlockBlastRoom() {
   const joinRoom = useCallback(
     (
       code: string,
-      profile: { name: string; animal: AnimalId; accessory: AccessorySelection },
+      profile: {
+        name: string;
+        animal: AnimalId;
+        accessory: AccessorySelection;
+        avatarFrame?: AvatarFrameId | null;
+      },
     ) => {
       connectToRoom(code, profile, false);
     },
@@ -763,6 +802,7 @@ export function useBlockBlastRoom() {
         name: string;
         animal: AnimalId;
         accessory: AccessorySelection;
+        avatarFrame: AvatarFrameId | null;
         ready: boolean;
       }>,
     ) => {
@@ -776,6 +816,12 @@ export function useBlockBlastRoom() {
           patch.accessory !== undefined
             ? normalizeAccessories(patch.accessory)
             : current.accessory,
+        avatarFrame:
+          patch.avatarFrame !== undefined
+            ? isAvatarFrameId(patch.avatarFrame)
+              ? patch.avatarFrame
+              : null
+            : current.avatarFrame ?? null,
         name:
           patch.name !== undefined
             ? patch.name.trim() || current.name
@@ -815,6 +861,7 @@ export function useBlockBlastRoom() {
         name: m.name,
         animal: m.animal,
         accessory: m.accessory,
+        avatarFrame: m.avatarFrame ?? null,
         joinedAt: m.joinedAt,
       };
     }
@@ -971,6 +1018,46 @@ export function useBlockBlastRoom() {
     [applyEmote, myPeerId],
   );
 
+  const sendChat = useCallback(
+    (rawText: string): boolean => {
+      const text = sanitizeChatText(rawText);
+      if (!text) return false;
+      const now = Date.now();
+      if (!canSendChatAt(lastChatSentAtRef.current, now)) {
+        setChatRateLimited(true);
+        window.setTimeout(() => setChatRateLimited(false), 1200);
+        return false;
+      }
+
+      lastChatSentAtRef.current = now;
+      setChatRateLimited(false);
+      const member =
+        membersRef.current.find((m) => m.peerId === myPeerId) ??
+        myProfileRef.current;
+      const msg: BbChatMessage = {
+        id: `${myPeerId}-${now}-${Math.random().toString(36).slice(2, 6)}`,
+        peerId: myPeerId,
+        name: sanitizeChatDisplayName(member?.name ?? 'Người chơi'),
+        animal: member?.animal ?? 'dog',
+        avatarFrame: member?.avatarFrame ?? null,
+        text,
+        at: now,
+        channel: 'room',
+      };
+      setChatMessages((prev) => appendChatMessage(prev, msg));
+      const channel = channelRef.current;
+      if (channel) {
+        void channel.send({
+          type: 'broadcast',
+          event: 'bb_chat',
+          payload: msg,
+        });
+      }
+      return true;
+    },
+    [myPeerId],
+  );
+
   useEffect(() => {
     return () => {
       teardownChannel();
@@ -1032,6 +1119,8 @@ export function useBlockBlastRoom() {
     canStartMatch,
     standings,
     lastEmote,
+    chatMessages,
+    chatRateLimited,
     createRoom,
     joinRoom,
     leaveRoom,
@@ -1041,6 +1130,7 @@ export function useBlockBlastRoom() {
     publishFinish,
     returnToLobby,
     sendEmote,
+    sendChat,
   };
 }
 

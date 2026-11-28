@@ -10,6 +10,15 @@ import { BLOCK_COLORS } from '../../engine/pieces.ts';
 import { BOARD_SIZE } from '../../engine/types.ts';
 import type { MatchAction, MatchReceipt } from '../../engine/verify.ts';
 import {
+  appendChatMessage,
+  BB_CHAT_MAX_HISTORY,
+  BB_CHAT_MAX_LENGTH,
+  BB_CHAT_MIN_INTERVAL_MS,
+  canSendChatAt,
+  parseIncomingChatMessage,
+  sanitizeChatText,
+} from '../chat.ts';
+import {
   decodeGrid,
   EMPTY_COMPACT_GRID,
   encodeGrid,
@@ -376,5 +385,70 @@ describe('blockblast online ranking & completion state', () => {
       ),
       true,
     );
+  });
+
+  it('sanitizes online chat messages, enforces rate limits, deduplicates history, and preserves avatarFrame in standings', () => {
+    assert.equal(sanitizeChatText('  Xin\t\nchào\u0007   mọi người  '), 'Xin chào mọi người');
+    assert.equal(sanitizeChatText('   \u0000\n  '), '');
+    assert.equal(sanitizeChatText('a'.repeat(200)).length, BB_CHAT_MAX_LENGTH);
+
+    assert.equal(canSendChatAt(0, 1000), true);
+    assert.equal(canSendChatAt(1000, 1000 + BB_CHAT_MIN_INTERVAL_MS - 1), false);
+    assert.equal(canSendChatAt(1000, 1000 + BB_CHAT_MIN_INTERVAL_MS), true);
+
+    const parsed = parseIncomingChatMessage(
+      {
+        id: 'm1',
+        peerId: 'p1',
+        name: 'Mèo Pro',
+        animal: 'cat',
+        avatarFrame: 'frame_stage_10',
+        text: 'Lên Stage 10 rồi!',
+        at: 5000,
+        channel: 'room',
+      },
+      'global',
+    );
+    assert.ok(parsed);
+    assert.equal(parsed.avatarFrame, 'frame_stage_10');
+    assert.equal(parsed.channel, 'room');
+
+    // Invalid avatarFrame is sanitized to null
+    const badFrame = parseIncomingChatMessage(
+      { peerId: 'p2', name: 'Guest', animal: 'dog', avatarFrame: 'hacked_frame', text: 'Hi' },
+      'global',
+    );
+    assert.ok(badFrame);
+    assert.equal(badFrame.avatarFrame, null);
+
+    // Deduplicate + cap at BB_CHAT_MAX_HISTORY
+    let history = appendChatMessage([], parsed);
+    history = appendChatMessage(history, parsed);
+    assert.equal(history.length, 1);
+    for (let i = 0; i < BB_CHAT_MAX_HISTORY + 10; i++) {
+      history = appendChatMessage(history, { ...parsed, id: `msg-${i}` });
+    }
+    assert.equal(history.length, BB_CHAT_MAX_HISTORY);
+
+    // Standings propagate avatarFrame cleanly
+    const standings = computeRoomStandings(
+      ['p1'],
+      {
+        p1: {
+          peerId: 'p1',
+          name: 'Mèo Pro',
+          animal: 'cat',
+          accessory: [],
+          avatarFrame: 'frame_stage_15',
+          joinedAt: 1,
+        },
+      },
+      { p1: makeProgress({ peerId: 'p1', matchId: 'm-frame', score: 1200 }) },
+      {},
+      'm-frame',
+      42,
+      false,
+    );
+    assert.equal(standings[0].avatarFrame, 'frame_stage_15');
   });
 });

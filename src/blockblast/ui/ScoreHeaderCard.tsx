@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { Crown, Flame, Sparkles, Trophy } from 'lucide-react';
-import type { BoardStageTheme } from '../engine/stages.ts';
+import {
+  getStageScoreMultiplier,
+  type BoardStageTheme,
+} from '../engine/stages.ts';
 import {
   buildScoreSparks,
   computeRollDurationMs,
@@ -151,6 +154,7 @@ export function ScoreHeaderCard({
   }, [pulse]);
 
   const stageVisual = getStageScoreVisual(stageTheme.id);
+  const stageMultiplier = getStageScoreMultiplier(stageNumber);
   const motionFlagClass = reducedMotion ? ' bb-no-motion' : '';
   const beatingBest = isBeatingBestScore(score, bestScore);
   const showHalo =
@@ -346,6 +350,14 @@ export function ScoreHeaderCard({
               />
             ) : null}
             <span>Stage {stageNumber}</span>
+            {stageMultiplier > 1 && (
+              <span
+                className="rounded-md bg-white/15 px-1 py-0.5 text-[10px] font-black leading-none text-white tabular-nums"
+                title={`Hệ số nhân điểm Stage ${stageNumber}`}
+              >
+                ×{Number.isInteger(stageMultiplier) ? stageMultiplier : stageMultiplier.toFixed(1)}
+              </span>
+            )}
           </div>
         </div>
       </div>

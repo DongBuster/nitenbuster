@@ -77,7 +77,11 @@ function renderStandingRowContent(
           )}
         </span>
 
-        <AnimalAvatar animal={entry.animal} size="sm" />
+        <AnimalAvatar
+          animal={entry.animal}
+          size="sm"
+          frameId={entry.avatarFrame}
+        />
 
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">

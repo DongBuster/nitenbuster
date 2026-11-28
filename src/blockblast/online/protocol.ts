@@ -1,4 +1,5 @@
 import type { AnimalId } from '../../engine/types.ts';
+import type { AvatarFrameId } from '../engine/avatarFrames.ts';
 import type { MatchReceipt } from '../engine/verify.ts';
 
 export const BB_MAX_ROOM_PLAYERS = 8;
@@ -30,6 +31,7 @@ export interface BbParticipantInfo {
   name: string;
   animal: AnimalId;
   accessory: string[];
+  avatarFrame?: AvatarFrameId | null;
   joinedAt: number;
 }
 
@@ -106,6 +108,7 @@ export interface BbRoomStanding {
   name: string;
   animal: AnimalId;
   accessory: string[];
+  avatarFrame: AvatarFrameId | null;
   joinedAt: number;
   status: BbPlayerStatus;
   verification: BbVerificationStatus;

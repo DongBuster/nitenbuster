@@ -348,7 +348,7 @@ export const BlockBoard = memo(function BlockBoard({
           >
             {bursts.map((burst) => {
               const ringCount = burst.shockwaveCount
-                ? Math.min(5, Math.max(0, Math.floor(burst.shockwaveCount)))
+                ? Math.min(6, Math.max(0, Math.floor(burst.shockwaveCount)))
                 : 0;
               const callout = burst.callout;
               const fallbackLabel = !callout ? burst.label : undefined;

@@ -14,7 +14,11 @@ import {
   BLOCK_PIECES,
   createTrayPieceFromDef,
 } from './pieces.ts';
-import { getStageNumber, getStageTheme } from './stages.ts';
+import {
+  getStageNumber,
+  getStageScoreMultiplier,
+  getStageTheme,
+} from './stages.ts';
 
 interface ScoredPlacement {
   defPiece: PieceDef;
@@ -26,6 +30,7 @@ interface ScoredPlacement {
 const SLOT_PRIMARY_WEIGHTS = [40, 26, 16, 10, 8] as const;
 const ALL_CLEAR_WEIGHT_MULTIPLIER = 4;
 const TACTICAL_FIT_SCORE_THRESHOLD = 85;
+const SNUG_SLOT1_SCORE_THRESHOLD = 105;
 const SINGLE_ALL_CLEAR_MAX_OCCUPIED = 22;
 const MULTI_ALL_CLEAR_MAX_OCCUPIED = 20;
 const CLEANUP_BIAS_MAX_OCCUPIED = 22;
@@ -482,6 +487,18 @@ function scorePlacementFit(
     cleanupBias = leftoverSelfCells === 0 ? 24 : -leftoverSelfCells * 5;
   }
 
+  // Reward flush pocket fits: high ratio of occupied-block/wall contact with zero newly isolated holes.
+  let snugPocketBonus = 0;
+  if (occupiedBefore >= 4 && newlyIsolated === 0) {
+    const exposedEdges = Math.max(4, defPiece.cells.length * 2 + 2);
+    const contactRatio = (blockNeighbors + wallNeighbors * 0.5) / exposedEdges;
+    if (contactRatio >= 0.75) {
+      snugPocketBonus = 30;
+    } else if (contactRatio >= 0.55) {
+      snugPocketBonus = 18;
+    }
+  }
+
   const largeCrowdingPenalty =
     clearCount === 0 && defPiece.group === 'large' && occupiedBefore >= 8
       ? occupiedBefore <= CLEANUP_BIAS_MAX_OCCUPIED
@@ -489,7 +506,7 @@ function scorePlacementFit(
         : 24
       : 0;
 
-  // Favor line clears & block adjacency over unanchored wall/size scores so tight pockets win.
+  // Favor line clears & flush pocket fits over unanchored wall/size scores so tight pockets win.
   const score =
     clearCount * 140 +
     blockNeighbors * 12 +
@@ -498,6 +515,7 @@ function scorePlacementFit(
     newlyIsolated * 14 -
     largeCrowdingPenalty +
     cleanupBias +
+    snugPocketBonus +
     allClearBonus;
   return { score, isAllClear };
 }
@@ -730,7 +748,8 @@ function pickSmartPieceForSlot(
     };
   }
 
-  // Only slot 0 runs cross-group tactical gap/clear rescue so slots 1 & 2 preserve shape variety and real tension.
+  // Slot 0 runs full tactical gap/clear fitting; Slot 1 also catches high-confidence clears/flush pockets
+  // so 2 of 3 pieces feel tailored while Slot 2 preserves 29-shape rotation and healthy puzzle tension.
   const tacticalPool = pool.filter((c) => c.score >= TACTICAL_FIT_SCORE_THRESHOLD);
   if (slotIndex === 0 && tacticalPool.length > 0) {
     const tacticalInGroup = tacticalPool.filter((c) => c.defPiece.group === targetGroup);
@@ -747,6 +766,26 @@ function pickSmartPieceForSlot(
         placement: picked.chosen.placement,
         nextPrng: picked.nextPrng,
       };
+    }
+  }
+
+  if (slotIndex === 1 && targetGroup !== 'large') {
+    const snugSlot1Pool = pool.filter((c) => c.score >= SNUG_SLOT1_SCORE_THRESHOLD);
+    if (snugSlot1Pool.length > 0) {
+      const assistRoll = nextRandom(rng);
+      rng = assistRoll.nextState;
+      if (assistRoll.value < 0.65) {
+        const inTarget = snugSlot1Pool.filter((c) => c.defPiece.group === targetGroup);
+        const source = inTarget.length > 0 ? inTarget : snugSlot1Pool;
+        const top = source.slice(0, SLOT_PRIMARY_WEIGHTS.length);
+        const weights = top.map((_, idx) => SLOT_PRIMARY_WEIGHTS[idx]);
+        const picked = pickWeightedCandidate(top, weights, rng);
+        return {
+          defPiece: picked.chosen.defPiece,
+          placement: picked.chosen.placement,
+          nextPrng: picked.nextPrng,
+        };
+      }
     }
   }
 
@@ -1284,7 +1323,10 @@ export function placePiece(
   );
   const clearCount = clearedRows.length + clearedCols.length;
 
-  let pointsEarned = piece.cells.length * 10;
+  const currentStage = getStageNumber(state.allClears);
+  const stageMultiplier = getStageScoreMultiplier(currentStage);
+
+  let rawPoints = piece.cells.length * 10;
   let nextStreak = state.streak;
   let nextGraceUsed = state.graceUsed;
   let allClear = false;
@@ -1294,11 +1336,11 @@ export function placePiece(
     nextGraceUsed = false;
     const lineScore = (100 * clearCount * (clearCount + 1)) / 2;
     const streakBonus = 50 * (nextStreak - 1);
-    pointsEarned += lineScore + streakBonus;
+    rawPoints += lineScore + streakBonus;
 
     if (countOccupiedCells(nextGrid) === 0) {
       allClear = true;
-      pointsEarned += 1000;
+      rawPoints += 1000 * currentStage;
     }
   } else if (state.streak > 0 && !state.graceUsed) {
     nextGraceUsed = true;
@@ -1306,6 +1348,8 @@ export function placePiece(
     nextStreak = 0;
     nextGraceUsed = false;
   }
+
+  const pointsEarned = Math.round(rawPoints * stageMultiplier);
 
   const stageUp = allClear;
   const staged = applyStageProgression(baseTray, state.prngState, state.allClears, stageUp);

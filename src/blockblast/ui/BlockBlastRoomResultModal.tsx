@@ -10,6 +10,7 @@ import {
   Users,
   WifiOff,
 } from 'lucide-react';
+import { AnimalAvatar } from '../../components/AnimalAvatar.tsx';
 import type { BbRoomStanding } from '../online/protocol.ts';
 import { NativeModalShell, setNativeAutofocus } from './BlockBlastModals.tsx';
 
@@ -112,7 +113,14 @@ export function BlockBlastRoomResultModal({
                     <Medal aria-hidden="true" className="h-3.5 w-3.5 text-yellow-300" />
                     <span>Hạng #{entry.rank}</span>
                   </div>
-                  <div className="mt-1 truncate text-sm font-black text-white">
+                  <div className="mt-2 flex justify-center">
+                    <AnimalAvatar
+                      animal={entry.animal}
+                      size="md"
+                      frameId={entry.avatarFrame}
+                    />
+                  </div>
+                  <div className="mt-1.5 truncate text-sm font-black text-white">
                     {entry.name}
                     {entry.peerId === myPeerId ? ' (Bạn)' : ''}
                   </div>

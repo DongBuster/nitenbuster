@@ -151,6 +151,127 @@ const STAGE_SCORE_VISUALS: Record<StageThemeId, StageScoreVisual> = {
       'border-yellow-200/90 bg-gradient-to-b from-fuchsia-500/40 via-cyan-500/30 to-yellow-400/35 text-white shadow-[0_0_28px_rgba(232,121,249,0.58)]',
     sparkColors: ['#FEF08A', '#67E8F9', '#F0ABFC', '#FFFFFF'],
   },
+  abyss_ocean: {
+    cardClass:
+      'border-sky-400/90 bg-gradient-to-b from-[#0A2F52] via-[#07203A] to-[#03101F] shadow-[0_16px_44px_rgba(2,132,199,0.5),0_0_24px_rgba(45,212,191,0.3),inset_0_1px_0_rgba(186,230,253,0.46)]',
+    labelClass: 'text-teal-200',
+    digitGradient: 'linear-gradient(180deg, #F0FDFA 0%, #5EEAD4 44%, #38BDF8 100%)',
+    digitGlow: 'drop-shadow(0 0 21px rgba(56,189,248,0.85))',
+    beamGradient:
+      'linear-gradient(110deg, transparent 14%, rgba(94,234,212,0.65) 46%, rgba(56,189,248,0.52) 60%, transparent 86%)',
+    streakActiveClass:
+      'border-teal-300/85 bg-gradient-to-b from-sky-500/40 to-teal-500/35 text-teal-50 shadow-[0_0_26px_rgba(56,189,248,0.52)]',
+    sparkColors: ['#CCFBF1', '#5EEAD4', '#38BDF8'],
+  },
+  golden_pharaoh: {
+    cardClass:
+      'border-amber-300/90 bg-gradient-to-b from-[#3E2B0F] via-[#281B09] to-[#150E04] shadow-[0_16px_44px_rgba(217,119,6,0.5),0_0_26px_rgba(37,99,235,0.32),inset_0_1px_0_rgba(254,243,199,0.5)]',
+    labelClass: 'text-amber-200',
+    digitGradient: 'linear-gradient(180deg, #FFFBEB 0%, #FCD34D 48%, #60A5FA 100%)',
+    digitGlow: 'drop-shadow(0 0 21px rgba(251,191,36,0.86))',
+    beamGradient:
+      'linear-gradient(110deg, transparent 14%, rgba(252,211,77,0.66) 46%, rgba(96,165,250,0.5) 60%, transparent 86%)',
+    streakActiveClass:
+      'border-amber-300/85 bg-gradient-to-b from-amber-500/40 to-blue-600/35 text-amber-50 shadow-[0_0_26px_rgba(251,191,36,0.52)]',
+    sparkColors: ['#FEF3C7', '#FBBF24', '#60A5FA'],
+  },
+  crimson_samurai: {
+    cardClass:
+      'border-rose-400/90 bg-gradient-to-b from-[#45111C] via-[#2C0B12] to-[#180509] shadow-[0_16px_46px_rgba(220,38,38,0.52),0_0_26px_rgba(234,179,8,0.3),inset_0_1px_0_rgba(254,226,226,0.46)]',
+    labelClass: 'text-rose-200',
+    digitGradient: 'linear-gradient(180deg, #FFF1F2 0%, #FDA4AF 44%, #FACC15 100%)',
+    digitGlow: 'drop-shadow(0 0 21px rgba(244,63,94,0.86))',
+    beamGradient:
+      'linear-gradient(110deg, transparent 14%, rgba(253,164,175,0.65) 46%, rgba(250,204,21,0.5) 60%, transparent 86%)',
+    streakActiveClass:
+      'border-rose-300/85 bg-gradient-to-b from-rose-600/40 to-amber-500/35 text-rose-50 shadow-[0_0_26px_rgba(244,63,94,0.54)]',
+    sparkColors: ['#FFE4E6', '#FB7185', '#FACC15'],
+  },
+  frost_valkyrie: {
+    cardClass:
+      'border-sky-200/90 bg-gradient-to-b from-[#1E325E] via-[#13203E] to-[#0B1226] shadow-[0_16px_46px_rgba(125,211,252,0.5),0_0_28px_rgba(129,140,248,0.38),inset_0_1px_0_rgba(255,255,255,0.55)]',
+    labelClass: 'text-sky-100',
+    digitGradient: 'linear-gradient(180deg, #FFFFFF 0%, #BAE6FD 46%, #A5B4FC 100%)',
+    digitGlow: 'drop-shadow(0 0 22px rgba(186,230,253,0.9))',
+    beamGradient:
+      'linear-gradient(110deg, transparent 14%, rgba(224,242,254,0.7) 46%, rgba(165,180,252,0.55) 60%, transparent 86%)',
+    streakActiveClass:
+      'border-sky-200/85 bg-gradient-to-b from-sky-400/40 to-indigo-500/35 text-white shadow-[0_0_26px_rgba(186,230,253,0.54)]',
+    sparkColors: ['#FFFFFF', '#BAE6FD', '#A5B4FC'],
+  },
+  solar_phoenix: {
+    cardClass:
+      'border-orange-300/95 bg-gradient-to-b from-[#521F0B] via-[#341206] to-[#1B0803] shadow-[0_18px_50px_rgba(249,115,22,0.58),0_0_32px_rgba(250,204,21,0.42),inset_0_1px_0_rgba(255,251,235,0.58)]',
+    labelClass: 'text-yellow-200',
+    digitGradient: 'linear-gradient(180deg, #FFFFFF 0%, #FEF08A 42%, #FB923C 74%, #EA580C 100%)',
+    digitGlow: 'drop-shadow(0 0 24px rgba(251,146,60,0.92))',
+    beamGradient:
+      'linear-gradient(110deg, transparent 12%, rgba(254,240,138,0.74) 44%, rgba(251,146,60,0.58) 60%, transparent 88%)',
+    streakActiveClass:
+      'border-yellow-200/90 bg-gradient-to-b from-orange-500/45 to-yellow-500/35 text-yellow-50 shadow-[0_0_28px_rgba(251,146,60,0.6)]',
+    sparkColors: ['#FFFFFF', '#FEF08A', '#FB923C', '#F97316'],
+  },
+  void_nebula: {
+    cardClass:
+      'border-purple-300/95 bg-gradient-to-b from-[#2E1354] via-[#1C0B36] to-[#0D041C] shadow-[0_18px_50px_rgba(147,51,234,0.58),0_0_32px_rgba(244,114,182,0.4),inset_0_1px_0_rgba(243,232,255,0.52)]',
+    labelClass: 'text-fuchsia-200',
+    digitGradient: 'linear-gradient(180deg, #FAF5FF 0%, #E879F9 48%, #F472B6 100%)',
+    digitGlow: 'drop-shadow(0 0 23px rgba(192,132,252,0.9))',
+    beamGradient:
+      'linear-gradient(110deg, transparent 12%, rgba(232,121,249,0.68) 44%, rgba(244,114,182,0.56) 60%, transparent 88%)',
+    streakActiveClass:
+      'border-fuchsia-300/90 bg-gradient-to-b from-purple-600/45 to-pink-500/35 text-fuchsia-50 shadow-[0_0_28px_rgba(192,132,252,0.58)]',
+    sparkColors: ['#FAF5FF', '#C084FC', '#F472B6', '#F0ABFC'],
+  },
+  jade_dragon: {
+    cardClass:
+      'border-emerald-300/95 bg-gradient-to-b from-[#0E4A3D] via-[#082E26] to-[#041814] shadow-[0_18px_50px_rgba(16,185,129,0.56),0_0_32px_rgba(6,182,212,0.4),inset_0_1px_0_rgba(209,250,229,0.55)]',
+    labelClass: 'text-emerald-200',
+    digitGradient: 'linear-gradient(180deg, #ECFDF5 0%, #34D399 46%, #22D3EE 100%)',
+    digitGlow: 'drop-shadow(0 0 23px rgba(16,185,129,0.9))',
+    beamGradient:
+      'linear-gradient(110deg, transparent 12%, rgba(110,231,183,0.68) 44%, rgba(34,211,238,0.56) 60%, transparent 88%)',
+    streakActiveClass:
+      'border-emerald-300/90 bg-gradient-to-b from-emerald-500/45 to-cyan-500/35 text-emerald-50 shadow-[0_0_28px_rgba(16,185,129,0.56)]',
+    sparkColors: ['#ECFDF5', '#34D399', '#22D3EE', '#A7F3D0'],
+  },
+  arcane_clockwork: {
+    cardClass:
+      'border-amber-300/95 bg-gradient-to-b from-[#3D2A14] via-[#261A0C] to-[#130C05] shadow-[0_18px_52px_rgba(217,119,6,0.55),0_0_32px_rgba(109,40,217,0.42),inset_0_1px_0_rgba(254,243,199,0.55)]',
+    labelClass: 'text-amber-200',
+    digitGradient: 'linear-gradient(180deg, #FFFBEB 0%, #F59E0B 48%, #C4B5FD 100%)',
+    digitGlow: 'drop-shadow(0 0 23px rgba(245,158,11,0.9))',
+    beamGradient:
+      'linear-gradient(110deg, transparent 12%, rgba(252,211,77,0.7) 44%, rgba(196,181,253,0.56) 60%, transparent 88%)',
+    streakActiveClass:
+      'border-amber-300/90 bg-gradient-to-b from-amber-500/45 to-violet-600/35 text-amber-50 shadow-[0_0_28px_rgba(245,158,11,0.56)]',
+    sparkColors: ['#FEF3C7', '#F59E0B', '#C4B5FD', '#FFFFFF'],
+  },
+  supernova_core: {
+    cardClass:
+      'border-rose-300/95 bg-gradient-to-b from-[#3E1346] via-[#250B2B] to-[#120416] shadow-[0_20px_54px_rgba(244,63,94,0.6),0_0_36px_rgba(14,165,233,0.45),inset_0_1px_0_rgba(255,255,255,0.6)]',
+    labelClass: 'text-cyan-100',
+    digitGradient: 'linear-gradient(180deg, #FFFFFF 0%, #FB7185 45%, #38BDF8 100%)',
+    digitGlow: 'drop-shadow(0 0 25px rgba(244,63,94,0.92))',
+    beamGradient:
+      'linear-gradient(110deg, transparent 10%, rgba(251,113,133,0.72) 42%, rgba(56,189,248,0.62) 60%, transparent 90%)',
+    streakActiveClass:
+      'border-cyan-200/90 bg-gradient-to-b from-rose-500/45 to-sky-500/40 text-white shadow-[0_0_30px_rgba(244,63,94,0.62)]',
+    sparkColors: ['#FFFFFF', '#FB7185', '#38BDF8', '#FEF08A'],
+  },
+  astral_sovereign: {
+    cardClass:
+      'border-yellow-200 bg-gradient-to-b from-[#1E424C] via-[#122930] to-[#081318] shadow-[0_22px_58px_rgba(250,204,21,0.64),0_0_38px_rgba(16,185,129,0.48),0_0_20px_rgba(168,85,247,0.38),inset_0_1px_0_rgba(255,255,255,0.7)]',
+    labelClass: 'text-yellow-100',
+    digitGradient:
+      'linear-gradient(180deg, #FFFFFF 0%, #FEF08A 32%, #6EE7B7 66%, #C084FC 100%)',
+    digitGlow: 'drop-shadow(0 0 26px rgba(254,240,138,0.96))',
+    beamGradient:
+      'linear-gradient(110deg, transparent 10%, rgba(254,240,138,0.76) 36%, rgba(110,231,183,0.64) 54%, rgba(192,132,252,0.56) 68%, transparent 90%)',
+    streakActiveClass:
+      'border-yellow-200 bg-gradient-to-b from-yellow-400/45 via-emerald-500/35 to-purple-500/35 text-white shadow-[0_0_32px_rgba(250,204,21,0.68)]',
+    sparkColors: ['#FFFFFF', '#FEF08A', '#6EE7B7', '#D8B4FE'],
+  },
 };
 
 /** Returns stage-matched visual tokens for the Block Blast scoreboard header. */
@@ -176,7 +297,8 @@ export function buildScoreSparks(
             ? 4
             : 0;
   if (baseCount === 0) return [];
-  const tierBonus = stageTier >= 8 ? 4 : stageTier >= 6 ? 2 : 0;
+  const tierBonus =
+    stageTier >= 15 ? 8 : stageTier >= 11 ? 6 : stageTier >= 8 ? 4 : stageTier >= 6 ? 2 : 0;
   const count = baseCount + tierBonus;
 
   const colors = getStageScoreVisual(stageId).sparkColors;

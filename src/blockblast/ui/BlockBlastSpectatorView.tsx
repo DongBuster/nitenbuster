@@ -11,12 +11,15 @@ import {
   VolumeX,
 } from 'lucide-react';
 import { playSfx, setAudioPreferences } from '../../audio/soundEngine.ts';
+import { AnimalAvatar } from '../../components/AnimalAvatar.tsx';
 import { useProfileStore } from '../../store/profileStore.ts';
 import { getStageTheme } from '../engine/stages.ts';
 import { decodeGrid } from '../online/gridCodec.ts';
 import { BB_ROOM_EMOTES } from '../online/protocol.ts';
+import { useBlockBlastGlobalChat } from '../online/useBlockBlastGlobalChat.ts';
 import type { BlockBlastRoomController } from '../online/useBlockBlastRoom.ts';
 import { BlockBoard } from './BlockBoard.tsx';
+import { BlockBlastChatPanel } from './BlockBlastChatPanel.tsx';
 import { BlockBlastLiveLeaderboard } from './BlockBlastLiveLeaderboard.tsx';
 
 export interface BlockBlastSpectatorViewProps {
@@ -31,9 +34,19 @@ const FOCUS_RING_CLASS =
  * (or joins an active room mid-round). Shows clickable standings and live 8x8 board.
  */
 export function BlockBlastSpectatorView({ room }: BlockBlastSpectatorViewProps) {
-  const { settings, updateSettings } = useProfileStore();
+  const { settings, updateSettings, selectedAnimal, equippedAvatarFrame } =
+    useProfileStore();
   const [selectedPeerId, setSelectedPeerId] = useState<string | null>(null);
   const noopBoardRef = useRef<HTMLDivElement | null>(null);
+  const myMember = room.members.find((m) => m.peerId === room.myPeerId);
+  const globalChat = useBlockBlastGlobalChat(
+    {
+      name: myMember?.name ?? 'Khán giả',
+      animal: myMember?.animal ?? selectedAnimal,
+      avatarFrame: myMember?.avatarFrame ?? equippedAvatarFrame,
+    },
+    room.configured,
+  );
 
   const standings = room.standings;
   const activeCandidate = useMemo(
@@ -204,26 +217,54 @@ export function BlockBlastSpectatorView({ room }: BlockBlastSpectatorViewProps) 
                 ))}
               </div>
             </section>
+
+            <BlockBlastChatPanel
+              mode="embedded"
+              roomCode={room.roomCode}
+              roomFeed={{
+                configured: room.configured,
+                connected: room.connectionStatus === 'connected',
+                myPeerId: room.myPeerId,
+                messages: room.chatMessages,
+                rateLimited: room.chatRateLimited,
+                onSend: room.sendChat,
+              }}
+              globalFeed={{
+                configured: globalChat.configured,
+                connected: globalChat.connected,
+                myPeerId: globalChat.myPeerId,
+                messages: globalChat.messages,
+                rateLimited: globalChat.rateLimited,
+                onSend: globalChat.sendMessage,
+              }}
+            />
           </div>
 
           {/* Right Column: Live 8x8 Board of Selected Player */}
           <section className="flex flex-col items-center gap-3 lg:col-span-7">
             {targetStanding && (
               <div className="flex w-full max-w-[492px] flex-wrap items-center justify-between gap-2 rounded-2xl border border-sky-400/35 bg-[#122236]/95 px-4 py-3 shadow-lg">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[11px] font-black uppercase tracking-wider text-sky-300">
-                      Đang xem · Hạng #{targetStanding.rank}
-                    </span>
-                    {targetStanding.status === 'playing' && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-black text-emerald-200">
-                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                        LIVE
+                <div className="flex items-center gap-3">
+                  <AnimalAvatar
+                    animal={targetStanding.animal}
+                    size="md"
+                    frameId={targetStanding.avatarFrame}
+                  />
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-black uppercase tracking-wider text-sky-300">
+                        Đang xem · Hạng #{targetStanding.rank}
                       </span>
-                    )}
-                  </div>
-                  <div className="mt-0.5 font-display text-lg font-black text-white">
-                    {targetStanding.name}
+                      {targetStanding.status === 'playing' && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-black text-emerald-200">
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                          LIVE
+                        </span>
+                      )}
+                    </div>
+                    <div className="mt-0.5 font-display text-lg font-black text-white">
+                      {targetStanding.name}
+                    </div>
                   </div>
                 </div>
 

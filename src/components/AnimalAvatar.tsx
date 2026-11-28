@@ -1,5 +1,9 @@
 import { useId } from 'react';
 import type { AnimalId } from '../engine/types';
+import {
+  getAvatarFrameMeta,
+  type AvatarFrameId,
+} from '../blockblast/engine/avatarFrames';
 import { getAnimalAvatarTheme } from './animalAvatarMeta';
 
 export type AnimalAvatarSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl';
@@ -7,6 +11,7 @@ export type AnimalAvatarSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl';
 export interface AnimalAvatarProps {
   animal: AnimalId;
   size?: AnimalAvatarSize;
+  frameId?: AvatarFrameId | null;
   className?: string;
   /** Pass a label only when the avatar is standalone without adjacent text. */
   label?: string;
@@ -453,51 +458,167 @@ function renderAnimalFace(animal: AnimalId) {
  * Reusable chibi plush SVG portrait avatar for all 8 playable 3D animals.
  * Zero WebGL contexts, instant first paint, and crisp at every UI scale.
  */
+function renderAvatarFrameOverlay(frameId: AvatarFrameId, uid: string) {
+  const gradId = `${uid}-frame-grad`;
+  switch (frameId) {
+    case 'frame_stage_5':
+      return (
+        <svg
+          viewBox="0 0 80 80"
+          className="pointer-events-none absolute -inset-[14%] h-[128%] w-[128%] overflow-visible"
+          aria-hidden="true"
+          focusable="false"
+        >
+          <defs>
+            <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#67E8F9" />
+              <stop offset="50%" stopColor="#A78BFA" />
+              <stop offset="100%" stopColor="#38BDF8" />
+            </linearGradient>
+          </defs>
+          <circle cx="40" cy="40" r="33.5" fill="none" stroke={`url(#${gradId})`} strokeWidth="3.8" />
+          <circle cx="40" cy="40" r="36.5" fill="none" stroke="#E0F2FE" strokeWidth="1" strokeDasharray="3 4" opacity="0.85" />
+          <polygon points="40,1 42.2,6.4 47.6,8.6 42.2,10.8 40,16.2 37.8,10.8 32.4,8.6 37.8,6.4" fill="#FEF3C7" stroke="#6366F1" strokeWidth="0.8" />
+          <circle cx="13" cy="18" r="2.2" fill="#67E8F9" />
+          <circle cx="67" cy="18" r="2.2" fill="#C4B5FD" />
+          <circle cx="14" cy="63" r="1.8" fill="#C4B5FD" />
+          <circle cx="66" cy="63" r="1.8" fill="#67E8F9" />
+        </svg>
+      );
+    case 'frame_stage_10':
+      return (
+        <svg
+          viewBox="0 0 80 80"
+          className="pointer-events-none absolute -inset-[15%] h-[130%] w-[130%] overflow-visible"
+          aria-hidden="true"
+          focusable="false"
+        >
+          <defs>
+            <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#FEF08A" />
+              <stop offset="35%" stopColor="#67E8F9" />
+              <stop offset="70%" stopColor="#E879F9" />
+              <stop offset="100%" stopColor="#FACC15" />
+            </linearGradient>
+          </defs>
+          <circle cx="40" cy="40" r="33.5" fill="none" stroke={`url(#${gradId})`} strokeWidth="4.4" />
+          <circle cx="40" cy="40" r="37.2" fill="none" stroke="#FFFFFF" strokeWidth="1.2" opacity="0.7" />
+          <polygon points="40,0 45,7.5 40,14 35,7.5" fill="#FEF08A" stroke="#D946EF" strokeWidth="1.1" />
+          <polygon points="10,40 5,36 1,40 5,44" fill="#67E8F9" />
+          <polygon points="70,40 75,36 79,40 75,44" fill="#F0ABFC" />
+          <polygon points="40,70 43.5,74.5 40,79 36.5,74.5" fill="#FFFFFF" />
+        </svg>
+      );
+    case 'frame_stage_15':
+      return (
+        <svg
+          viewBox="0 0 80 80"
+          className="pointer-events-none absolute -inset-[16%] h-[132%] w-[132%] overflow-visible"
+          aria-hidden="true"
+          focusable="false"
+        >
+          <defs>
+            <linearGradient id={gradId} x1="0%" y1="100%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#DC2626" />
+              <stop offset="50%" stopColor="#FB923C" />
+              <stop offset="100%" stopColor="#FEF08A" />
+            </linearGradient>
+          </defs>
+          <circle cx="40" cy="40" r="33.5" fill="none" stroke={`url(#${gradId})`} strokeWidth="4.6" />
+          <path d="M12 52 C2 44 2 28 14 20 C9 30 11 40 16 47 Z" fill="#FB923C" stroke="#FEF08A" strokeWidth="1" />
+          <path d="M68 52 C78 44 78 28 66 20 C71 30 69 40 64 47 Z" fill="#FB923C" stroke="#FEF08A" strokeWidth="1" />
+          <path d="M40 0 C45 6 47 10 40 16 C33 10 35 6 40 0 Z" fill="#FACC15" stroke="#FFF7ED" strokeWidth="1.1" />
+          <circle cx="40" cy="74" r="2.6" fill="#FDE047" />
+        </svg>
+      );
+    case 'frame_stage_20':
+      return (
+        <svg
+          viewBox="0 0 80 80"
+          className="pointer-events-none absolute -inset-[18%] h-[136%] w-[136%] overflow-visible"
+          aria-hidden="true"
+          focusable="false"
+        >
+          <defs>
+            <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#FEF08A" />
+              <stop offset="45%" stopColor="#34D399" />
+              <stop offset="75%" stopColor="#A855F7" />
+              <stop offset="100%" stopColor="#FACC15" />
+            </linearGradient>
+          </defs>
+          <circle cx="40" cy="40" r="33.5" fill="none" stroke={`url(#${gradId})`} strokeWidth="5" />
+          <circle cx="40" cy="40" r="38" fill="none" stroke="#FEF08A" strokeWidth="1.4" strokeDasharray="5 3" opacity="0.9" />
+          <path d="M27 11 L32 2 L40 8 L48 2 L53 11 Z" fill="#FACC15" stroke="#FFFFFF" strokeWidth="1.1" strokeLinejoin="round" />
+          <circle cx="40" cy="7.5" r="2" fill="#34D399" />
+          <polygon points="4,40 9,37 12,40 9,43" fill="#FEF08A" />
+          <polygon points="76,40 71,37 68,40 71,43" fill="#6EE7B7" />
+          <polygon points="40,79 43,74 40,69 37,74" fill="#FEF08A" />
+        </svg>
+      );
+  }
+}
+
+/**
+ * High-contrast, friendly 2D plush animal portrait avatar built on a unified 64x64 viewBox.
+ */
 export function AnimalAvatar({
   animal,
   size = 'md',
+  frameId = null,
   className = '',
   label,
 }: AnimalAvatarProps) {
   const uid = useId();
   const theme = getAnimalAvatarTheme(animal);
+  const frameMeta = getAvatarFrameMeta(frameId);
   const bgGradId = `${uid}-bg`;
   const clipId = `${uid}-clip`;
   const sheenId = `${uid}-sheen`;
 
   return (
     <span
-      className={`pointer-events-none relative inline-flex shrink-0 items-center justify-center overflow-clip rounded-full ring-2 ring-white/35 shadow-md ${SIZE_CLASSES[size]} ${className}`}
+      className={`pointer-events-none relative inline-flex shrink-0 items-center justify-center rounded-full shadow-md ${
+        frameMeta ? 'overflow-visible' : 'overflow-clip ring-2 ring-white/35'
+      } ${SIZE_CLASSES[size]} ${className}`}
+      style={
+        frameMeta
+          ? { boxShadow: `0 0 14px ${frameMeta.glowRgba}` }
+          : undefined
+      }
       role={label ? 'img' : undefined}
       aria-label={label}
       aria-hidden={label ? undefined : true}
     >
-      <svg
-        viewBox="0 0 64 64"
-        className="block h-full w-full"
-        aria-hidden="true"
-        focusable="false"
-      >
-        <defs>
-          <radialGradient id={bgGradId} cx="32%" cy="24%" r="76%">
-            <stop offset="0%" stopColor={theme.bgStart} />
-            <stop offset="100%" stopColor={theme.bgEnd} />
-          </radialGradient>
-          <linearGradient id={sheenId} x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.28" />
-            <stop offset="48%" stopColor="#FFFFFF" stopOpacity="0" />
-          </linearGradient>
-          <clipPath id={clipId}>
-            <circle cx="32" cy="32" r="31" />
-          </clipPath>
-        </defs>
+      <span className="block h-full w-full overflow-clip rounded-full">
+        <svg
+          viewBox="0 0 64 64"
+          className="block h-full w-full"
+          aria-hidden="true"
+          focusable="false"
+        >
+          <defs>
+            <radialGradient id={bgGradId} cx="32%" cy="24%" r="76%">
+              <stop offset="0%" stopColor={theme.bgStart} />
+              <stop offset="100%" stopColor={theme.bgEnd} />
+            </radialGradient>
+            <linearGradient id={sheenId} x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.28" />
+              <stop offset="48%" stopColor="#FFFFFF" stopOpacity="0" />
+            </linearGradient>
+            <clipPath id={clipId}>
+              <circle cx="32" cy="32" r="31" />
+            </clipPath>
+          </defs>
 
-        <g clipPath={`url(#${clipId})`}>
-          <circle cx="32" cy="32" r="32" fill={`url(#${bgGradId})`} />
-          {renderAnimalFace(animal)}
-          <ellipse cx="32" cy="14" rx="24" ry="12" fill={`url(#${sheenId})`} />
-        </g>
-      </svg>
+          <g clipPath={`url(#${clipId})`}>
+            <circle cx="32" cy="32" r="32" fill={`url(#${bgGradId})`} />
+            {renderAnimalFace(animal)}
+            <ellipse cx="32" cy="14" rx="24" ry="12" fill={`url(#${sheenId})`} />
+          </g>
+        </svg>
+      </span>
+      {frameMeta && renderAvatarFrameOverlay(frameMeta.id, uid)}
     </span>
   );
 }

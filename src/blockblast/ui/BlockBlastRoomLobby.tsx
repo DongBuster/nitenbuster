@@ -18,7 +18,10 @@ import { normalizeRoomCode } from '../../online/sanitize.ts';
 import { formatEquippedSummary } from '../../scene3d/accessoryCatalog.ts';
 import { useProfileStore } from '../../store/profileStore.ts';
 import { BB_MAX_ROOM_PLAYERS, BB_MIN_START_PLAYERS } from '../online/protocol.ts';
+import { useBlockBlastGlobalChat } from '../online/useBlockBlastGlobalChat.ts';
 import type { BlockBlastRoomController } from '../online/useBlockBlastRoom.ts';
+import { AvatarFramePickerModal } from './AvatarFramePickerModal.tsx';
+import { BlockBlastChatPanel } from './BlockBlastChatPanel.tsx';
 
 export interface BlockBlastRoomLobbyProps {
   room: BlockBlastRoomController;
@@ -51,16 +54,41 @@ export function BlockBlastRoomLobby({
   onSwitchToSolo,
   onBackToModeSelect,
 }: BlockBlastRoomLobbyProps) {
-  const { selectedAnimal, equippedAccessory, selectAnimal } = useProfileStore();
+  const {
+    selectedAnimal,
+    equippedAccessory,
+    selectAnimal,
+    blockBlastBestStage,
+    unlockedAvatarFrames,
+    equippedAvatarFrame,
+    equipAvatarFrame,
+  } = useProfileStore();
   const [displayName, setDisplayName] = useState<string>(() => loadSavedName());
   const [joinCodeInput, setJoinCodeInput] = useState<string>(() =>
     normalizeRoomCode(initialRoomCode),
   );
   const [copiedMode, setCopiedMode] = useState<'code' | 'link' | null>(null);
+  const [framePickerOpen, setFramePickerOpen] = useState(false);
+
+  const globalChat = useBlockBlastGlobalChat(
+    {
+      name: displayName.trim() || 'Người chơi',
+      animal: selectedAnimal,
+      avatarFrame: equippedAvatarFrame,
+    },
+    room.configured,
+  );
 
   const myAccessory = equippedAccessory[selectedAnimal] ?? [];
   const myMember =
     room.members.find((m) => m.peerId === room.myPeerId) ?? null;
+
+  const handleEquipFrame = (frameId: typeof equippedAvatarFrame) => {
+    equipAvatarFrame(frameId);
+    if (room.phase === 'lobby') {
+      room.updateMyProfile({ avatarFrame: frameId });
+    }
+  };
 
   const saveName = (val: string) => {
     setDisplayName(val);
@@ -90,6 +118,7 @@ export function BlockBlastRoomLobby({
       name: displayName.trim() || 'Chủ phòng',
       animal: selectedAnimal,
       accessory: myAccessory,
+      avatarFrame: equippedAvatarFrame,
     });
   };
 
@@ -101,6 +130,7 @@ export function BlockBlastRoomLobby({
       name: displayName.trim() || 'Người chơi',
       animal: selectedAnimal,
       accessory: myAccessory,
+      avatarFrame: equippedAvatarFrame,
     });
   };
 
@@ -396,17 +426,30 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={() => {
-              playSfx('click');
-              room.leaveRoom();
-            }}
-            className={`btn-tactile-wood inline-flex cursor-pointer items-center gap-1.5 rounded-2xl border border-rose-500/40 px-4 py-2 text-xs font-black text-rose-200 ${FOCUS_RING_CLASS}`}
-          >
-            <ArrowLeft aria-hidden="true" className="h-3.5 w-3.5" />
-            <span>Rời Phòng</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                playSfx('click');
+                setFramePickerOpen(true);
+              }}
+              className={`inline-flex cursor-pointer items-center gap-1.5 rounded-2xl border border-amber-400/50 bg-amber-500/15 px-3.5 py-2 text-xs font-black text-amber-100 hover:border-amber-300 ${FOCUS_RING_CLASS}`}
+            >
+              <Crown aria-hidden="true" className="h-3.5 w-3.5 text-yellow-300" />
+              <span>Khung ({unlockedAvatarFrames.length}/4)</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                playSfx('click');
+                room.leaveRoom();
+              }}
+              className={`btn-tactile-wood inline-flex cursor-pointer items-center gap-1.5 rounded-2xl border border-rose-500/40 px-4 py-2 text-xs font-black text-rose-200 ${FOCUS_RING_CLASS}`}
+            >
+              <ArrowLeft aria-hidden="true" className="h-3.5 w-3.5" />
+              <span>Rời Phòng</span>
+            </button>
+          </div>
         </header>
 
         {room.error && (
@@ -447,7 +490,11 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
                     }`}
                   >
                     <div className="flex min-w-0 items-center gap-2.5">
-                      <AnimalAvatar animal={animalMeta.id} size="md" />
+                      <AnimalAvatar
+                        animal={animalMeta.id}
+                        size="md"
+                        frameId={member.avatarFrame ?? null}
+                      />
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5">
                           <span className="truncate text-sm font-extrabold text-amber-50">
@@ -544,7 +591,39 @@ VITE_SUPABASE_ANON_KEY=<your-anon-key>`}
             </div>
           </aside>
         </div>
+
+        {/* Embedded Room + Global Online Chat */}
+        <BlockBlastChatPanel
+          mode="embedded"
+          roomCode={room.roomCode}
+          roomFeed={{
+            configured: room.configured,
+            connected: room.connectionStatus === 'connected',
+            myPeerId: room.myPeerId,
+            messages: room.chatMessages,
+            rateLimited: room.chatRateLimited,
+            onSend: room.sendChat,
+          }}
+          globalFeed={{
+            configured: globalChat.configured,
+            connected: globalChat.connected,
+            myPeerId: globalChat.myPeerId,
+            messages: globalChat.messages,
+            rateLimited: globalChat.rateLimited,
+            onSend: globalChat.sendMessage,
+          }}
+        />
       </div>
+
+      <AvatarFramePickerModal
+        open={framePickerOpen}
+        animal={selectedAnimal}
+        bestStage={blockBlastBestStage}
+        unlockedFrames={unlockedAvatarFrames}
+        equippedFrame={equippedAvatarFrame}
+        onEquip={handleEquipFrame}
+        onClose={() => setFramePickerOpen(false)}
+      />
     </div>
   );
 }
