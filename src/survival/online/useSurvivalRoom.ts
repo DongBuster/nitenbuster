@@ -9,6 +9,7 @@ import {
   getSupabaseClient,
   isSupabaseConfigured,
 } from '../../online/supabaseClient.ts';
+import { HostStarTransport } from '../../online/p2p/starTransport.ts';
 import { isSurvivalMapId } from '../sim/maps.ts';
 import type {
   GearId,
@@ -20,6 +21,7 @@ import {
   SURVIVAL_DISCONNECT_BOT_MS,
   SURVIVAL_INPUT_INTERVAL_MS,
   SURVIVAL_MAX_PLAYERS,
+  SURVIVAL_SNAPSHOT_INTERVAL_MS,
   decodeSnapshotWire,
   encodeSnapshotWire,
   isSafeId,
@@ -179,6 +181,7 @@ export function useSurvivalRoom(): SurvivalRoomController {
   const [error, setError] = useState<string | null>(null);
 
   const channelRef = useRef<RealtimeChannel | null>(null);
+  const transportRef = useRef<HostStarTransport | null>(null);
   const pendingTeardownRef = useRef<Promise<unknown> | null>(null);
   const connectAttemptIdRef = useRef<number>(0);
   const connectResolveRef = useRef<(() => void) | null>(null);
@@ -273,6 +276,8 @@ export function useSurvivalRoom(): SurvivalRoomController {
     resolvePendingConnect();
     clearInputThrottle();
     clearHeartbeatTimer();
+    transportRef.current?.dispose();
+    transportRef.current = null;
     const client = getSupabaseClient();
     const ch = channelRef.current;
     channelRef.current = null;
@@ -352,10 +357,8 @@ export function useSurvivalRoom(): SurvivalRoomController {
         peerId: myPeerId,
         sentAt: Date.now(),
       };
-      void channel.send({
-        type: 'broadcast',
-        event: 'survival_heartbeat',
-        payload,
+      transportRef.current?.sendToHost('survival_heartbeat', payload, {
+        forceFallback: false,
       });
     }, GUEST_HEARTBEAT_INTERVAL_MS);
   }, [clearHeartbeatTimer, myPeerId]);
@@ -635,6 +638,81 @@ export function useSurvivalRoom(): SurvivalRoomController {
         },
       });
       channelRef.current = channel;
+
+      const transport = new HostStarTransport({
+        channel,
+        myPeerId,
+        fallbackBaseSnapshotIntervalMs: SURVIVAL_SNAPSHOT_INTERVAL_MS,
+        fallbackBaseInputIntervalMs: SURVIVAL_INPUT_INTERVAL_MS,
+      });
+      transportRef.current = transport;
+
+      transport.onMessage('survival_input', (payload) => {
+        if (
+          channelRef.current !== channel ||
+          !isHostRef.current ||
+          phaseRef.current !== 'playing'
+        ) {
+          return;
+        }
+        const evt = validateSurvivalInputPayload(
+          payload,
+          activeGuestIdsRef.current,
+          matchIdRef.current,
+        );
+        if (!evt) return;
+
+        const prevSeq = lastGuestInputSeqRef.current.get(evt.peerId);
+        if (prevSeq !== undefined && evt.seq <= prevSeq) return;
+        lastGuestInputSeqRef.current.set(evt.peerId, evt.seq);
+        guestHeartbeatRef.current.set(evt.peerId, Date.now());
+        guestInputListenerRef.current?.(evt);
+      });
+
+      transport.onMessage('survival_heartbeat', (payload) => {
+        if (
+          channelRef.current !== channel ||
+          !isHostRef.current ||
+          phaseRef.current !== 'playing'
+        ) {
+          return;
+        }
+        if (
+          !payload ||
+          typeof payload !== 'object' ||
+          Array.isArray(payload)
+        ) {
+          return;
+        }
+        const evt = payload as Partial<SurvivalHeartbeatPayload>;
+        if (
+          typeof evt.matchId !== 'string' ||
+          !matchIdRef.current ||
+          evt.matchId !== matchIdRef.current ||
+          !isSafeId(evt.peerId, 64) ||
+          !activeGuestIdsRef.current.has(evt.peerId)
+        ) {
+          return;
+        }
+        guestHeartbeatRef.current.set(evt.peerId, Date.now());
+      });
+
+      transport.onMessage('survival_snapshot', (payload) => {
+        if (
+          channelRef.current !== channel ||
+          isHostRef.current ||
+          phaseRef.current !== 'playing'
+        ) {
+          return;
+        }
+        const activeMatchId = matchIdRef.current;
+        if (!activeMatchId) return;
+        const decoded = isSnapshotWirePayload(payload)
+          ? decodeSnapshotWire(payload, rosterByIdRef.current, activeMatchId)
+          : validateSurvivalSnapshotPayload(payload, activeMatchId);
+        if (!decoded) return;
+        snapshotListenerRef.current?.(decoded);
+      });
 
       return new Promise<void>((resolve) => {
         connectResolveRef.current = resolve;
@@ -944,70 +1022,6 @@ export function useSurvivalRoom(): SurvivalRoomController {
               return;
             }
             resetMatchState('lobby');
-          })
-          .on('broadcast', { event: 'survival_input' }, ({ payload }) => {
-            if (
-              channelRef.current !== channel ||
-              !isHostRef.current ||
-              phaseRef.current !== 'playing'
-            ) {
-              return;
-            }
-            const evt = validateSurvivalInputPayload(
-              payload,
-              activeGuestIdsRef.current,
-              matchIdRef.current,
-            );
-            if (!evt) return;
-
-            const prevSeq = lastGuestInputSeqRef.current.get(evt.peerId);
-            if (prevSeq !== undefined && evt.seq <= prevSeq) return;
-            lastGuestInputSeqRef.current.set(evt.peerId, evt.seq);
-            guestHeartbeatRef.current.set(evt.peerId, Date.now());
-            guestInputListenerRef.current?.(evt);
-          })
-          .on('broadcast', { event: 'survival_heartbeat' }, ({ payload }) => {
-            if (
-              channelRef.current !== channel ||
-              !isHostRef.current ||
-              phaseRef.current !== 'playing'
-            ) {
-              return;
-            }
-            if (
-              !payload ||
-              typeof payload !== 'object' ||
-              Array.isArray(payload)
-            ) {
-              return;
-            }
-            const evt = payload as Partial<SurvivalHeartbeatPayload>;
-            if (
-              typeof evt.matchId !== 'string' ||
-              !matchIdRef.current ||
-              evt.matchId !== matchIdRef.current ||
-              !isSafeId(evt.peerId, 64) ||
-              !activeGuestIdsRef.current.has(evt.peerId)
-            ) {
-              return;
-            }
-            guestHeartbeatRef.current.set(evt.peerId, Date.now());
-          })
-          .on('broadcast', { event: 'survival_snapshot' }, ({ payload }) => {
-            if (
-              channelRef.current !== channel ||
-              isHostRef.current ||
-              phaseRef.current !== 'playing'
-            ) {
-              return;
-            }
-            const activeMatchId = matchIdRef.current;
-            if (!activeMatchId) return;
-            const decoded = isSnapshotWirePayload(payload)
-              ? decodeSnapshotWire(payload, rosterByIdRef.current, activeMatchId)
-              : validateSurvivalSnapshotPayload(payload, activeMatchId);
-            if (!decoded) return;
-            snapshotListenerRef.current?.(decoded);
           })
           .on('broadcast', { event: 'survival_skill_action' }, ({ payload }) => {
             if (
@@ -1427,11 +1441,7 @@ export function useSurvivalRoom(): SurvivalRoomController {
       lastInputSentAtRef.current = nowMs;
       lastSentInputRef.current = sanitized;
 
-      void channel.send({
-        type: 'broadcast',
-        event: 'survival_input',
-        payload,
-      });
+      transportRef.current?.sendToHost('survival_input', payload);
     },
     [myPeerId],
   );
@@ -1498,16 +1508,26 @@ export function useSurvivalRoom(): SurvivalRoomController {
     [clearInputThrottle, flushGuestInput],
   );
 
+  useEffect(() => {
+    if (connectionStatus !== 'connected') return;
+    const resolvedHostPeerId =
+      hostPeerIdState || members.find((m) => m.isHost)?.peerId || '';
+    if (!resolvedHostPeerId) return;
+    transportRef.current?.syncPeers({
+      isHost: isHostState,
+      hostPeerId: resolvedHostPeerId,
+      peerIds: members.map((m) => m.peerId),
+    });
+  }, [connectionStatus, hostPeerIdState, isHostState, members]);
+
   const broadcastSnapshot = useCallback((snapshot: SurvivalSnapshotPayload) => {
     if (!isHostRef.current || phaseRef.current !== 'playing') return;
     if (!matchIdRef.current || snapshot.matchId !== matchIdRef.current) return;
-    const channel = channelRef.current;
-    if (!channel) return;
+    const transport = transportRef.current;
+    if (!transport) return;
     const wire = encodeSnapshotWire(snapshot);
-    void channel.send({
-      type: 'broadcast',
-      event: 'survival_snapshot',
-      payload: wire,
+    transport.sendFromHost('survival_snapshot', wire, {
+      forceFallback: snapshot.phase !== 'playing',
     });
   }, []);
 

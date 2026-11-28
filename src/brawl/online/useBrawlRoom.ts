@@ -9,6 +9,7 @@ import {
   getSupabaseClient,
   isSupabaseConfigured,
 } from '../../online/supabaseClient';
+import { HostStarTransport } from '../../online/p2p/starTransport';
 import {
   normalizeAccessories,
   type AccessorySelection,
@@ -16,8 +17,10 @@ import {
 import { matchReducer } from '../sim/matchStore';
 import type { FighterInput, MatchState } from '../sim/types';
 import {
+  BRAWL_INPUT_INTERVAL_MS,
   BRAWL_INPUT_STALE_MS,
   BRAWL_MAX_ROOM_PLAYERS,
+  BRAWL_SNAPSHOT_INTERVAL_MS,
   buildBrawlRoundKey,
   type BrawlInputPayload,
   type BrawlMatchSyncPayload,
@@ -117,6 +120,7 @@ export function useBrawlRoom() {
   const [lockedHostPeerId, setLockedHostPeerId] = useState<string | null>(null);
 
   const channelRef = useRef<RealtimeChannel | null>(null);
+  const transportRef = useRef<HostStarTransport | null>(null);
   const myProfileRef = useRef<BrawlRoomMember | null>(null);
   const roomCodeRef = useRef<string>(roomCode);
   roomCodeRef.current = roomCode;
@@ -166,6 +170,8 @@ export function useBrawlRoom() {
   }, []);
 
   const cleanupChannel = useCallback(() => {
+    transportRef.current?.dispose();
+    transportRef.current = null;
     const ch = channelRef.current;
     channelRef.current = null;
     if (ch) {
@@ -248,6 +254,14 @@ export function useBrawlRoom() {
       });
       channelRef.current = channel;
 
+      const transport = new HostStarTransport({
+        channel,
+        myPeerId,
+        fallbackBaseSnapshotIntervalMs: BRAWL_SNAPSHOT_INTERVAL_MS,
+        fallbackBaseInputIntervalMs: BRAWL_INPUT_INTERVAL_MS,
+      });
+      transportRef.current = transport;
+
       channel.on('presence', { event: 'sync' }, () => {
         const parsed = parsePresenceMembers(channel.presenceState());
         setMembers(parsed);
@@ -287,7 +301,7 @@ export function useBrawlRoom() {
         setMatch(data.match);
       });
 
-      channel.on('broadcast', { event: 'brawl_snapshot' }, ({ payload }) => {
+      transport.onMessage('brawl_snapshot', (payload) => {
         if (isHostRef.current) return;
         const snap = payload as BrawlSnapshotPayload;
         if (!snap || typeof snap.tick !== 'number') return;
@@ -309,7 +323,7 @@ export function useBrawlRoom() {
         interpolatorRef.current.push(snap, performance.now());
       });
 
-      channel.on('broadcast', { event: 'brawl_input' }, ({ payload }) => {
+      transport.onMessage('brawl_input', (payload) => {
         if (!isHostRef.current) return;
         const evt = payload as BrawlInputPayload;
         if (!evt || evt.peerId === myPeerId) return;
@@ -531,13 +545,19 @@ export function useBrawlRoom() {
     } satisfies BrawlMatchSyncPayload);
   }, [broadcast, myPeerId]);
 
-  const broadcastSnapshot = useCallback(
-    (snapshot: BrawlSnapshotPayload) => {
-      if (!isHostRef.current) return;
-      broadcast('brawl_snapshot', snapshot);
-    },
-    [broadcast],
-  );
+  useEffect(() => {
+    if (status !== 'connected' || !hostPeerId) return;
+    transportRef.current?.syncPeers({
+      isHost,
+      hostPeerId,
+      peerIds: members.map((m) => m.peerId),
+    });
+  }, [hostPeerId, isHost, members, status]);
+
+  const broadcastSnapshot = useCallback((snapshot: BrawlSnapshotPayload) => {
+    if (!isHostRef.current) return;
+    transportRef.current?.sendFromHost('brawl_snapshot', snapshot);
+  }, []);
 
   const sendClientInput = useCallback(
     (roundKey: string, input: FighterInput) => {
@@ -547,7 +567,7 @@ export function useBrawlRoom() {
         input,
         performance.now(),
         (seq, payloadInput, activeRoundKey) => {
-          broadcast('brawl_input', {
+          transportRef.current?.sendToHost('brawl_input', {
             roundKey: activeRoundKey,
             peerId: myPeerId,
             seq,
@@ -556,7 +576,7 @@ export function useBrawlRoom() {
         },
       );
     },
-    [broadcast, myPeerId],
+    [myPeerId],
   );
 
   const getRemoteInputs = useCallback((): Record<string, FighterInput> => {

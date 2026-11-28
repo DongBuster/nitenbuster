@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { RealtimeChannel } from '@supabase/supabase-js';
+import {
+  BRAWL_INPUT_INTERVAL_MS,
+  BRAWL_SNAPSHOT_INTERVAL_MS,
+} from '../brawl/online/protocol';
 import type { AnimalId } from '../engine/types';
+import { HostStarTransport } from '../online/p2p/starTransport';
 import {
   generateRoomCode,
   normalizeRoomCode,
@@ -128,6 +133,7 @@ export function useEventRoom() {
     useState<number>(0);
 
   const channelRef = useRef<RealtimeChannel | null>(null);
+  const transportRef = useRef<HostStarTransport | null>(null);
   const myProfileRef = useRef<EventMember | null>(null);
   const seqRef = useRef<number>(0);
   const membersRef = useRef<EventMember[]>([]);
@@ -144,6 +150,9 @@ export function useEventRoom() {
   const gameListenersRef = useRef<Map<string, Set<(payload: unknown) => void>>>(
     new Map(),
   );
+  const realtimeListenersRef = useRef<
+    Map<string, Set<(payload: unknown) => void>>
+  >(new Map());
 
   membersRef.current = members;
   rosterRef.current = roster;
@@ -247,6 +256,8 @@ export function useEventRoom() {
   );
 
   const teardownChannel = useCallback(() => {
+    transportRef.current?.dispose();
+    transportRef.current = null;
     const client = getSupabaseClient();
     const ch = channelRef.current;
     channelRef.current = null;
@@ -326,11 +337,28 @@ export function useEventRoom() {
 
       const channel = client.channel(`paws-event:${code}`, {
         config: {
-          broadcast: { self: true },
+          broadcast: { self: false },
           presence: { key: myPeerId },
         },
       });
       channelRef.current = channel;
+
+      const transport = new HostStarTransport({
+        channel,
+        myPeerId,
+        fallbackBaseSnapshotIntervalMs: BRAWL_SNAPSHOT_INTERVAL_MS,
+        fallbackBaseInputIntervalMs: BRAWL_INPUT_INTERVAL_MS,
+      });
+      transportRef.current = transport;
+      transport.onMessage('event_rt', (payload) => {
+        const env = payload as GameMsgEnvelope | undefined;
+        if (!env || typeof env.kind !== 'string') return;
+        const activeId = currentRoundRef.current?.roundId;
+        if (activeId && env.roundId !== activeId) return;
+        const set = realtimeListenersRef.current.get(env.kind);
+        if (!set) return;
+        set.forEach((handler) => handler(env.payload));
+      });
 
       channel
         .on('presence', { event: 'sync' }, () => {
@@ -700,17 +728,24 @@ export function useEventRoom() {
     });
   }, [broadcastStateFromHost, myPeerId]);
 
-  const sendGameEvent = useCallback((kind: string, payload: unknown) => {
-    const ch = channelRef.current;
-    const roundId = currentRoundRef.current?.roundId;
-    if (!ch || !roundId) return;
-    const env: GameMsgEnvelope = { roundId, kind, payload };
-    void ch.send({
-      type: 'broadcast',
-      event: 'event_game_msg',
-      payload: env,
-    });
-  }, []);
+  const sendGameEvent = useCallback(
+    (kind: string, payload: unknown, opts?: { localEcho?: boolean }) => {
+      const ch = channelRef.current;
+      const roundId = currentRoundRef.current?.roundId;
+      if (!ch || !roundId) return;
+      const env: GameMsgEnvelope = { roundId, kind, payload };
+      if (opts?.localEcho) {
+        const set = gameListenersRef.current.get(kind);
+        set?.forEach((handler) => handler(payload));
+      }
+      void ch.send({
+        type: 'broadcast',
+        event: 'event_game_msg',
+        payload: env,
+      });
+    },
+    [],
+  );
 
   const subscribeGameEvent = useCallback(
     (kind: string, handler: (payload: unknown) => void): (() => void) => {
@@ -726,6 +761,47 @@ export function useEventRoom() {
     },
     [],
   );
+
+  const sendRealtimeFromHost = useCallback((kind: string, payload: unknown) => {
+    const transport = transportRef.current;
+    const roundId = currentRoundRef.current?.roundId;
+    if (!transport || !roundId) return;
+    const env: GameMsgEnvelope = { roundId, kind, payload };
+    transport.sendFromHost('event_rt', env);
+  }, []);
+
+  const sendRealtimeToHost = useCallback((kind: string, payload: unknown) => {
+    const transport = transportRef.current;
+    const roundId = currentRoundRef.current?.roundId;
+    if (!transport || !roundId) return;
+    const env: GameMsgEnvelope = { roundId, kind, payload };
+    transport.sendToHost('event_rt', env);
+  }, []);
+
+  const subscribeRealtimeEvent = useCallback(
+    (kind: string, handler: (payload: unknown) => void): (() => void) => {
+      let set = realtimeListenersRef.current.get(kind);
+      if (!set) {
+        set = new Set();
+        realtimeListenersRef.current.set(kind, set);
+      }
+      set.add(handler);
+      return () => {
+        set?.delete(handler);
+      };
+    },
+    [],
+  );
+
+  // Keep WebRTC P2P star topology synced once the Event channel is subscribed
+  useEffect(() => {
+    if (connectionStatus !== 'connected' || !hostId) return;
+    transportRef.current?.syncPeers({
+      isHost,
+      hostPeerId: hostId,
+      peerIds: members.map((m) => m.peerId),
+    });
+  }, [connectionStatus, hostId, isHost, members]);
 
   // Synchronized countdown ticker for roundIntro, playing, and roundResult auto-advance
   useEffect(() => {
@@ -837,6 +913,9 @@ export function useEventRoom() {
     resetEventToLobby,
     sendGameEvent,
     subscribeGameEvent,
+    sendRealtimeFromHost,
+    sendRealtimeToHost,
+    subscribeRealtimeEvent,
   };
 }
 

@@ -453,7 +453,7 @@ export function EventCardsAdapter({ room, round }: EventAdapterProps) {
           text,
           at: Date.now(),
         };
-        sendGameEvent('cards_emote', evt);
+        sendGameEvent('cards_emote', evt, { localEcho: true });
       },
     }),
     [

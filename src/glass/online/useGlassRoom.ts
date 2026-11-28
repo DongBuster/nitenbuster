@@ -22,6 +22,7 @@ import {
   getSupabaseClient,
   isSupabaseConfigured,
 } from '../../online/supabaseClient.ts';
+import { HostStarTransport } from '../../online/p2p/starTransport.ts';
 import {
   normalizeAccessories,
   type AccessorySelection,
@@ -32,7 +33,9 @@ import {
   GLASS_COUNTDOWN_MS,
   GLASS_DISCONNECT_GRACE_MS,
   GLASS_EMOTES,
+  GLASS_INPUT_INTERVAL_MS,
   GLASS_MAX_PLAYERS,
+  GLASS_SNAPSHOT_INTERVAL_MS,
   sortGlassRoomMembers,
   type CoopSelectMapPayload,
   type CoopSnapshotPayload,
@@ -253,6 +256,7 @@ export function useGlassRoom(): GlassRoomController {
   const [error, setError] = useState<string | null>(null);
 
   const channelRef = useRef<RealtimeChannel | null>(null);
+  const transportRef = useRef<HostStarTransport | null>(null);
   const connectResolveRef = useRef<(() => void) | null>(null);
   const myProfileRef = useRef<GlassRoomMember | null>(null);
   const asHostRef = useRef<boolean>(false);
@@ -355,6 +359,8 @@ export function useGlassRoom(): GlassRoomController {
     clearDisconnectTimer();
     inputSenderRef.current.reset();
     clearEmoteTimers();
+    transportRef.current?.dispose();
+    transportRef.current = null;
     const client = getSupabaseClient();
     const ch = channelRef.current;
     channelRef.current = null;
@@ -965,6 +971,47 @@ export function useGlassRoom(): GlassRoomController {
       });
       channelRef.current = channel;
 
+      const transport = new HostStarTransport({
+        channel,
+        myPeerId,
+        fallbackBaseSnapshotIntervalMs: GLASS_SNAPSHOT_INTERVAL_MS,
+        fallbackBaseInputIntervalMs: GLASS_INPUT_INTERVAL_MS,
+      });
+      transportRef.current = transport;
+
+      transport.onMessage('glass:input', (payload) => {
+        if (channelRef.current !== channel || !isHostRef.current) return;
+        const evt = payload as GlassInputPayload | undefined;
+        if (!evt || evt.peerId === myPeerId) return;
+        if (!evt.matchId || evt.matchId !== matchIdRef.current) return;
+        if (evt.seq <= lastGuestSeqRef.current) return;
+        lastGuestSeqRef.current = evt.seq;
+        guestInputListenerRef.current?.(evt);
+      });
+
+      transport.onMessage('glass:snapshot', (payload) => {
+        if (channelRef.current !== channel || isHostRef.current) return;
+        const evt = payload as CoopSnapshotPayload | undefined;
+        if (!evt || !evt.matchId || evt.matchId !== matchIdRef.current) {
+          return;
+        }
+        lastSnapshotRef.current = evt;
+        snapshotListenerRef.current?.(evt);
+        if (
+          evt.phase === 'finished' &&
+          finalResultRef.current?.matchId !== evt.matchId
+        ) {
+          applyMatchFinished(
+            evt.matchId,
+            evt.matchTime,
+            getSnapshotFailures(evt),
+            getSnapshotMapId(evt),
+            selectedMapPackRef.current,
+            selectedLevelRef.current,
+          );
+        }
+      });
+
       return new Promise<void>((resolve) => {
         connectResolveRef.current = resolve;
 
@@ -1131,37 +1178,6 @@ export function useGlassRoom(): GlassRoomController {
             const evt = payload as GlassReturnLobbyPayload | undefined;
             if (!evt) return;
             resetMatchState('lobby');
-          })
-          .on('broadcast', { event: 'glass:input' }, ({ payload }) => {
-            if (!isHostRef.current) return;
-            const evt = payload as GlassInputPayload | undefined;
-            if (!evt || evt.peerId === myPeerId) return;
-            if (!evt.matchId || evt.matchId !== matchIdRef.current) return;
-            if (evt.seq <= lastGuestSeqRef.current) return;
-            lastGuestSeqRef.current = evt.seq;
-            guestInputListenerRef.current?.(evt);
-          })
-          .on('broadcast', { event: 'glass:snapshot' }, ({ payload }) => {
-            if (isHostRef.current) return;
-            const evt = payload as CoopSnapshotPayload | undefined;
-            if (!evt || !evt.matchId || evt.matchId !== matchIdRef.current) {
-              return;
-            }
-            lastSnapshotRef.current = evt;
-            snapshotListenerRef.current?.(evt);
-            if (
-              evt.phase === 'finished' &&
-              finalResultRef.current?.matchId !== evt.matchId
-            ) {
-              applyMatchFinished(
-                evt.matchId,
-                evt.matchTime,
-                getSnapshotFailures(evt),
-                getSnapshotMapId(evt),
-                selectedMapPackRef.current,
-                selectedLevelRef.current,
-              );
-            }
           })
           .on('broadcast', { event: 'glass:finish' }, ({ payload }) => {
             const evt = payload as GlassFinishPayload | undefined;
@@ -1575,6 +1591,18 @@ export function useGlassRoom(): GlassRoomController {
     [applyEmote, myPeerId],
   );
 
+  useEffect(() => {
+    if (connectionStatus !== 'connected') return;
+    const activeHostPeerId =
+      matchRosterRef.current?.hostPeerId ?? members[0]?.peerId ?? '';
+    if (!activeHostPeerId) return;
+    transportRef.current?.syncPeers({
+      isHost: isHostState,
+      hostPeerId: activeHostPeerId,
+      peerIds: members.map((m) => m.peerId),
+    });
+  }, [connectionStatus, isHostState, members, phase]);
+
   const sendGuestInput = useCallback(
     (input: PlayerInput) => {
       const currentMatchId = matchIdRef.current;
@@ -1592,9 +1620,9 @@ export function useGlassRoom(): GlassRoomController {
         input,
         Date.now(),
         (seq, payloadInput, activeMatchId) => {
-          const channel = channelRef.current;
+          const transport = transportRef.current;
           if (
-            !channel ||
+            !transport ||
             phaseRef.current !== 'playing' ||
             isHostRef.current ||
             matchIdRef.current !== activeMatchId
@@ -1610,11 +1638,7 @@ export function useGlassRoom(): GlassRoomController {
             jump: payloadInput.jump,
             lift: payloadInput.lift,
           };
-          void channel.send({
-            type: 'broadcast',
-            event: 'glass:input',
-            payload,
-          });
+          transport.sendToHost('glass:input', payload);
         },
       );
     },
@@ -1627,14 +1651,9 @@ export function useGlassRoom(): GlassRoomController {
       if (!matchIdRef.current || snapshot.matchId !== matchIdRef.current) return;
 
       lastSnapshotRef.current = snapshot;
-      const channel = channelRef.current;
-      if (channel) {
-        void channel.send({
-          type: 'broadcast',
-          event: 'glass:snapshot',
-          payload: snapshot,
-        });
-      }
+      transportRef.current?.sendFromHost('glass:snapshot', snapshot, {
+        forceFallback: snapshot.phase === 'finished',
+      });
 
       if (
         snapshot.phase === 'finished' &&

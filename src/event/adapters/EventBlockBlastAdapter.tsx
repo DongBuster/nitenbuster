@@ -145,7 +145,7 @@ export function EventBlockBlastAdapter({ room, round }: EventAdapterProps) {
         alive: state.phase !== 'gameOver',
         elapsedMs: Math.max(0, now - startedAtRef.current),
       };
-      sendGameEvent('bb_progress', payload);
+      sendGameEvent('bb_progress', payload, { localEcho: true });
     },
     [myPeerId, sendGameEvent],
   );
@@ -159,7 +159,7 @@ export function EventBlockBlastAdapter({ room, round }: EventAdapterProps) {
         alive: false,
         elapsedMs: receipt.elapsedMs,
       };
-      sendGameEvent('bb_progress', payload);
+      sendGameEvent('bb_progress', payload, { localEcho: true });
     },
     [myPeerId, sendGameEvent],
   );

@@ -92,6 +92,9 @@ export function EventBrawlAdapter({
     isHost,
     sendGameEvent,
     subscribeGameEvent,
+    sendRealtimeFromHost,
+    sendRealtimeToHost,
+    subscribeRealtimeEvent,
     submitHostRoundComplete,
   } = room;
 
@@ -194,7 +197,7 @@ export function EventBrawlAdapter({
 
   // Subscribe to online messages using stable callbacks (never re-subscribes on timer ticks)
   useEffect(() => {
-    const unsubInput = subscribeGameEvent('brawl_input', (raw) => {
+    const unsubInput = subscribeRealtimeEvent('brawl_input', (raw) => {
       if (!isHost) return;
       const evt = raw as BrawlInputPayload;
       if (!evt || evt.roundKey !== roundKey || evt.peerId === myPeerId) return;
@@ -207,7 +210,7 @@ export function EventBrawlAdapter({
       };
     });
 
-    const unsubSnap = subscribeGameEvent('brawl_snapshot', (raw) => {
+    const unsubSnap = subscribeRealtimeEvent('brawl_snapshot', (raw) => {
       if (isHost) return;
       const snap = raw as BrawlSnapshotPayload;
       if (!snap || snap.roundKey !== roundKey) return;
@@ -254,7 +257,14 @@ export function EventBrawlAdapter({
       unsubSub();
       unsubSyncReq();
     };
-  }, [isHost, myPeerId, roundKey, sendGameEvent, subscribeGameEvent]);
+  }, [
+    isHost,
+    myPeerId,
+    roundKey,
+    sendGameEvent,
+    subscribeGameEvent,
+    subscribeRealtimeEvent,
+  ]);
 
   const concludeSubRoundFromHost = useCallback(
     (timedOut: boolean) => {
@@ -462,7 +472,7 @@ export function EventBrawlAdapter({
       localFighterId: myPeerId,
       getRemoteInputs: isHost ? getRemoteInputs : undefined,
       onBroadcastSnapshot: isHost
-        ? (snap) => sendGameEvent('brawl_snapshot', snap)
+        ? (snap) => sendRealtimeFromHost('brawl_snapshot', snap)
         : undefined,
       onSendClientInput: !isHost
         ? (input) => {
@@ -477,7 +487,7 @@ export function EventBrawlAdapter({
                   seq,
                   input: payloadInput,
                 };
-                sendGameEvent('brawl_input', payload);
+                sendRealtimeToHost('brawl_input', payload);
               },
             );
           }
@@ -485,7 +495,14 @@ export function EventBrawlAdapter({
       interpolatorRef,
       runtimeRef,
     }),
-    [getRemoteInputs, isHost, myPeerId, roundKey, sendGameEvent],
+    [
+      getRemoteInputs,
+      isHost,
+      myPeerId,
+      roundKey,
+      sendRealtimeFromHost,
+      sendRealtimeToHost,
+    ],
   );
 
   const sortedSubStandings = useMemo(() => {

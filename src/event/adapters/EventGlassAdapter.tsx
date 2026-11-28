@@ -7,6 +7,8 @@ import { CoopSkillBar } from '../../coop/ui/CoopSkillBar';
 import { setVirtualMoveDpad } from '../../glass/input/coopVirtualInput';
 import { createGlassInputSender } from '../../glass/online/inputSync';
 import {
+  GLASS_INPUT_INTERVAL_MS,
+  GLASS_SNAPSHOT_INTERVAL_MS,
   type CoopSnapshotPayload,
   type GlassEmotePayload,
   type GlassInputPayload,
@@ -18,6 +20,7 @@ import type { GlassHudSnapshot } from '../../glass/render/renderTypes';
 import { GLASS_MAX_HP } from '../../glass/sim/constants';
 import { GLASS_COURSE } from '../../glass/sim/course';
 import type { PlayerInput } from '../../glass/sim/types';
+import { HostStarTransport } from '../../online/p2p/starTransport';
 import { getSupabaseClient } from '../../online/supabaseClient';
 import { useDeviceFormFactor } from '../../utils/useDeviceFormFactor';
 import type { GlassPairAssignment } from '../protocol';
@@ -114,6 +117,7 @@ export function EventGlassAdapter({
   });
 
   const subChannelRef = useRef<RealtimeChannel | null>(null);
+  const subTransportRef = useRef<HostStarTransport | null>(null);
   const subSubscribedRef = useRef<boolean>(false);
   const membersRef = useRef(members);
   membersRef.current = members;
@@ -179,31 +183,54 @@ export function EventGlassAdapter({
     });
     subChannelRef.current = channel;
 
-    channel
-      .on('broadcast', { event: 'glass_input' }, ({ payload }) => {
-        if (!payload || !isHostRef.current) return;
-        guestInputListenerRef.current?.(payload as GlassInputPayload);
-      })
-      .on('broadcast', { event: 'glass_snapshot' }, ({ payload }) => {
-        if (!payload || isHostRef.current) return;
-        snapshotListenerRef.current?.(payload as CoopSnapshotPayload);
-      })
-      .on('broadcast', { event: 'glass_pair_finish' }, () => {
-        setLocalPhase('finished');
-      });
+    const transport = new HostStarTransport({
+      channel,
+      myPeerId,
+      fallbackBaseSnapshotIntervalMs: GLASS_SNAPSHOT_INTERVAL_MS,
+      fallbackBaseInputIntervalMs: GLASS_INPUT_INTERVAL_MS,
+    });
+    subTransportRef.current = transport;
+
+    transport.onMessage('glass_input', (payload) => {
+      if (!payload || !isHostRef.current) return;
+      guestInputListenerRef.current?.(payload as GlassInputPayload);
+    });
+    transport.onMessage('glass_snapshot', (payload) => {
+      if (!payload || isHostRef.current) return;
+      snapshotListenerRef.current?.(payload as CoopSnapshotPayload);
+    });
+
+    channel.on('broadcast', { event: 'glass_pair_finish' }, () => {
+      setLocalPhase('finished');
+    });
 
     channel.subscribe((status) => {
-      subSubscribedRef.current = status === 'SUBSCRIBED';
+      const subscribed = status === 'SUBSCRIBED';
+      subSubscribedRef.current = subscribed;
+      if (subscribed) {
+        transport.syncPeers({
+          isHost: isHostRef.current,
+          hostPeerId: myPair.memberIds[0] ?? '',
+          peerIds: myPair.memberIds,
+        });
+      }
     });
 
     const sender = inputSenderRef.current;
     return () => {
       sender.reset();
+      transport.dispose();
+      subTransportRef.current = null;
       subSubscribedRef.current = false;
       subChannelRef.current = null;
       void client.removeChannel(channel);
     };
-  }, [isSoloAssigned, myPair.subChannelCode]);
+  }, [
+    isSoloAssigned,
+    myPair.memberIds,
+    myPair.subChannelCode,
+    myPeerId,
+  ]);
 
   const reportProgressToEvent = useCallback(
     (progressPct: number, shatters: number, finished: boolean, elapsedSec: number) => {
@@ -215,7 +242,7 @@ export function EventGlassAdapter({
         finished,
         elapsedSec: Math.round(elapsedSec * 100) / 100,
       };
-      sendGameEvent('glass_team_progress', payload);
+      sendGameEvent('glass_team_progress', payload, { localEcho: true });
     },
     [myPair.memberIds, myPair.pairId, sendGameEvent],
   );
@@ -400,8 +427,8 @@ export function EventGlassAdapter({
           input,
           performance.now(),
           (seq, payloadInput, matchKey) => {
-            const ch = subChannelRef.current;
-            if (!ch || !subSubscribedRef.current || isHostRef.current) return;
+            const transport = subTransportRef.current;
+            if (!transport || !subSubscribedRef.current || isHostRef.current) return;
             const payload: GlassInputPayload = {
               matchId: matchKey,
               peerId: myPeerId,
@@ -411,21 +438,15 @@ export function EventGlassAdapter({
               jump: payloadInput.jump,
               lift: payloadInput.lift,
             };
-            void ch.send({
-              type: 'broadcast',
-              event: 'glass_input',
-              payload,
-            });
+            transport.sendToHost('glass_input', payload);
           },
         );
       },
       broadcastSnapshot: (snapshot: CoopSnapshotPayload) => {
-        const ch = subChannelRef.current;
-        if (!ch || !subSubscribedRef.current || fallbackSolo) return;
-        void ch.send({
-          type: 'broadcast',
-          event: 'glass_snapshot',
-          payload: snapshot,
+        const transport = subTransportRef.current;
+        if (!transport || !subSubscribedRef.current || fallbackSolo) return;
+        transport.sendFromHost('glass_snapshot', snapshot, {
+          forceFallback: snapshot.phase === 'finished',
         });
       },
       notifyMatchFinished: (elapsedSec: number, shatters: number) => {
