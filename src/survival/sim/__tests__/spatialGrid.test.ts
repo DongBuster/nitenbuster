@@ -67,7 +67,15 @@ function makePlayer(overrides: Partial<PlayerEntity> = {}): PlayerEntity {
     caramelNovaTimer: 0,
     prismChainTimer: 0,
     voidPulseTimer: 0,
+    whirlwindBladeTimer: 0,
+    glacialSpearTimer: 0,
+    popcornBarrageTimer: 0,
+    laserTurretTimer: 0,
+    vitalRegenTimer: 0,
     crystalShieldCooldown: 0,
+    blizzardWardCooldown: 0,
+    honeyShieldCooldown: 0,
+    honeyShieldReady: false,
     teamAuraHealTimer: 0,
     teamAuraBuffTimer: 0,
     pylonBuffTimer: 0,
@@ -156,6 +164,7 @@ function makeWorld(overrides: Partial<SurvivalWorldState> = {}): SurvivalWorldSt
     floatingTexts: [],
     particles: [],
     lightningArcs: [],
+    visualEffects: [],
     ...overrides,
   };
 }
@@ -451,5 +460,19 @@ describe('pickBotSkillIndex', () => {
       { skillId: 'agility', rarity: 'common', currentLevel: 0, nextLevel: 1, levelGain: 1 },
     ];
     assert.equal(pickBotSkillIndex(lowHpBot, vampOffers), 1);
+
+    const regenOffers: SkillOffer[] = [
+      { skillId: 'agility', rarity: 'common', currentLevel: 0, nextLevel: 1, levelGain: 1 },
+      { skillId: 'vital_regen', rarity: 'common', currentLevel: 0, nextLevel: 1, levelGain: 1 },
+      { skillId: 'magnet_range', rarity: 'common', currentLevel: 0, nextLevel: 1, levelGain: 1 },
+    ];
+    assert.equal(pickBotSkillIndex(lowHpBot, regenOffers), 1);
+
+    const newSecondaryOffers: SkillOffer[] = [
+      { skillId: 'agility', rarity: 'common', currentLevel: 0, nextLevel: 1, levelGain: 1 },
+      { skillId: 'whirlwind_blade', rarity: 'common', currentLevel: 0, nextLevel: 1, levelGain: 1 },
+      { skillId: 'prism_focus', rarity: 'common', currentLevel: 0, nextLevel: 1, levelGain: 1 },
+    ];
+    assert.equal(pickBotSkillIndex(makePlayer({ hp: 120, maxHp: 120 }), newSecondaryOffers), 1);
   });
 });

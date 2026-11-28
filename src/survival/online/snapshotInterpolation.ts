@@ -8,6 +8,7 @@ import {
   type PackedPickup,
   type PackedPlayer,
   type PackedProjectile,
+  type PackedVisualFx,
   type PackedXpGem,
   type PackedZoneState,
   type SurvivalSnapshotPayload,
@@ -42,10 +43,26 @@ export function lerpAngle(a: number, b: number, t: number): number {
   return wrapAngle(a + delta * t);
 }
 
+function cloneSecondaryCooldowns(
+  cds: PackedPlayer['secondaryCooldowns'],
+): PackedPlayer['secondaryCooldowns'] {
+  if (!cds) return undefined;
+  const out: NonNullable<PackedPlayer['secondaryCooldowns']> = {};
+  for (const [k, v] of Object.entries(cds)) {
+    if (v) {
+      out[k as keyof typeof out] = { ...v };
+    }
+  }
+  return out;
+}
+
 function clonePlayer(p: PackedPlayer): PackedPlayer {
   return {
     ...p,
     skills: { ...p.skills },
+    ...(p.secondaryCooldowns !== undefined
+      ? { secondaryCooldowns: cloneSecondaryCooldowns(p.secondaryCooldowns) }
+      : {}),
   };
 }
 
@@ -98,6 +115,16 @@ function cloneLightningArcs(
       points[j] = { ...arc.points[j] };
     }
     out[i] = { ...arc, points };
+  }
+  return out;
+}
+
+function cloneVisualEffects(
+  effects: readonly PackedVisualFx[],
+): PackedVisualFx[] {
+  const out = new Array<PackedVisualFx>(effects.length);
+  for (let i = 0; i < effects.length; i += 1) {
+    out[i] = { ...effects[i] };
   }
   return out;
 }
@@ -160,6 +187,7 @@ function cloneSnapshot(s: SurvivalSnapshotPayload): SurvivalSnapshotPayload {
     pickups: clonePickups(s.pickups),
     hazards: cloneHazards(s.hazards),
     lightningArcs: cloneLightningArcs(s.lightningArcs),
+    visualEffects: cloneVisualEffects(s.visualEffects),
     zones: cloneZones(s.zones),
   };
 }
@@ -178,6 +206,9 @@ function interpolatePlayer(
     orbitalAngle: lerpAngle(a.orbitalAngle, b.orbitalAngle, t),
     droneAngle: lerpAngle(a.droneAngle, b.droneAngle, t),
     skills: { ...b.skills },
+    ...(b.secondaryCooldowns !== undefined
+      ? { secondaryCooldowns: cloneSecondaryCooldowns(b.secondaryCooldowns) }
+      : {}),
   };
 }
 
@@ -369,6 +400,7 @@ export class SurvivalSnapshotInterpolator {
       pickups: clonePickups(b.pickups),
       hazards: cloneHazards(b.hazards),
       lightningArcs: cloneLightningArcs(b.lightningArcs),
+      visualEffects: cloneVisualEffects(b.visualEffects),
       zones: cloneZones(b.zones),
     };
   }

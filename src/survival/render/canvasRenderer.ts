@@ -13,9 +13,12 @@ import type {
   MapZone,
   ParticleFx,
   ProjectileEntity,
+  SkillCooldownState,
+  SkillId,
   SurvivalMapId,
   SurvivalMapMeta,
   SurvivalWorldState,
+  VisualFxEntity,
   WeaponId,
   XpGemEntity,
 } from '../sim/types.ts';
@@ -45,11 +48,17 @@ export interface RenderPlayer {
   warmAuraLevel?: number;
   droneLevel?: number;
   teamAuraLevel?: number;
+  honeyShieldReady?: boolean;
+  skills?: Partial<Record<SkillId, number>>;
+  secondaryCooldowns?: Partial<Record<SkillId, SkillCooldownState>>;
   stats?: {
     orbitalLevel: number;
     warmAuraLevel: number;
     droneLevel: number;
     teamAuraLevel: number;
+    laserTurretLevel?: number;
+    honeyShieldLevel?: number;
+    blizzardWardLevel?: number;
   };
 }
 
@@ -140,6 +149,7 @@ export interface SurvivalRenderView {
   floatingTexts: readonly FloatingText[];
   particles: readonly ParticleFx[];
   lightningArcs: readonly LightningArcFx[];
+  visualEffects: readonly VisualFxEntity[];
 }
 
 const VIEWPORT_MARGIN = 140;
@@ -272,6 +282,7 @@ export function worldToRenderView(world: SurvivalWorldState): SurvivalRenderView
     floatingTexts: world.floatingTexts,
     particles: world.particles,
     lightningArcs: world.lightningArcs,
+    visualEffects: world.visualEffects,
   };
 }
 
@@ -329,6 +340,7 @@ export function snapshotToRenderView(
     floatingTexts: EMPTY_FLOATING_TEXTS,
     particles: EMPTY_PARTICLES,
     lightningArcs: snap.lightningArcs,
+    visualEffects: snap.visualEffects,
   };
 }
 
@@ -801,12 +813,27 @@ function drawPlayerGroundAuras(
     ctx.arc(0, 0, auraRadius, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.globalAlpha = 0.58 + pulse * 0.16;
+    ctx.globalAlpha = 0.62 + pulse * 0.16;
     ctx.strokeStyle = '#fb923c';
-    ctx.lineWidth = 2;
-    ctx.setLineDash([7, 7]);
+    ctx.lineWidth = 2.4;
+    ctx.setLineDash([8, 6]);
+    ctx.lineDashOffset = reducedMotion ? 0 : -(nowMs * 0.03);
     ctx.stroke();
     ctx.setLineDash([]);
+
+    // Rotating warm flame embers around perimeter
+    const emberCount = 6 + warmAuraLevel;
+    const baseSpin = reducedMotion ? 0 : nowMs * 0.0022;
+    for (let eIdx = 0; eIdx < emberCount; eIdx += 1) {
+      const ang = baseSpin + (eIdx * Math.PI * 2) / emberCount;
+      const ex = Math.cos(ang) * (auraRadius - 4);
+      const ey = Math.sin(ang) * (auraRadius - 4);
+      ctx.fillStyle = eIdx % 2 === 0 ? '#fde047' : '#fb923c';
+      ctx.globalAlpha = 0.78;
+      ctx.beginPath();
+      ctx.arc(ex, ey, 3.2 + (eIdx % 2), 0, Math.PI * 2);
+      ctx.fill();
+    }
     ctx.restore();
   }
 
@@ -863,6 +890,56 @@ function drawHazard(ctx: CanvasRenderingContext2D, h: RenderHazard): void {
     ctx.arc(h.x, h.y, h.radius, 0, Math.PI * 2);
     ctx.stroke();
     ctx.setLineDash([]);
+
+    // Falling candy meteor comet body & fiery trail descending into impact circle
+    if (!h.fromEnemy) {
+      const fallRem = 1 - ratio;
+      const cometX = h.x - fallRem * 78;
+      const cometY = h.y - fallRem * 260;
+      const tailX = cometX - 24;
+      const tailY = cometY - 76;
+
+      // Ground dark impact shadow shrinking tight as meteor lands
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.34)';
+      ctx.beginPath();
+      ctx.ellipse(
+        h.x,
+        h.y + 4,
+        Math.max(10, h.radius * 0.42 * (0.4 + 0.6 * ratio)),
+        Math.max(5, h.radius * 0.2 * (0.4 + 0.6 * ratio)),
+        0,
+        0,
+        Math.PI * 2,
+      );
+      ctx.fill();
+
+      // Fiery streak tail
+      const tailGrad = ctx.createLinearGradient(tailX, tailY, cometX, cometY);
+      tailGrad.addColorStop(0, 'rgba(251, 146, 60, 0)');
+      tailGrad.addColorStop(0.55, 'rgba(192, 132, 252, 0.58)');
+      tailGrad.addColorStop(1, 'rgba(254, 240, 138, 0.95)');
+      ctx.strokeStyle = tailGrad;
+      ctx.lineWidth = 14;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(tailX, tailY);
+      ctx.lineTo(cometX, cometY);
+      ctx.stroke();
+
+      // Glowing candy meteor core
+      ctx.fillStyle = '#c084fc';
+      ctx.strokeStyle = '#fef08a';
+      ctx.lineWidth = 2.6;
+      ctx.beginPath();
+      ctx.arc(cometX, cometY, 13, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(cometX - 2, cometY - 2, 5, 0, Math.PI * 2);
+      ctx.fill();
+    }
   } else {
     const endX = h.endX ?? h.x;
     const endY = h.endY ?? h.y;
@@ -2572,6 +2649,72 @@ function drawPlayer(
       ctx.arc(dx, dy, 3, 0, Math.PI * 2);
       ctx.fill();
     }
+
+    const laserTurretLevel =
+      player.stats?.laserTurretLevel ?? player.skills?.laser_turret ?? 0;
+    if (laserTurretLevel > 0) {
+      const tang = player.droneAngle + Math.PI;
+      const lx = player.x + Math.cos(tang) * DRONE_ORBIT_RADIUS;
+      const ly = player.y + Math.sin(tang) * DRONE_ORBIT_RADIUS;
+      ctx.save();
+      ctx.translate(lx, ly);
+      ctx.rotate(reducedMotion ? 0 : nowMs * 0.003);
+      ctx.fillStyle = 'rgba(217, 70, 239, 0.34)';
+      ctx.beginPath();
+      ctx.arc(0, 0, 12, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#d946ef';
+      ctx.strokeStyle = '#fae8ff';
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(0, -9);
+      ctx.lineTo(7, 0);
+      ctx.lineTo(0, 9);
+      ctx.lineTo(-7, 0);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(0, 0, 2.8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // Protective passive barrier halos (Honey Shield & Blizzard Ward)
+    const honeyLv = player.stats?.honeyShieldLevel ?? player.skills?.honey_shield ?? 0;
+    const honeyActive =
+      honeyLv > 0 &&
+      (player.honeyShieldReady === true ||
+        (player.honeyShieldReady === undefined &&
+          (player.secondaryCooldowns?.honey_shield?.remaining ?? 0) <= 0.01));
+    if (honeyActive) {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(251, 191, 36, 0.85)';
+      ctx.fillStyle = 'rgba(251, 191, 36, 0.1)';
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.arc(player.x, player.y, r + 7, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    const blizzardLv =
+      player.stats?.blizzardWardLevel ?? player.skills?.blizzard_ward ?? 0;
+    if (blizzardLv > 0) {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(186, 230, 253, 0.65)';
+      ctx.lineWidth = 1.8;
+      ctx.setLineDash([5, 5]);
+      ctx.beginPath();
+      ctx.arc(player.x, player.y, r + 10, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
   }
 
   ctx.globalAlpha = 1;
@@ -2637,7 +2780,71 @@ function drawProjectile(
   reducedMotion: boolean,
 ): void {
   ctx.save();
-  if (proj.boomerang) {
+  if (proj.weaponId === 'whirlwind_blade') {
+    ctx.translate(proj.x, proj.y);
+    ctx.rotate(reducedMotion ? 0.5 : nowMs * 0.022);
+    ctx.fillStyle = 'rgba(34, 211, 238, 0.25)';
+    ctx.beginPath();
+    ctx.arc(0, 0, proj.radius * 1.25, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#22d3ee';
+    ctx.strokeStyle = '#ecfeff';
+    ctx.lineWidth = 1.8;
+    for (let b = 0; b < 4; b += 1) {
+      ctx.rotate(Math.PI * 0.5);
+      ctx.beginPath();
+      ctx.moveTo(0, -3);
+      ctx.lineTo(proj.radius * 1.15, -2);
+      ctx.lineTo(proj.radius * 0.55, 5);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    }
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(0, 0, 3.6, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (proj.weaponId === 'glacial_spear') {
+    const hasAngle = typeof proj.angle === 'number' && Number.isFinite(proj.angle);
+    const hasVel =
+      typeof proj.vx === 'number' &&
+      typeof proj.vy === 'number' &&
+      (proj.vx !== 0 || proj.vy !== 0);
+    const ang = hasAngle ? proj.angle! : hasVel ? Math.atan2(proj.vy!, proj.vx!) : 0;
+    ctx.translate(proj.x, proj.y);
+    ctx.rotate(ang);
+    ctx.fillStyle = 'rgba(56, 189, 248, 0.28)';
+    ctx.beginPath();
+    ctx.ellipse(-2, 0, proj.radius * 2.5, proj.radius * 1.1, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#38bdf8';
+    ctx.strokeStyle = '#f0f9ff';
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.moveTo(proj.radius * 3.1, 0);
+    ctx.lineTo(-proj.radius * 1.8, -proj.radius * 0.78);
+    ctx.lineTo(-proj.radius * 1.1, 0);
+    ctx.lineTo(-proj.radius * 1.8, proj.radius * 0.78);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  } else if (proj.weaponId === 'popcorn_barrage') {
+    ctx.fillStyle = 'rgba(253, 224, 71, 0.32)';
+    ctx.beginPath();
+    ctx.arc(proj.x, proj.y, proj.radius * 1.7, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#fef08a';
+    ctx.strokeStyle = '#d97706';
+    ctx.lineWidth = 1.5;
+    const pr = proj.radius;
+    ctx.beginPath();
+    ctx.arc(proj.x - pr * 0.35, proj.y - pr * 0.2, pr * 0.75, 0, Math.PI * 2);
+    ctx.arc(proj.x + pr * 0.35, proj.y - pr * 0.15, pr * 0.7, 0, Math.PI * 2);
+    ctx.arc(proj.x, proj.y + pr * 0.35, pr * 0.75, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  } else if (proj.boomerang) {
     ctx.translate(proj.x, proj.y);
     ctx.rotate(reducedMotion ? 0.4 : nowMs * 0.016);
     ctx.strokeStyle = '#67e8f9';
@@ -2763,6 +2970,186 @@ function drawLightningArc(
   ctx.globalAlpha = fade;
   ctx.lineWidth = 2.2;
   ctx.stroke();
+  ctx.restore();
+}
+
+function drawVisualFx(
+  ctx: CanvasRenderingContext2D,
+  fx: VisualFxEntity,
+  nowMs: number,
+  reducedMotion: boolean,
+): void {
+  const fade = clamp01(fx.ttl / Math.max(0.01, fx.maxTtl));
+  const progress = 1 - fade;
+
+  ctx.save();
+  if (fx.kind === 'frost_nova' || fx.kind === 'blizzard_counter') {
+    const curR = fx.radius * (0.28 + 0.76 * progress);
+    ctx.globalAlpha = fade * 0.32;
+    ctx.fillStyle = '#38bdf8';
+    ctx.beginPath();
+    ctx.arc(fx.x, fx.y, curR, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.globalAlpha = fade * 0.92;
+    ctx.strokeStyle = fx.kind === 'frost_nova' ? '#bae6fd' : '#7dd3fc';
+    ctx.lineWidth = 3.5;
+    ctx.beginPath();
+    ctx.arc(fx.x, fx.y, curR, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.arc(fx.x, fx.y, curR * 0.74, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // 8 radiating diamond frost shards
+    const spin = reducedMotion ? 0 : progress * 0.7;
+    for (let i = 0; i < 8; i += 1) {
+      const ang = spin + (i * Math.PI) / 4;
+      const sx = fx.x + Math.cos(ang) * curR;
+      const sy = fx.y + Math.sin(ang) * curR;
+      ctx.save();
+      ctx.translate(sx, sy);
+      ctx.rotate(ang);
+      ctx.fillStyle = '#e0f2fe';
+      ctx.beginPath();
+      ctx.moveTo(8, 0);
+      ctx.lineTo(0, -3.5);
+      ctx.lineTo(-5, 0);
+      ctx.lineTo(0, 3.5);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+  } else if (fx.kind === 'caramel_nova') {
+    const pullR = fx.radius * (1.05 - 0.55 * progress);
+    const spin = reducedMotion ? 0 : nowMs * 0.012;
+    ctx.globalAlpha = fade * 0.28;
+    ctx.fillStyle = '#ea580c';
+    ctx.beginPath();
+    ctx.arc(fx.x, fx.y, fx.radius * (0.35 + 0.65 * progress), 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.globalAlpha = fade * 0.9;
+    ctx.strokeStyle = '#fdba74';
+    ctx.lineWidth = 3.2;
+    for (let s = 0; s < 3; s += 1) {
+      const a0 = spin + (s * Math.PI * 2) / 3;
+      ctx.beginPath();
+      ctx.arc(fx.x, fx.y, Math.max(12, pullR), a0, a0 + Math.PI * 0.65);
+      ctx.stroke();
+    }
+    ctx.strokeStyle = '#f97316';
+    ctx.lineWidth = 2.4;
+    ctx.beginPath();
+    ctx.arc(fx.x, fx.y, fx.radius * (0.4 + 0.6 * progress), 0, Math.PI * 2);
+    ctx.stroke();
+  } else if (fx.kind === 'void_pulse') {
+    const curR = fx.radius * (0.2 + 0.85 * progress);
+    ctx.globalAlpha = fade * 0.3;
+    ctx.fillStyle = '#581c87';
+    ctx.beginPath();
+    ctx.arc(fx.x, fx.y, curR, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.globalAlpha = fade;
+    ctx.strokeStyle = '#c084fc';
+    ctx.lineWidth = 4.5;
+    ctx.beginPath();
+    ctx.arc(fx.x, fx.y, curR, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.strokeStyle = '#f5d0fe';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([12, 8]);
+    ctx.beginPath();
+    ctx.arc(fx.x, fx.y, fx.radius * Math.max(0.18, 0.95 - progress * 0.75), 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  } else if (fx.kind === 'meteor_impact' || fx.kind === 'popcorn_pop') {
+    const curR = fx.radius * (0.35 + 0.72 * progress);
+    const isPop = fx.kind === 'popcorn_pop';
+    ctx.globalAlpha = fade * 0.35;
+    ctx.fillStyle = isPop ? '#fef08a' : '#f97316';
+    ctx.beginPath();
+    ctx.arc(fx.x, fx.y, curR * 0.85, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.globalAlpha = fade * 0.95;
+    ctx.strokeStyle = isPop ? '#facc15' : '#fb923c';
+    ctx.lineWidth = isPop ? 2.6 : 4;
+    ctx.beginPath();
+    ctx.arc(fx.x, fx.y, curR, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.arc(fx.x, fx.y, curR * 0.55, 0, Math.PI * 2);
+    ctx.stroke();
+  } else if (fx.kind === 'laser_beam') {
+    const ex = fx.endX ?? fx.x;
+    const ey = fx.endY ?? fx.y;
+    ctx.lineCap = 'round';
+    ctx.globalAlpha = fade * 0.38;
+    ctx.strokeStyle = '#d946ef';
+    ctx.lineWidth = Math.max(10, fx.radius * 1.15);
+    ctx.beginPath();
+    ctx.moveTo(fx.x, fx.y);
+    ctx.lineTo(ex, ey);
+    ctx.stroke();
+
+    ctx.globalAlpha = fade * 0.92;
+    ctx.strokeStyle = '#f0abfc';
+    ctx.lineWidth = Math.max(5, fx.radius * 0.45);
+    ctx.stroke();
+
+    ctx.globalAlpha = fade;
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 2.4;
+    ctx.stroke();
+
+    // Origin & endpoint flares
+    ctx.fillStyle = '#fae8ff';
+    ctx.beginPath();
+    ctx.arc(fx.x, fx.y, 7 * fade + 2, 0, Math.PI * 2);
+    ctx.arc(ex, ey, 9 * fade + 3, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (fx.kind === 'shield_break') {
+    const curR = fx.radius * (0.45 + 0.65 * progress);
+    ctx.globalAlpha = fade * 0.9;
+    ctx.strokeStyle = '#fde047';
+    ctx.lineWidth = 3.2;
+    ctx.beginPath();
+    for (let i = 0; i < 6; i += 1) {
+      const a = (i * Math.PI) / 3;
+      const hx = fx.x + Math.cos(a) * curR;
+      const hy = fx.y + Math.sin(a) * curR;
+      if (i === 0) ctx.moveTo(hx, hy);
+      else ctx.lineTo(hx, hy);
+    }
+    ctx.closePath();
+    ctx.stroke();
+  } else if (fx.kind === 'level_heal') {
+    const curR = fx.radius * (0.38 + 0.72 * progress);
+    ctx.globalAlpha = fade * 0.85;
+    ctx.strokeStyle = '#4ade80';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(fx.x, fx.y, curR, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.fillStyle = '#bbf7d0';
+    for (let i = 0; i < 4; i += 1) {
+      const a = (i * Math.PI) / 2 + progress * 0.8;
+      const px = fx.x + Math.cos(a) * curR;
+      const py = fx.y + Math.sin(a) * curR - progress * 14;
+      ctx.fillRect(px - 1.5, py - 4.5, 3, 9);
+      ctx.fillRect(px - 4.5, py - 1.5, 9, 3);
+    }
+  }
   ctx.restore();
 }
 
@@ -3199,6 +3586,19 @@ export function renderSurvivalFrame(
     }
     if (anyVisible) {
       drawLightningArc(ctx, arc, nowMs, reducedMotion);
+    }
+  }
+
+  for (let i = 0; i < view.visualEffects.length; i += 1) {
+    const fx = view.visualEffects[i];
+    const fxMargin = Math.max(fx.radius + 32, 48);
+    const inStart = isInView(fx.x, fx.y, fxMargin, viewMinX, viewMaxX, viewMinY, viewMaxY);
+    const inEnd =
+      fx.endX !== undefined && fx.endY !== undefined
+        ? isInView(fx.endX, fx.endY, fxMargin, viewMinX, viewMaxX, viewMinY, viewMaxY)
+        : false;
+    if (inStart || inEnd) {
+      drawVisualFx(ctx, fx, nowMs, reducedMotion);
     }
   }
 

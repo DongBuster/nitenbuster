@@ -37,19 +37,27 @@ export type SkillId =
   | 'magnet_range'
   | 'agility'
   | 'team_aura'
+  | 'whirlwind_blade'
+  | 'vital_regen'
   // Map 1: Winter Cabin exclusives
   | 'frost_nova'
   | 'ice_shatter'
+  | 'glacial_spear'
+  | 'blizzard_ward'
   // Map 2: Candy Canyon exclusives
   | 'sugar_rush'
   | 'pepper_bomb'
   | 'caramel_nova'
+  | 'popcorn_barrage'
+  | 'honey_shield'
   // Map 3: Crystal Cavern exclusives
   | 'overcharge'
   | 'crystal_shield'
   | 'prism_chain'
   | 'gem_greed'
-  | 'void_pulse';
+  | 'void_pulse'
+  | 'laser_turret'
+  | 'prism_focus';
 
 export type SkillCategory = 'weapon' | 'secondary' | 'survival';
 
@@ -169,22 +177,31 @@ export interface DerivedPlayerStats {
   bonusPierce: number;
   projectileScale: number;
   ricochetCount: number;
+  hpRegenPerSec: number;
   orbitalLevel: number;
   warmAuraLevel: number;
   meteorLevel: number;
   droneLevel: number;
   vampirismLevel: number;
   teamAuraLevel: number;
+  whirlwindBladeLevel: number;
+  vitalRegenLevel: number;
   frostNovaLevel: number;
   iceShatterLevel: number;
+  glacialSpearLevel: number;
+  blizzardWardLevel: number;
   sugarRushLevel: number;
   pepperBombLevel: number;
   caramelNovaLevel: number;
+  popcornBarrageLevel: number;
+  honeyShieldLevel: number;
   overchargeLevel: number;
   crystalShieldLevel: number;
   prismChainLevel: number;
   gemGreedLevel: number;
   voidPulseLevel: number;
+  laserTurretLevel: number;
+  prismFocusLevel: number;
 }
 
 export interface MapObstacle {
@@ -205,6 +222,24 @@ export interface MapZone {
   activeTimerSec: number;
 }
 
+export interface ScenarioChapterMeta {
+  id: 'wave1' | 'wave2' | 'wave3';
+  order: 1 | 2 | 3;
+  title: string;
+  timeRangeLabel: string;
+  bossAtSec: number;
+  bossKind: BossKind;
+  summary: string;
+  enemyHint: string;
+  bossRewardLabel: string;
+}
+
+export interface MapScenarioMeta {
+  headline: string;
+  chapters: readonly ScenarioChapterMeta[];
+  endlessSummary?: string;
+}
+
 export interface SurvivalMapMeta {
   id: SurvivalMapId;
   order: number;
@@ -212,6 +247,7 @@ export interface SurvivalMapMeta {
   subtitle: string;
   description: string;
   mechanicSummary: string;
+  scenario: MapScenarioMeta;
   isEndless: boolean;
   targetDurationSec: number;
   difficultyStars: 1 | 2 | 3 | 4;
@@ -277,7 +313,15 @@ export interface PlayerEntity {
   caramelNovaTimer: number;
   prismChainTimer: number;
   voidPulseTimer: number;
+  whirlwindBladeTimer: number;
+  glacialSpearTimer: number;
+  popcornBarrageTimer: number;
+  laserTurretTimer: number;
+  vitalRegenTimer: number;
   crystalShieldCooldown: number;
+  blizzardWardCooldown: number;
+  honeyShieldCooldown: number;
+  honeyShieldReady: boolean;
   teamAuraHealTimer: number;
   teamAuraBuffTimer: number;
   pylonBuffTimer: number;
@@ -321,7 +365,14 @@ export interface ProjectileEntity {
   id: string;
   ownerId: string;
   fromEnemy: boolean;
-  weaponId: WeaponId | 'drone' | 'enemy_orb' | 'enemy_dragon';
+  weaponId:
+    | WeaponId
+    | 'drone'
+    | 'whirlwind_blade'
+    | 'glacial_spear'
+    | 'popcorn_barrage'
+    | 'enemy_orb'
+    | 'enemy_dragon';
   x: number;
   y: number;
   vx: number;
@@ -420,6 +471,33 @@ export interface LightningArcFx {
   maxTtl: number;
 }
 
+export type VisualFxKind =
+  | 'frost_nova'
+  | 'caramel_nova'
+  | 'void_pulse'
+  | 'meteor_impact'
+  | 'popcorn_pop'
+  | 'laser_beam'
+  | 'shield_break'
+  | 'blizzard_counter'
+  | 'level_heal';
+
+export interface VisualFxEntity {
+  kind: VisualFxKind;
+  x: number;
+  y: number;
+  radius: number;
+  ttl: number;
+  maxTtl: number;
+  endX?: number;
+  endY?: number;
+}
+
+export interface SkillCooldownState {
+  remaining: number;
+  max: number;
+}
+
 export type SurvivalSimEvent =
   | { type: 'shoot'; weaponId?: WeaponId }
   | { type: 'hit' }
@@ -479,6 +557,7 @@ export interface SurvivalWorldState {
   floatingTexts: FloatingText[];
   particles: ParticleFx[];
   lightningArcs: LightningArcFx[];
+  visualEffects: VisualFxEntity[];
 }
 
 export interface SurvivalPlayerSummary {
@@ -497,6 +576,7 @@ export interface SurvivalPlayerSummary {
   score: number;
   revives: number;
   skills: Partial<Record<SkillId, number>>;
+  secondaryCooldowns: Partial<Record<SkillId, SkillCooldownState>>;
   rerollsLeft: number;
   dashCooldownPct: number;
   comboCount: number;

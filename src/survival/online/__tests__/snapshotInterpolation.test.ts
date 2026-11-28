@@ -181,6 +181,10 @@ function makeSnapshot(
         teamAuraLevel: 0,
         pylonBuffTimer: 0,
         skills: { orbital_ice: 1, plush_drone: 1 },
+        secondaryCooldowns: {
+          orbital_ice: { remaining: 0, max: 0 },
+          plush_drone: { remaining: 0, max: 0 },
+        },
       },
     ],
     enemies: overrides.enemies ?? [],
@@ -190,6 +194,7 @@ function makeSnapshot(
     pickups: overrides.pickups ?? [],
     hazards: overrides.hazards ?? [],
     lightningArcs: overrides.lightningArcs ?? [],
+    visualEffects: overrides.visualEffects ?? [],
     zones: overrides.zones ?? [],
   };
 }
@@ -269,6 +274,14 @@ describe('packSurvivalSnapshot', () => {
       ttl: 0.14,
       maxTtl: 0.16,
     });
+    world.visualEffects.push({
+      kind: 'caramel_nova',
+      x: 512.34,
+      y: 618.78,
+      radius: 162,
+      ttl: 0.31,
+      maxTtl: 0.5,
+    });
     world.pendingOffersByPlayer = {
       p1: [
         {
@@ -301,6 +314,9 @@ describe('packSurvivalSnapshot', () => {
     assert.equal(packedA.hazards[0].endY, 1400.9);
     assert.equal(packedA.lightningArcs[0].points[0].x, 100.1);
     assert.equal(packedA.lightningArcs[0].points[1].y, 400.4);
+    assert.equal(packedA.visualEffects.length, 1);
+    assert.equal(packedA.visualEffects[0].kind, 'caramel_nova');
+    assert.equal(packedA.visualEffects[0].x, 512.3);
     assert.equal(packedA.zones.length, world.zones.length);
 
     // Mutating packed snapshot does not mutate world

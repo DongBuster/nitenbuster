@@ -4,6 +4,8 @@ import type {
   EnemyKind,
   GearId,
   GearSpec,
+  PlayerEntity,
+  SkillCooldownState,
   SkillId,
   SkillMapScope,
   SkillOffer,
@@ -368,9 +370,31 @@ export const SKILLS: readonly SkillSpec[] = [
     perLevelSummary: '+1 tia đạn mỗi phát',
     color: '#f472b6',
   },
+  {
+    id: 'whirlwind_blade',
+    name: 'Phi Tiêu Xoáy',
+    category: 'secondary',
+    rarity: 'rare',
+    mapScope: 'core',
+    maxLevel: 5,
+    description: 'Định kỳ phóng phi tiêu gió xoay tròn bay xuyên bầy quái rồi quay về.',
+    perLevelSummary: 'Sát thương cao, xoay rộng & phóng nhanh hơn',
+    color: '#22d3ee',
+  },
+  {
+    id: 'vital_regen',
+    name: 'Hồi Sinh Lực',
+    category: 'survival',
+    rarity: 'rare',
+    mapScope: 'core',
+    maxLevel: 5,
+    description: 'Tự hồi phục sinh lực đều đặn theo thời gian và tăng hiệu quả mọi nguồn hồi máu.',
+    perLevelSummary: 'Hồi máu đều mỗi giây & tăng trị liệu',
+    color: '#10b981',
+  },
 
   // =========================================================================
-  // 6 MAP 1 EXCLUSIVES: Rừng Tuyết Cabin (50% of Map 1 pool)
+  // 8 MAP 1 EXCLUSIVES: Rừng Tuyết Cabin (50% of Map 1 pool)
   // =========================================================================
   {
     id: 'pierce_up',
@@ -438,9 +462,31 @@ export const SKILLS: readonly SkillSpec[] = [
     perLevelSummary: '+8% chí mạng & vỡ băng đau hơn',
     color: '#0ea5e9',
   },
+  {
+    id: 'glacial_spear',
+    name: 'Thương Băng Rơi',
+    category: 'secondary',
+    rarity: 'rare',
+    mapScope: 'winter_cabin',
+    maxLevel: 5,
+    description: 'Phóng chùm thương băng sắc nhọn xuyên hàng quái gần nhất và làm chậm sâu.',
+    perLevelSummary: 'Thêm thương băng, xuyên sâu & làm chậm hơn',
+    color: '#38bdf8',
+  },
+  {
+    id: 'blizzard_ward',
+    name: 'Giáp Băng Giá',
+    category: 'survival',
+    rarity: 'common',
+    mapScope: 'winter_cabin',
+    maxLevel: 5,
+    description: 'Giảm sát thương nhận vào và phản hơi lạnh làm chậm quái đánh trúng bạn.',
+    perLevelSummary: '+5% giảm sát thương & phản làm chậm',
+    color: '#bae6fd',
+  },
 
   // =========================================================================
-  // 6 MAP 2 EXCLUSIVES: Hoang Mạc Kẹo Đá (50% of Map 2 pool)
+  // 8 MAP 2 EXCLUSIVES: Hoang Mạc Kẹo Đá (50% of Map 2 pool)
   // =========================================================================
   {
     id: 'sugar_rush',
@@ -508,9 +554,31 @@ export const SKILLS: readonly SkillSpec[] = [
     perLevelSummary: 'Xoáy mạnh, hút rộng & đánh đau hơn',
     color: '#ea580c',
   },
+  {
+    id: 'popcorn_barrage',
+    name: 'Pháo Bỏng Ngô',
+    category: 'secondary',
+    rarity: 'rare',
+    mapScope: 'candy_canyon',
+    maxLevel: 5,
+    description: 'Bắn loạt hạt bắp rang nảy bật giữa đàn quái kèm vụ nổ giòn lan nhẹ.',
+    perLevelSummary: 'Thêm hạt nảy & nổ lan rộng hơn',
+    color: '#fde047',
+  },
+  {
+    id: 'honey_shield',
+    name: 'Lớp Mật Dẻo',
+    category: 'survival',
+    rarity: 'common',
+    mapScope: 'candy_canyon',
+    maxLevel: 5,
+    description: 'Định kỳ tạo lớp màng mật ong chắn trọn một đòn đánh và hồi lại một ít máu.',
+    perLevelSummary: 'Hồi khiên nhanh hơn & hồi máu khi vỡ',
+    color: '#fbbf24',
+  },
 
   // =========================================================================
-  // 6 MAP 3 EXCLUSIVES: Hầm Mỏ Pha Lê (50% of Map 3 pool)
+  // 8 MAP 3 EXCLUSIVES: Hầm Mỏ Pha Lê (50% of Map 3 pool)
   // =========================================================================
   {
     id: 'overcharge',
@@ -578,6 +646,28 @@ export const SKILLS: readonly SkillSpec[] = [
     perLevelSummary: 'Sóng cực rộng & sát thương hủy diệt',
     color: '#9333ea',
   },
+  {
+    id: 'laser_turret',
+    name: 'Tháp Tia Pha Lê',
+    category: 'secondary',
+    rarity: 'rare',
+    mapScope: 'crystal_cavern',
+    maxLevel: 5,
+    description: 'Triệu hồi tinh thể pha lê bay cùng bạn, định kỳ quét chùm tia laser xuyên hàng quái.',
+    perLevelSummary: 'Tia laser dài mạnh & bắn nhanh hơn',
+    color: '#d946ef',
+  },
+  {
+    id: 'prism_focus',
+    name: 'Khúc Xạ Chí Mạng',
+    category: 'weapon',
+    rarity: 'common',
+    mapScope: 'crystal_cavern',
+    maxLevel: 5,
+    description: 'Điều chỉnh góc khúc xạ pha lê tăng mạnh tỉ lệ và sát thương đòn chí mạng.',
+    perLevelSummary: '+5.5% chí mạng & +15% lực chí mạng',
+    color: '#f0abfc',
+  },
 ] as const;
 
 const WEAPON_BY_ID: Record<WeaponId, WeaponSpec> = Object.fromEntries(
@@ -604,10 +694,32 @@ export function getSkillSpec(id: SkillId): SkillSpec {
   return SKILL_BY_ID[id];
 }
 
+const SKILL_TIMING_LABELS: Partial<Record<SkillId, string>> = {
+  orbital_ice: 'Quay liên tục quanh thân',
+  warm_aura: 'Tỏa nhiệt liên tục quanh thân',
+  plush_drone: 'Bay theo & bắn tự động',
+  whirlwind_blade: 'Tự phóng theo nhịp · Bay đi & về',
+  frost_nova: 'Tự nổ sóng băng theo nhịp',
+  glacial_spear: 'Tự phóng thương băng theo nhịp',
+  candy_meteor: 'Tự gọi thiên thạch theo nhịp',
+  caramel_nova: 'Tự cuốn xoáy hút quái theo nhịp',
+  popcorn_barrage: 'Tự bắn bắp nảy theo nhịp',
+  prism_chain: 'Tự giật sét chuỗi theo nhịp',
+  void_pulse: 'Tự nổ sóng trọng lực theo nhịp',
+  laser_turret: 'Vệ tinh tự quét laser theo nhịp',
+};
+
+/**
+ * Returns player-friendly cadence summary for active secondary skills (`null` for passives).
+ */
+export function getSkillTimingLabel(skillId: SkillId): string | null {
+  return SKILL_TIMING_LABELS[skillId] ?? null;
+}
+
 /**
  * Returns the skill pool available on a given map:
- * - Campaign maps expose 6 Core Default skills + 6 Map-Exclusive skills (50/50 split = 12 skills).
- * - Endless Abyss (or unspecified map) unlocks all 24 skills.
+ * - Campaign maps expose 8 Core Default skills + 8 Map-Exclusive skills (50/50 split = 16 skills).
+ * - Endless Abyss (or unspecified map) unlocks all 32 skills.
  */
 export function getSkillPoolForMap(
   mapId?: SurvivalMapId,
@@ -715,16 +827,24 @@ const RARITY_EXCESS_SKILLS: readonly SkillId[] = [
   'plush_drone',
   'vampirism',
   'team_aura',
+  'whirlwind_blade',
+  'vital_regen',
   'frost_nova',
   'ice_shatter',
+  'glacial_spear',
+  'blizzard_ward',
   'sugar_rush',
   'pepper_bomb',
   'caramel_nova',
+  'popcorn_barrage',
+  'honey_shield',
   'overcharge',
   'crystal_shield',
   'prism_chain',
   'gem_greed',
   'void_pulse',
+  'laser_turret',
+  'prism_focus',
 ];
 
 export function computeDerivedStats(
@@ -760,6 +880,9 @@ export function computeDerivedStats(
   const iceShatterPower = eff('ice_shatter');
   const crystalShieldPower = eff('crystal_shield');
   const gemGreedPower = eff('gem_greed');
+  const vitalRegenPower = eff('vital_regen');
+  const blizzardWardPower = eff('blizzard_ward');
+  const prismFocusPower = eff('prism_focus');
 
   let rarityDamageBonus = 0;
   for (let i = 0; i < RARITY_EXCESS_SKILLS.length; i++) {
@@ -777,15 +900,19 @@ export function computeDerivedStats(
         (1 + gear.dashCooldownPct - agilityPower * 0.12 - overchargePower * 0.06),
     ),
     damageReduction: Math.min(
-      0.6,
-      gear.damageReductionPct + crystalShieldPower * 0.07,
+      0.65,
+      gear.damageReductionPct + crystalShieldPower * 0.07 + blizzardWardPower * 0.05,
     ),
     pickupRadius:
       BASE_PICKUP_RADIUS * (1 + gear.pickupRadiusPct + magnetPower * 0.4),
     xpMultiplier:
       1 + gear.xpBonusPct + magnetPower * 0.1 + gemGreedPower * 0.16,
-    critChance: Math.min(0.85, gear.critChance + iceShatterPower * 0.08),
-    critMultiplier: BASE_CRIT_MULTIPLIER + iceShatterPower * 0.18,
+    critChance: Math.min(
+      0.85,
+      gear.critChance + iceShatterPower * 0.08 + prismFocusPower * 0.055,
+    ),
+    critMultiplier:
+      BASE_CRIT_MULTIPLIER + iceShatterPower * 0.18 + prismFocusPower * 0.15,
     fireRate:
       weapon.fireRate *
       (1 + gear.fireRatePct + fireRatePower * 0.18 + overchargePower * 0.12),
@@ -794,21 +921,135 @@ export function computeDerivedStats(
     bonusPierce: lv('pierce_up'),
     projectileScale: 1 + piercePower * 0.12 + overchargePower * 0.08,
     ricochetCount: lv('ricochet'),
+    hpRegenPerSec: vitalRegenPower * 1.5,
     orbitalLevel: lv('orbital_ice'),
     warmAuraLevel: lv('warm_aura'),
     meteorLevel: lv('candy_meteor'),
     droneLevel: lv('plush_drone'),
     vampirismLevel: lv('vampirism'),
     teamAuraLevel: lv('team_aura'),
+    whirlwindBladeLevel: lv('whirlwind_blade'),
+    vitalRegenLevel: lv('vital_regen'),
     frostNovaLevel: lv('frost_nova'),
     iceShatterLevel: lv('ice_shatter'),
+    glacialSpearLevel: lv('glacial_spear'),
+    blizzardWardLevel: lv('blizzard_ward'),
     sugarRushLevel: lv('sugar_rush'),
     pepperBombLevel: lv('pepper_bomb'),
     caramelNovaLevel: lv('caramel_nova'),
+    popcornBarrageLevel: lv('popcorn_barrage'),
+    honeyShieldLevel: lv('honey_shield'),
     overchargeLevel: lv('overcharge'),
     crystalShieldLevel: lv('crystal_shield'),
     prismChainLevel: lv('prism_chain'),
     gemGreedLevel: lv('gem_greed'),
     voidPulseLevel: lv('void_pulse'),
+    laserTurretLevel: lv('laser_turret'),
+    prismFocusLevel: lv('prism_focus'),
   };
+}
+
+/**
+ * Authoritative base recharge duration in seconds for periodic secondary and shield skills
+ * (`0` denotes continuous always-on abilities).
+ */
+export function getSecondarySkillMaxCooldown(skillId: SkillId, level: number): number {
+  const lv = Math.max(1, level);
+  switch (skillId) {
+    case 'whirlwind_blade':
+      return Math.max(2.1, 4.4 - lv * 0.42);
+    case 'frost_nova':
+      return Math.max(2.0, 4.6 - lv * 0.45);
+    case 'glacial_spear':
+      return Math.max(2.0, 4.2 - lv * 0.4);
+    case 'candy_meteor':
+      return Math.max(1.2, 3.8 - lv * 0.4);
+    case 'caramel_nova':
+      return Math.max(2.2, 5.0 - lv * 0.5);
+    case 'popcorn_barrage':
+      return Math.max(2.2, 4.5 - lv * 0.4);
+    case 'prism_chain':
+      return Math.max(1.1, 3.0 - lv * 0.35);
+    case 'void_pulse':
+      return Math.max(2.4, 5.2 - lv * 0.5);
+    case 'laser_turret':
+      return Math.max(2.0, 4.0 - lv * 0.35);
+    case 'crystal_shield':
+      return Math.max(2.5, 6.0 - lv * 0.65);
+    case 'honey_shield':
+      return Math.max(5.5, 11.0 - lv * 1.0);
+    case 'blizzard_ward':
+      return 3.5;
+    default:
+      return 0;
+  }
+}
+
+export type PlayerCooldownSource = Pick<
+  PlayerEntity,
+  | 'skills'
+  | 'whirlwindBladeTimer'
+  | 'frostNovaTimer'
+  | 'glacialSpearTimer'
+  | 'meteorTimer'
+  | 'caramelNovaTimer'
+  | 'popcornBarrageTimer'
+  | 'prismChainTimer'
+  | 'voidPulseTimer'
+  | 'laserTurretTimer'
+  | 'crystalShieldCooldown'
+  | 'blizzardWardCooldown'
+  | 'honeyShieldCooldown'
+  | 'honeyShieldReady'
+>;
+
+const TIMED_SKILL_EXTRACTORS: ReadonlyArray<
+  readonly [SkillId, (p: PlayerCooldownSource) => number]
+> = [
+  ['whirlwind_blade', (p) => p.whirlwindBladeTimer],
+  ['frost_nova', (p) => p.frostNovaTimer],
+  ['glacial_spear', (p) => p.glacialSpearTimer],
+  ['candy_meteor', (p) => p.meteorTimer],
+  ['caramel_nova', (p) => p.caramelNovaTimer],
+  ['popcorn_barrage', (p) => p.popcornBarrageTimer],
+  ['prism_chain', (p) => p.prismChainTimer],
+  ['void_pulse', (p) => p.voidPulseTimer],
+  ['laser_turret', (p) => p.laserTurretTimer],
+  ['crystal_shield', (p) => p.crystalShieldCooldown],
+  ['blizzard_ward', (p) => p.blizzardWardCooldown],
+  ['honey_shield', (p) => (p.honeyShieldReady ? 0 : p.honeyShieldCooldown)],
+];
+
+const ALWAYS_ON_SECONDARY_IDS: readonly SkillId[] = [
+  'orbital_ice',
+  'warm_aura',
+  'plush_drone',
+];
+
+function roundCooldown(sec: number): number {
+  return Math.max(0, Math.round(sec * 100) / 100);
+}
+
+/**
+ * Extracts per-skill cooldown telemetry for active secondary skills and reactive shield perks.
+ */
+export function buildPlayerSecondaryCooldowns(
+  player: PlayerCooldownSource,
+): Partial<Record<SkillId, SkillCooldownState>> {
+  const out: Partial<Record<SkillId, SkillCooldownState>> = {};
+  for (let i = 0; i < ALWAYS_ON_SECONDARY_IDS.length; i++) {
+    const id = ALWAYS_ON_SECONDARY_IDS[i];
+    if ((player.skills[id] ?? 0) > 0) {
+      out[id] = { remaining: 0, max: 0 };
+    }
+  }
+  for (let i = 0; i < TIMED_SKILL_EXTRACTORS.length; i++) {
+    const [id, readRem] = TIMED_SKILL_EXTRACTORS[i];
+    const lv = player.skills[id] ?? 0;
+    if (lv <= 0) continue;
+    const max = roundCooldown(getSecondarySkillMaxCooldown(id, lv));
+    const remaining = Math.min(max, roundCooldown(readRem(player)));
+    out[id] = { remaining, max };
+  }
+  return out;
 }

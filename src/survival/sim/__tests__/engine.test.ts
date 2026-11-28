@@ -1450,4 +1450,180 @@ describe('survival simulation engine', () => {
       );
     }
   });
+
+  it('heals living players by 15% Max HP (min 15) on level-up without reviving downed teammates', () => {
+    const world = createSurvivalWorld({
+      matchId: 'm-level-heal',
+      mode: 'bot_team',
+      mapId: 'winter_cabin',
+      seed: 91,
+      players: [
+        { id: 'p1', name: 'Hero', animal: 'dog', weaponId: 'candy_smg', gearId: 'ice_skates', isBot: false },
+        { id: 'p2', name: 'Tank', animal: 'panda', weaponId: 'frost_bow', gearId: 'plush_armor', isBot: true },
+        { id: 'p3', name: 'Down', animal: 'cat', weaponId: 'candy_smg', gearId: 'ice_skates', isBot: true },
+      ],
+    });
+    world.obstacles = [];
+    world.crates = [];
+    world.spawnTimer = 9999;
+
+    const p1 = world.players[0]; // maxHp 120 -> 15% = 18
+    const p2 = world.players[1]; // maxHp 155 -> 15% = 23
+    const p3 = world.players[2];
+    p1.hp = 60;
+    p2.hp = 80;
+    p3.hp = 0;
+    p3.downed = true;
+
+    world.teamXp = world.xpToNext + 5;
+    stepSurvivalWorld(world, { p1: IDLE_INPUT }, 0.05);
+
+    assert.equal(world.phase, 'levelup');
+    assert.equal(p1.hp, 60 + Math.max(15, Math.round(p1.maxHp * 0.15)));
+    assert.ok(p2.hp >= 80 + Math.max(15, Math.round(p2.maxHp * 0.15)));
+    assert.equal(p3.downed, true, 'downed teammate must remain downed on levelup');
+    assert.equal(p3.hp, 0);
+    assert.ok(
+      world.visualEffects.some((fx) => fx.kind === 'level_heal'),
+      'levelup heal emits level_heal visual effect',
+    );
+  });
+
+  it('activates all 8 new skills, emits VisualFx for secondary skills, and reports secondaryCooldowns in HUD', () => {
+    // 1. Core + Winter new skills: whirlwind_blade, vital_regen, glacial_spear, blizzard_ward + frost_nova VFX
+    const wWin = createSurvivalWorld({
+      matchId: 'm-v2-win',
+      mode: 'solo',
+      mapId: 'winter_cabin',
+      seed: 44,
+      players: [
+        { id: 'p1', name: 'Frost', animal: 'cat', weaponId: 'candy_smg', gearId: 'ice_skates', isBot: false },
+      ],
+    });
+    wWin.obstacles = [];
+    wWin.crates = [];
+    wWin.spawnTimer = 9999;
+    const pW = wWin.players[0];
+    pW.fireCooldown = 9999;
+    pW.skills = {
+      whirlwind_blade: 2,
+      vital_regen: 2,
+      glacial_spear: 2,
+      blizzard_ward: 2,
+      frost_nova: 2,
+      orbital_ice: 1,
+    };
+    pW.stats = computeDerivedStats('candy_smg', 'ice_skates', pW.skills);
+    pW.hp = 80;
+    const eClose = makeEnemy(wWin, { x: pW.x, y: pW.y, hp: 500, maxHp: 500, damage: 25, radius: 22 });
+    const eMid = makeEnemy(wWin, { x: pW.x + 110, y: pW.y, hp: 500, maxHp: 500 });
+    wWin.enemies.push(eClose, eMid);
+
+    stepSurvivalWorld(wWin, { p1: IDLE_INPUT }, 0.05);
+    assert.ok(
+      wWin.projectiles.some((pr) => pr.weaponId === 'whirlwind_blade' && pr.boomerang),
+      'whirlwind_blade launches boomerang blade',
+    );
+    assert.ok(
+      wWin.projectiles.some((pr) => pr.weaponId === 'glacial_spear' && pr.slowPct > 0),
+      'glacial_spear fires slowing ice lances',
+    );
+    assert.ok(
+      wWin.visualEffects.some((fx) => fx.kind === 'frost_nova'),
+      'frost_nova emits frost_nova visual effect',
+    );
+    assert.ok(
+      wWin.visualEffects.some((fx) => fx.kind === 'blizzard_counter'),
+      'blizzard_ward retaliates with blizzard_counter visual effect',
+    );
+    assert.ok(eMid.slowTimer > 0, 'frost_nova / blizzard_ward slows nearby enemy');
+
+    // Step 0.6s with no enemy collision so vital_regen restores HP
+    wWin.enemies = [];
+    const hpBeforeRegen = pW.hp;
+    for (let i = 0; i < 14; i++) {
+      stepSurvivalWorld(wWin, { p1: IDLE_INPUT }, 0.05);
+    }
+    assert.ok(pW.hp > hpBeforeRegen, 'vital_regen passively restores HP');
+
+    const hudW = buildHudSnapshot(wWin, 'p1');
+    assert.deepEqual(hudW.localPlayer.secondaryCooldowns.orbital_ice, { remaining: 0, max: 0 });
+    assert.ok((hudW.localPlayer.secondaryCooldowns.frost_nova?.max ?? 0) > 0);
+    assert.ok((hudW.localPlayer.secondaryCooldowns.whirlwind_blade?.max ?? 0) > 0);
+
+    // 2. Candy new skills: popcorn_barrage + honey_shield + meteor_impact VFX
+    const wCandy = createSurvivalWorld({
+      matchId: 'm-v2-candy',
+      mode: 'solo',
+      mapId: 'candy_canyon',
+      seed: 45,
+      players: [
+        { id: 'p1', name: 'Sweet', animal: 'dog', weaponId: 'candy_smg', gearId: 'ice_skates', isBot: false },
+      ],
+    });
+    wCandy.obstacles = [];
+    wCandy.crates = [];
+    wCandy.spawnTimer = 9999;
+    const pC = wCandy.players[0];
+    pC.fireCooldown = 9999;
+    pC.skills = { popcorn_barrage: 2, honey_shield: 2, candy_meteor: 2 };
+    pC.stats = computeDerivedStats('candy_smg', 'ice_skates', pC.skills);
+    pC.honeyShieldReady = true;
+    pC.hp = 90;
+
+    const cAttacker = makeEnemy(wCandy, { x: pC.x, y: pC.y, hp: 500, maxHp: 500, damage: 30, radius: 22 });
+    const cSecond = makeEnemy(wCandy, { x: pC.x + 80, y: pC.y, hp: 500, maxHp: 500 });
+    wCandy.enemies.push(cAttacker, cSecond);
+
+    stepSurvivalWorld(wCandy, { p1: IDLE_INPUT }, 0.05);
+    assert.equal(pC.honeyShieldReady, false, 'honey_shield consumes barrier on hit');
+    assert.ok(pC.hp >= 90, 'honey_shield absorbs damage and heals instead of losing HP');
+    assert.ok(
+      wCandy.visualEffects.some((fx) => fx.kind === 'shield_break'),
+      'honey_shield emits shield_break visual effect',
+    );
+    assert.ok(
+      wCandy.projectiles.some((pr) => pr.weaponId === 'popcorn_barrage'),
+      'popcorn_barrage spawns popcorn kernels',
+    );
+    // Advance until candy_meteor detonates
+    for (let i = 0; i < 14; i++) {
+      stepSurvivalWorld(wCandy, { p1: IDLE_INPUT }, 0.05);
+    }
+    assert.ok(
+      wCandy.visualEffects.some((fx) => fx.kind === 'meteor_impact'),
+      'candy_meteor detonation emits meteor_impact visual effect',
+    );
+
+    // 3. Crystal new skills: laser_turret + prism_focus + void_pulse VFX
+    const wCry = createSurvivalWorld({
+      matchId: 'm-v2-cry',
+      mode: 'solo',
+      mapId: 'crystal_cavern',
+      seed: 46,
+      players: [
+        { id: 'p1', name: 'Laser', animal: 'panda', weaponId: 'candy_smg', gearId: 'golden_scope', isBot: false },
+      ],
+    });
+    wCry.obstacles = [];
+    wCry.crates = [];
+    wCry.spawnTimer = 9999;
+    const pCr = wCry.players[0];
+    pCr.fireCooldown = 9999;
+    pCr.skills = { laser_turret: 2, prism_focus: 3, void_pulse: 2 };
+    pCr.stats = computeDerivedStats('candy_smg', 'golden_scope', pCr.skills);
+    const lTarget = makeEnemy(wCry, { x: pCr.x + 140, y: pCr.y, hp: 600, maxHp: 600 });
+    wCry.enemies.push(lTarget);
+
+    stepSurvivalWorld(wCry, { p1: IDLE_INPUT }, 0.05);
+    assert.ok(lTarget.hp < 600, 'laser_turret & void_pulse damage enemy');
+    assert.ok(
+      wCry.visualEffects.some((fx) => fx.kind === 'laser_beam' && fx.endX !== undefined),
+      'laser_turret emits laser_beam visual effect with endpoint',
+    );
+    assert.ok(
+      wCry.visualEffects.some((fx) => fx.kind === 'void_pulse'),
+      'void_pulse emits void_pulse visual effect',
+    );
+  });
 });

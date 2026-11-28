@@ -16,6 +16,7 @@ import {
   getGearSpec,
   getSkillPoolForMap,
   getSkillSpec,
+  getSkillTimingLabel,
   getWeaponSpec,
   rollSkillOffers,
   xpForNextLevel,
@@ -40,16 +41,17 @@ function mulberry32(seed: number): () => number {
 }
 
 describe('survival catalog & map registry', () => {
-  it('exposes exact counts for 6 weapons, 4 gears, 24 skills (6 core + 18 map-exclusive), 9 bosses, and 4 maps', () => {
+  it('exposes exact counts for 6 weapons, 4 gears, 32 skills (8 core + 24 map-exclusive), 9 bosses, and 4 maps', () => {
     assert.equal(WEAPONS.length, 6);
     assert.equal(GEARS.length, 4);
-    assert.equal(SKILLS.length, 24);
+    assert.equal(SKILLS.length, 32);
+    assert.equal(SKILLS.filter((s) => s.category === 'secondary').length, 12);
     assert.equal(SURVIVAL_MAPS.length, 4);
     assert.equal(Object.keys(BOSS_NAMES).length, 9);
 
     assert.equal(new Set(WEAPONS.map((w) => w.id)).size, 6);
     assert.equal(new Set(GEARS.map((g) => g.id)).size, 4);
-    assert.equal(new Set(SKILLS.map((s) => s.id)).size, 24);
+    assert.equal(new Set(SKILLS.map((s) => s.id)).size, 32);
     assert.equal(new Set(SURVIVAL_MAPS.map((m) => m.id)).size, 4);
 
     for (const skill of SKILLS) {
@@ -108,6 +110,17 @@ describe('survival catalog & map registry', () => {
       BIOME_ENEMY_NAMES.candy_canyon.wolf,
       BIOME_ENEMY_NAMES.crystal_cavern.wolf,
     );
+
+    for (const map of SURVIVAL_MAPS) {
+      assert.ok(map.scenario.headline.length > 0);
+      assert.equal(map.scenario.chapters.length, 3);
+      for (let i = 0; i < map.scenario.chapters.length; i++) {
+        const ch = map.scenario.chapters[i];
+        assert.equal(ch.order, i + 1);
+        assert.ok(ch.title.length > 0 && ch.summary.length > 0);
+        assert.ok(map.bossRotation.includes(ch.bossKind));
+      }
+    }
   });
 
   it('computes xpForNextLevel(1) === 101 and grows strictly', () => {
@@ -120,17 +133,17 @@ describe('survival catalog & map registry', () => {
     }
   });
 
-  it('enforces 50/50 map skill pools (6 core + 6 exclusive), fixed rarity (never downgrades), and guaranteeRare', () => {
+  it('enforces 50/50 map skill pools (8 core + 8 exclusive), fixed rarity (never downgrades), and guaranteeRare', () => {
     const rng = mulberry32(42);
 
-    // 1. 50/50 split on every campaign map; all 24 on endless_abyss
+    // 1. 50/50 split on every campaign map; all 32 on endless_abyss
     for (const mapId of ['winter_cabin', 'candy_canyon', 'crystal_cavern'] as const) {
       const mapPool = getSkillPoolForMap(mapId);
-      assert.equal(mapPool.length, 12, `${mapId} should have 12 total skills`);
+      assert.equal(mapPool.length, 16, `${mapId} should have 16 total skills`);
       const coreCount = mapPool.filter((s) => s.mapScope === 'core').length;
       const exclCount = mapPool.filter((s) => s.mapScope === mapId).length;
-      assert.equal(coreCount, 6, `${mapId} should include all 6 core skills`);
-      assert.equal(exclCount, 6, `${mapId} should include 6 exclusive skills`);
+      assert.equal(coreCount, 8, `${mapId} should include all 8 core skills`);
+      assert.equal(exclCount, 8, `${mapId} should include 8 exclusive skills`);
 
       const allowedIds = new Set(mapPool.map((s) => s.id));
       for (let i = 0; i < 40; i++) {
@@ -151,7 +164,7 @@ describe('survival catalog & map registry', () => {
         }
       }
     }
-    assert.equal(getSkillPoolForMap('endless_abyss').length, 24);
+    assert.equal(getSkillPoolForMap('endless_abyss').length, 32);
 
     // 2. Fixed rarity NEVER downgrades when a Rare/Epic skill re-appears at higher levels
     for (let lv = 0; lv <= 4; lv++) {
@@ -192,12 +205,16 @@ describe('survival catalog & map registry', () => {
       agility: 4,
       magnet_range: 5,
       multishot: 5,
+      whirlwind_blade: 5,
+      vital_regen: 5,
       pierce_up: 5,
       orbital_ice: 5,
       warm_aura: 5,
       team_aura: 5,
       frost_nova: 5,
       ice_shatter: 5,
+      glacial_spear: 5,
+      blizzard_ward: 5,
     };
     const lastOffer = rollSkillOffers(almostMaxed, rng, true, 'winter_cabin');
     assert.equal(lastOffer.length, 1);
@@ -233,6 +250,16 @@ describe('survival catalog & map registry', () => {
     assert.ok(Math.abs(scopeStats.critChance - 0.15) < 1e-6);
     assert.equal(scopeStats.bonusProjectiles, 2);
     assert.ok(Math.abs(scopeStats.fireRate - 5.2 * (1 + 0.12 + 0.36)) < 1e-6);
+
+    const newPassiveStats = computeDerivedStats('candy_smg', 'ice_skates', {
+      vital_regen: 2,
+      blizzard_ward: 3,
+      prism_focus: 2,
+    });
+    assert.ok(newPassiveStats.hpRegenPerSec >= 3);
+    assert.ok(newPassiveStats.damageReduction >= 0.14);
+    assert.ok(newPassiveStats.critChance >= 0.1);
+    assert.ok(newPassiveStats.critMultiplier > 1.75);
   });
 
   it('generateMapLayout is deterministic, keeps center clear, and bounds obstacles', () => {
@@ -260,7 +287,7 @@ describe('survival catalog & map registry', () => {
     }
   });
 
-  it('computeDerivedStats makes rare skillPower strictly stronger than common across all 14 skills', () => {
+  it('computeDerivedStats makes rare skillPower strictly stronger than common across all 32 skills', () => {
     for (const skill of SKILLS) {
       const commonStats = computeDerivedStats(
         'candy_smg',
@@ -345,6 +372,13 @@ describe('survival catalog & map registry', () => {
         false,
         `Skill ${s.id} summary contains technical jargon: "${s.perLevelSummary}"`,
       );
+      const timing = getSkillTimingLabel(s.id);
+      if (s.category === 'secondary') {
+        assert.ok(timing && timing.length > 0, `Secondary skill ${s.id} must have timing label`);
+        assert.equal(forbidden.test(timing), false);
+      } else {
+        assert.equal(timing, null);
+      }
     }
   });
 });

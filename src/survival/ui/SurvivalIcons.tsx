@@ -926,6 +926,133 @@ export function SkillArt({
           <circle cx="32" cy="32" r="3.2" fill="#fef08a" />
         </svg>
       );
+
+    case 'whirlwind_blade':
+      return (
+        <svg viewBox="0 0 64 64" aria-hidden="true" className={className}>
+          <circle cx="32" cy="32" r="28" fill="#22d3ee" opacity="0.16" />
+          <circle cx="32" cy="32" r="22" fill="none" stroke="#67e8f9" strokeWidth="2" strokeDasharray="7 5" opacity="0.7" />
+          <path
+            d="M32 8 L40 24 L56 32 L40 40 L32 56 L24 40 L8 32 L24 24 Z"
+            fill="#22d3ee"
+            stroke="#ecfeff"
+            strokeWidth="2"
+            strokeLinejoin="round"
+          />
+          <circle cx="32" cy="32" r="6" fill="#0e7490" stroke="#ffffff" strokeWidth="2" />
+        </svg>
+      );
+
+    case 'vital_regen':
+      return (
+        <svg viewBox="0 0 64 64" aria-hidden="true" className={className}>
+          <circle cx="32" cy="32" r="28" fill="#10b981" opacity="0.18" />
+          <path
+            d="M32 52 C18 42 12 33 12 24 C12 16 18 11 25 11 C29 11 31 13 32 16 C33 13 35 11 39 11 C46 11 52 16 52 24 C52 33 46 42 32 52 Z"
+            fill="#10b981"
+            stroke="#d1fae5"
+            strokeWidth="2.2"
+          />
+          <rect x="29" y="21" width="6" height="18" rx="2" fill="#ecfdf5" />
+          <rect x="23" y="27" width="18" height="6" rx="2" fill="#ecfdf5" />
+        </svg>
+      );
+
+    case 'glacial_spear':
+      return (
+        <svg viewBox="0 0 64 64" aria-hidden="true" className={className}>
+          <circle cx="32" cy="32" r="28" fill="#38bdf8" opacity="0.18" />
+          <polygon points="54,10 35,20 26,38 44,29" fill="#38bdf8" stroke="#f0f9ff" strokeWidth="2" strokeLinejoin="round" />
+          <line x1="12" y1="52" x2="34" y2="30" stroke="#bae6fd" strokeWidth="4.2" strokeLinecap="round" />
+          <polygon points="48,26 56,22 50,34" fill="#7dd3fc" opacity="0.75" />
+          <polygon points="28,16 36,12 30,24" fill="#7dd3fc" opacity="0.75" />
+        </svg>
+      );
+
+    case 'blizzard_ward':
+      return (
+        <svg viewBox="0 0 64 64" aria-hidden="true" className={className}>
+          <circle cx="32" cy="32" r="28" fill="#bae6fd" opacity="0.16" />
+          <path
+            d="M32 8 L50 16 V32 C50 44 41 52 32 56 C23 52 14 44 14 32 V16 Z"
+            fill="#0284c7"
+            stroke="#e0f2fe"
+            strokeWidth="2.4"
+            strokeLinejoin="round"
+          />
+          <path d="M32 19 V43 M21 26 L43 38 M43 26 L21 38" stroke="#e0f2fe" strokeWidth="2.6" strokeLinecap="round" />
+          <circle cx="32" cy="31" r="4" fill="#7dd3fc" />
+        </svg>
+      );
+
+    case 'popcorn_barrage':
+      return (
+        <svg viewBox="0 0 64 64" aria-hidden="true" className={className}>
+          <circle cx="32" cy="32" r="28" fill="#fde047" opacity="0.16" />
+          <circle cx="24" cy="28" r="10" fill="#fef08a" stroke="#d97706" strokeWidth="2" />
+          <circle cx="39" cy="26" r="9.5" fill="#fde047" stroke="#d97706" strokeWidth="2" />
+          <circle cx="32" cy="38" r="11" fill="#fef9c3" stroke="#d97706" strokeWidth="2" />
+          <path d="M12 16 L18 20 M52 16 L46 20 M52 46 L46 42" stroke="#fb923c" strokeWidth="2.8" strokeLinecap="round" />
+        </svg>
+      );
+
+    case 'honey_shield':
+      return (
+        <svg viewBox="0 0 64 64" aria-hidden="true" className={className}>
+          <circle cx="32" cy="32" r="28" fill="#fbbf24" opacity="0.16" />
+          <polygon
+            points="32,8 52,19 52,45 32,56 12,45 12,19"
+            fill="#f59e0b"
+            fillOpacity="0.82"
+            stroke="#fef3c7"
+            strokeWidth="2.4"
+            strokeLinejoin="round"
+          />
+          <polygon
+            points="32,17 44,24 44,40 32,47 20,40 20,24"
+            fill="none"
+            stroke="#fde68a"
+            strokeWidth="2"
+          />
+          <circle cx="32" cy="32" r="5" fill="#fffbeb" />
+        </svg>
+      );
+
+    case 'laser_turret':
+      return (
+        <svg viewBox="0 0 64 64" aria-hidden="true" className={className}>
+          <circle cx="32" cy="32" r="28" fill="#d946ef" opacity="0.18" />
+          <line x1="22" y1="32" x2="58" y2="16" stroke="#f0abfc" strokeWidth="6" strokeLinecap="round" opacity="0.55" />
+          <line x1="22" y1="32" x2="58" y2="16" stroke="#ffffff" strokeWidth="2.2" strokeLinecap="round" />
+          <polygon
+            points="22,16 32,32 22,48 10,32"
+            fill="#c026d3"
+            stroke="#fae8ff"
+            strokeWidth="2.2"
+            strokeLinejoin="round"
+          />
+          <circle cx="22" cy="32" r="4.5" fill="#fef08a" />
+        </svg>
+      );
+
+    case 'prism_focus':
+      return (
+        <svg viewBox="0 0 64 64" aria-hidden="true" className={className}>
+          <circle cx="32" cy="32" r="28" fill="#f0abfc" opacity="0.16" />
+          <line x1="8" y1="36" x2="26" y2="30" stroke="#ffffff" strokeWidth="3" strokeLinecap="round" />
+          <line x1="38" y1="28" x2="56" y2="18" stroke="#f472b6" strokeWidth="3" strokeLinecap="round" />
+          <line x1="39" y1="32" x2="57" y2="32" stroke="#facc15" strokeWidth="3" strokeLinecap="round" />
+          <line x1="38" y1="36" x2="56" y2="46" stroke="#38bdf8" strokeWidth="3" strokeLinecap="round" />
+          <polygon
+            points="32,12 46,46 18,46"
+            fill="#a21caf"
+            fillOpacity="0.82"
+            stroke="#fae8ff"
+            strokeWidth="2.2"
+            strokeLinejoin="round"
+          />
+        </svg>
+      );
   }
 }
 

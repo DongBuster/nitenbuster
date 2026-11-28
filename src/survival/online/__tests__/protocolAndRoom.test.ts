@@ -753,10 +753,39 @@ describe('validateSurvivalSnapshotPayload & compact wire snapshot codec', () => 
       ttl: 0.12,
       maxTtl: 0.16,
     });
+    world.players[0].skills = { frost_nova: 2, orbital_ice: 1, whirlwind_blade: 3 };
+    world.players[0].frostNovaTimer = 1.45;
+    world.players[0].whirlwindBladeTimer = 0.85;
+    world.visualEffects.push(
+      {
+        kind: 'frost_nova',
+        x: 1000.4,
+        y: 1020.6,
+        radius: 189,
+        ttl: 0.35,
+        maxTtl: 0.48,
+      },
+      {
+        kind: 'laser_beam',
+        x: 1100.2,
+        y: 1150.8,
+        radius: 14,
+        ttl: 0.22,
+        maxTtl: 0.28,
+        endX: 1510.4,
+        endY: 1210.9,
+      },
+    );
 
     const packed = packSurvivalSnapshot(world, 42);
     const wire = encodeSnapshotWire(packed);
     assert.equal(isSnapshotWirePayload(wire), true);
+    assert.equal(packed.visualEffects.length, 2);
+    assert.ok((packed.players[0].secondaryCooldowns?.frost_nova?.max ?? 0) > 0);
+    assert.deepEqual(packed.players[0].secondaryCooldowns?.orbital_ice, {
+      remaining: 0,
+      max: 0,
+    });
 
     const roster = new Map<string, SnapshotPlayerMeta>(
       world.players.map((p) => [
@@ -787,6 +816,10 @@ describe('validateSurvivalSnapshotPayload & compact wire snapshot codec', () => 
     );
     assert.equal(
       decodeSnapshotWire({ ...wire, mp: 99 }, roster, 'match-wire-roundtrip'),
+      null,
+    );
+    assert.equal(
+      decodeSnapshotWire({ ...wire, vf: [[999, 10, 10, 20, 0.2, 0.4]] }, roster, 'match-wire-roundtrip'),
       null,
     );
     assert.equal(
@@ -844,7 +877,24 @@ describe('validateSurvivalSnapshotPayload & compact wire snapshot codec', () => 
         orbital_ice: 2,
         plush_drone: 1,
         team_aura: 1,
+        frost_nova: 2,
+        whirlwind_blade: 2,
+        laser_turret: 2,
       };
+      world.players[i].frostNovaTimer = 1.8;
+      world.players[i].whirlwindBladeTimer = 0.9;
+      world.players[i].laserTurretTimer = 1.4;
+    }
+    for (let i = 0; i < 20; i += 1) {
+      world.visualEffects.push({
+        kind: i % 2 === 0 ? 'frost_nova' : 'laser_beam',
+        x: 1500 + i * 10,
+        y: 1600 + i * 5,
+        radius: 140,
+        ttl: 0.25,
+        maxTtl: 0.45,
+        ...(i % 2 === 1 ? { endX: 1900 + i * 10, endY: 1650 + i * 5 } : {}),
+      });
     }
 
     for (let i = 0; i < SURVIVAL_MAX_SNAPSHOT_ENEMIES; i += 1) {

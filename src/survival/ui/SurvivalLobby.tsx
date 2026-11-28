@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import {
   AlertTriangle,
   ArrowLeft,
+  BookOpen,
   Bot,
   Check,
   Compass,
@@ -41,6 +42,7 @@ import type {
   SurvivalMode,
   WeaponId,
 } from '../sim/types.ts';
+import { MapScenarioModal } from './MapScenarioModal.tsx';
 import {
   GearArt,
   HeroLoadoutPreview,
@@ -180,6 +182,7 @@ export function SurvivalLobby({
   );
   const [inviteFeedback, setInviteFeedback] = useState<string | null>(null);
   const [codeCopied, setCodeCopied] = useState<boolean>(false);
+  const [scenarioMapId, setScenarioMapId] = useState<SurvivalMapId | null>(null);
 
   const offlineNameId = useId();
   const onlineNameId = useId();
@@ -1049,8 +1052,8 @@ export function SurvivalLobby({
                       <span className="flex flex-wrap items-center justify-between gap-1 text-[10px] font-black">
                         <span className="rounded-md border border-white/10 bg-white/5 px-1.5 py-0.5 text-slate-300">
                           {isEndless
-                            ? '24 Kỹ năng · 9 Boss'
-                            : '6 Mặc định + 6 Riêng Map'}
+                            ? '32 Kỹ năng · 9 Boss'
+                            : '8 Mặc định + 8 Riêng Map'}
                         </span>
                       </span>
 
@@ -1090,30 +1093,37 @@ export function SurvivalLobby({
                     : 'border-white/10 bg-[#0d1320]/90'
               }`;
 
-              if (isOnlineGuest) {
-                return (
+              return (
+                <div
+                  key={map.id}
+                  className={`${baseClass} ${!isOnlineGuest ? 'hover:border-amber-300/75' : 'opacity-95'}`}
+                >
                   <button
-                    key={map.id}
                     type="button"
-                    disabled
+                    disabled={isOnlineGuest}
                     aria-pressed={isSelected}
-                    className={`${baseClass} cursor-default opacity-95`}
+                    onClick={() => handleMapSelect(map.id)}
+                    className={`flex flex-1 flex-col text-left ${
+                      isOnlineGuest ? 'cursor-default' : `cursor-pointer ${FOCUS_RING_CLASS}`
+                    }`}
                   >
                     {cardContent}
                   </button>
-                );
-              }
 
-              return (
-                <button
-                  key={map.id}
-                  type="button"
-                  aria-pressed={isSelected}
-                  onClick={() => handleMapSelect(map.id)}
-                  className={`${baseClass} cursor-pointer hover:border-amber-300/75 ${FOCUS_RING_CLASS}`}
-                >
-                  {cardContent}
-                </button>
+                  <div className="border-t border-white/10 bg-[#090e19]/85 px-3 py-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        playSfx('click');
+                        setScenarioMapId(map.id);
+                      }}
+                      className={`inline-flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-cyan-400/35 bg-cyan-950/35 px-2.5 py-1.5 text-[11px] font-black text-cyan-200 transition-colors hover:border-cyan-300/70 hover:bg-cyan-900/45 motion-reduce:transition-none ${FOCUS_RING_CLASS}`}
+                    >
+                      <BookOpen aria-hidden="true" className="h-3.5 w-3.5" />
+                      <span>Kịch bản &amp; Kỹ năng</span>
+                    </button>
+                  </div>
+                </div>
               );
             })}
           </div>
@@ -1478,6 +1488,11 @@ export function SurvivalLobby({
           </span>
         </footer>
       </div>
+
+      <MapScenarioModal
+        mapId={scenarioMapId}
+        onClose={() => setScenarioMapId(null)}
+      />
     </div>
   );
 }

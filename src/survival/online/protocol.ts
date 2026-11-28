@@ -1,5 +1,10 @@
 import type { AnimalId } from '../../engine/types.ts';
-import { GEARS, SKILLS, WEAPONS } from '../sim/catalog.ts';
+import {
+  GEARS,
+  SKILLS,
+  WEAPONS,
+  buildPlayerSecondaryCooldowns,
+} from '../sim/catalog.ts';
 import { isSurvivalMapId } from '../sim/maps.ts';
 import type {
   BossKind,
@@ -13,6 +18,7 @@ import type {
   PickupItemEntity,
   PlayerEntity,
   ProjectileEntity,
+  SkillCooldownState,
   SkillId,
   SkillOffer,
   SkillRarity,
@@ -20,6 +26,8 @@ import type {
   SurvivalMapId,
   SurvivalPhase,
   SurvivalWorldState,
+  VisualFxEntity,
+  VisualFxKind,
   WeaponId,
   XpGemEntity,
 } from '../sim/types.ts';
@@ -43,6 +51,7 @@ const MAX_WIRE_CRATES = 64;
 const MAX_WIRE_PICKUPS = 64;
 const MAX_WIRE_HAZARDS = 64;
 const MAX_WIRE_ARCS = 64;
+const MAX_WIRE_VISUAL_FX = 24;
 const MAX_WIRE_ZONES = 32;
 
 const VALID_ANIMALS: ReadonlySet<AnimalId> = new Set([
@@ -113,8 +122,23 @@ const PROJECTILE_WEAPON_IDS: readonly ProjectileEntity['weaponId'][] = [
   'candy_launcher',
   'snow_boomerang',
   'drone',
+  'whirlwind_blade',
+  'glacial_spear',
+  'popcorn_barrage',
   'enemy_orb',
   'enemy_dragon',
+];
+
+const VISUAL_FX_KINDS: readonly VisualFxKind[] = [
+  'frost_nova',
+  'caramel_nova',
+  'void_pulse',
+  'meteor_impact',
+  'popcorn_pop',
+  'laser_beam',
+  'shield_break',
+  'blizzard_counter',
+  'level_heal',
 ];
 
 const XP_GEM_TIERS: readonly XpGemEntity['tier'][] = [
@@ -218,6 +242,7 @@ export interface PackedPlayer {
   teamAuraLevel: number;
   pylonBuffTimer: number;
   skills: Partial<Record<SkillId, number>>;
+  secondaryCooldowns?: Partial<Record<SkillId, SkillCooldownState>>;
 }
 
 export interface PackedEnemy {
@@ -294,6 +319,17 @@ export interface PackedLightningArc {
   maxTtl: number;
 }
 
+export interface PackedVisualFx {
+  kind: VisualFxKind;
+  x: number;
+  y: number;
+  radius: number;
+  ttl: number;
+  maxTtl: number;
+  endX?: number;
+  endY?: number;
+}
+
 export interface PackedZoneState {
   id: string;
   cooldownSec: number;
@@ -329,40 +365,73 @@ export interface SurvivalSnapshotPayload {
   pickups: PackedPickup[];
   hazards: PackedHazard[];
   lightningArcs: PackedLightningArc[];
+  visualEffects: PackedVisualFx[];
   zones: PackedZoneState[];
 }
 
 export type WireSkillPair = [number, number];
+export type WireSecondaryCooldownTuple = [number, number, number];
 export type WireSkillOfferTuple = [number, number, number, number, number];
-export type WirePlayerTuple = [
-  string, // 0 id
-  number, // 1 flags (botTakeover | downed << 1)
-  number, // 2 x
-  number, // 3 y
-  number, // 4 aimAngle
-  number, // 5 hp
-  number, // 6 maxHp
-  number, // 7 reviveProgress
-  number, // 8 invulnTimer
-  number, // 9 dashTimer
-  number, // 10 dashCooldownTimer
-  number, // 11 dashCooldownMax
-  number, // 12 hitFlashTimer
-  number, // 13 kills
-  number, // 14 damageDealt
-  number, // 15 score
-  number, // 16 revives
-  number, // 17 rerollsLeft
-  number, // 18 comboCount
-  number, // 19 orbitalAngle
-  number, // 20 orbitalLevel
-  number, // 21 warmAuraLevel
-  number, // 22 droneLevel
-  number, // 23 droneAngle
-  number, // 24 teamAuraLevel
-  number, // 25 pylonBuffTimer
-  WireSkillPair[], // 26 skills
-];
+export type WirePlayerTuple =
+  | [
+      string, // 0 id
+      number, // 1 flags (botTakeover | downed << 1)
+      number, // 2 x
+      number, // 3 y
+      number, // 4 aimAngle
+      number, // 5 hp
+      number, // 6 maxHp
+      number, // 7 reviveProgress
+      number, // 8 invulnTimer
+      number, // 9 dashTimer
+      number, // 10 dashCooldownTimer
+      number, // 11 dashCooldownMax
+      number, // 12 hitFlashTimer
+      number, // 13 kills
+      number, // 14 damageDealt
+      number, // 15 score
+      number, // 16 revives
+      number, // 17 rerollsLeft
+      number, // 18 comboCount
+      number, // 19 orbitalAngle
+      number, // 20 orbitalLevel
+      number, // 21 warmAuraLevel
+      number, // 22 droneLevel
+      number, // 23 droneAngle
+      number, // 24 teamAuraLevel
+      number, // 25 pylonBuffTimer
+      WireSkillPair[], // 26 skills
+    ]
+  | [
+      string,
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+      WireSkillPair[],
+      WireSecondaryCooldownTuple[], // 27 optional secondaryCooldowns
+    ];
 
 export type WireEnemyTuple = [
   string, // 0 id
@@ -404,6 +473,10 @@ export type WireHazardTuple =
 
 export type WireLightningArcTuple = [number[], number | string, number, number];
 
+export type WireVisualFxTuple =
+  | [number, number, number, number, number, number]
+  | [number, number, number, number, number, number, number, number];
+
 export type WireZoneTuple = [string, number, number];
 
 export interface SurvivalSnapshotWirePayload {
@@ -436,6 +509,7 @@ export interface SurvivalSnapshotWirePayload {
   pi?: WirePickupTuple[];
   hz?: WireHazardTuple[];
   la?: WireLightningArcTuple[];
+  vf?: WireVisualFxTuple[];
   zn?: WireZoneTuple[];
 }
 
@@ -955,6 +1029,25 @@ function validatePackedPlayer(raw: unknown): PackedPlayer | null {
     skills[key] = val;
   }
 
+  let secondaryCooldowns: Partial<Record<SkillId, SkillCooldownState>> = {};
+  if (raw.secondaryCooldowns !== undefined) {
+    if (!isPlainObject(raw.secondaryCooldowns)) return null;
+    for (const [key, val] of Object.entries(raw.secondaryCooldowns)) {
+      if (
+        !isSkillId(key) ||
+        !isPlainObject(val) ||
+        !isNonNegNumber(val.remaining) ||
+        !isNonNegNumber(val.max)
+      ) {
+        return null;
+      }
+      secondaryCooldowns[key] = {
+        remaining: cleanZero(val.remaining),
+        max: cleanZero(val.max),
+      };
+    }
+  }
+
   return {
     id: raw.id,
     name: sanitizeDisplayName(raw.name),
@@ -989,6 +1082,7 @@ function validatePackedPlayer(raw: unknown): PackedPlayer | null {
     teamAuraLevel: cleanZero(raw.teamAuraLevel),
     pylonBuffTimer: cleanZero(raw.pylonBuffTimer),
     skills,
+    secondaryCooldowns,
   };
 }
 
@@ -1174,6 +1268,33 @@ function validatePackedLightningArc(raw: unknown): PackedLightningArc | null {
   };
 }
 
+function validatePackedVisualFx(raw: unknown): PackedVisualFx | null {
+  if (!isPlainObject(raw)) return null;
+  if (
+    typeof raw.kind !== 'string' ||
+    !VISUAL_FX_KINDS.includes(raw.kind as VisualFxKind) ||
+    !isFiniteNumber(raw.x) ||
+    !isFiniteNumber(raw.y) ||
+    !isNonNegNumber(raw.radius) ||
+    !isNonNegNumber(raw.ttl) ||
+    !isNonNegNumber(raw.maxTtl)
+  ) {
+    return null;
+  }
+  if (raw.endX !== undefined && !isFiniteNumber(raw.endX)) return null;
+  if (raw.endY !== undefined && !isFiniteNumber(raw.endY)) return null;
+  return {
+    kind: raw.kind as VisualFxKind,
+    x: cleanZero(raw.x),
+    y: cleanZero(raw.y),
+    radius: cleanZero(raw.radius),
+    ttl: cleanZero(raw.ttl),
+    maxTtl: cleanZero(raw.maxTtl),
+    ...(raw.endX !== undefined ? { endX: cleanZero(raw.endX) } : {}),
+    ...(raw.endY !== undefined ? { endY: cleanZero(raw.endY) } : {}),
+  };
+}
+
 function validatePackedZone(raw: unknown): PackedZoneState | null {
   if (!isPlainObject(raw)) return null;
   if (!isSafeId(raw.id)) return null;
@@ -1291,6 +1412,14 @@ export function validateSurvivalSnapshotPayload(
     MAX_WIRE_ARCS,
     validatePackedLightningArc,
   );
+  const visualEffects =
+    raw.visualEffects !== undefined
+      ? validateArrayWithCap(
+          raw.visualEffects,
+          MAX_WIRE_VISUAL_FX,
+          validatePackedVisualFx,
+        )
+      : [];
   const zones = validateArrayWithCap(
     raw.zones,
     MAX_WIRE_ZONES,
@@ -1306,6 +1435,7 @@ export function validateSurvivalSnapshotPayload(
     !pickups ||
     !hazards ||
     !lightningArcs ||
+    !visualEffects ||
     !zones
   ) {
     return null;
@@ -1340,6 +1470,7 @@ export function validateSurvivalSnapshotPayload(
     pickups,
     hazards,
     lightningArcs,
+    visualEffects,
     zones,
   };
 }
@@ -1379,6 +1510,7 @@ function packPlayer(p: PlayerEntity): PackedPlayer {
     teamAuraLevel: p.stats.teamAuraLevel,
     pylonBuffTimer: round2(p.pylonBuffTimer),
     skills: { ...p.skills },
+    secondaryCooldowns: buildPlayerSecondaryCooldowns(p),
   };
 }
 
@@ -1610,6 +1742,19 @@ function packLightningArc(arc: LightningArcFx): PackedLightningArc {
   };
 }
 
+function packVisualFx(fx: VisualFxEntity): PackedVisualFx {
+  return {
+    kind: fx.kind,
+    x: round1(fx.x),
+    y: round1(fx.y),
+    radius: round1(fx.radius),
+    ttl: round2(fx.ttl),
+    maxTtl: round2(fx.maxTtl),
+    ...(fx.endX !== undefined ? { endX: round1(fx.endX) } : {}),
+    ...(fx.endY !== undefined ? { endY: round1(fx.endY) } : {}),
+  };
+}
+
 function packZone(zone: MapZone): PackedZoneState {
   return {
     id: zone.id,
@@ -1667,6 +1812,7 @@ export function packSurvivalSnapshot(
     pickups: world.pickups.map(packPickup),
     hazards: world.hazards.map(packHazard),
     lightningArcs: world.lightningArcs.map(packLightningArc),
+    visualEffects: world.visualEffects.slice(-MAX_WIRE_VISUAL_FX).map(packVisualFx),
     zones: world.zones.map(packZone),
   };
 }
@@ -1681,7 +1827,17 @@ function encodePlayerTuple(p: PackedPlayer): WirePlayerTuple {
       skillPairs.push([idx, level]);
     }
   }
-  return [
+  const cdTuples: WireSecondaryCooldownTuple[] = [];
+  if (p.secondaryCooldowns) {
+    for (const [skillId, cd] of Object.entries(p.secondaryCooldowns)) {
+      if (!cd) continue;
+      const idx = SKILL_IDS.indexOf(skillId as SkillId);
+      if (idx >= 0) {
+        cdTuples.push([idx, round2(cd.remaining), round2(cd.max)]);
+      }
+    }
+  }
+  const base: WirePlayerTuple = [
     p.id,
     flags,
     p.x,
@@ -1710,6 +1866,10 @@ function encodePlayerTuple(p: PackedPlayer): WirePlayerTuple {
     p.pylonBuffTimer,
     skillPairs,
   ];
+  if (cdTuples.length > 0) {
+    return [...base, cdTuples] as WirePlayerTuple;
+  }
+  return base;
 }
 
 function encodeEnemyTuple(e: PackedEnemy): WireEnemyTuple {
@@ -1874,6 +2034,14 @@ export function encodeSnapshotWire(
       return [flat, encodeColor(arc.color), arc.ttl, arc.maxTtl];
     });
   }
+  if (snapshot.visualEffects.length > 0) {
+    wire.vf = snapshot.visualEffects.map((fx) => {
+      const kindIdx = Math.max(0, VISUAL_FX_KINDS.indexOf(fx.kind));
+      return fx.endX !== undefined && fx.endY !== undefined
+        ? [kindIdx, fx.x, fx.y, fx.radius, fx.ttl, fx.maxTtl, fx.endX, fx.endY]
+        : [kindIdx, fx.x, fx.y, fx.radius, fx.ttl, fx.maxTtl];
+    });
+  }
   if (snapshot.zones.length > 0) {
     wire.zn = snapshot.zones.map((z) => [z.id, z.cooldownSec, z.activeTimerSec]);
   }
@@ -1892,7 +2060,9 @@ function decodePlayerTuple(
   tuple: unknown,
   rosterById: SnapshotRosterLookup,
 ): PackedPlayer | null {
-  if (!Array.isArray(tuple) || tuple.length !== 27) return null;
+  if (!Array.isArray(tuple) || (tuple.length !== 27 && tuple.length !== 28)) {
+    return null;
+  }
   const id = tuple[0];
   if (!isSafeId(id, 64)) return null;
 
@@ -1927,6 +2097,31 @@ function decodePlayerTuple(
       return null;
     }
     skills[SKILL_IDS[skillIdx]] = cleanZero(level);
+  }
+
+  const secondaryCooldowns: Partial<Record<SkillId, SkillCooldownState>> = {};
+  if (tuple.length === 28) {
+    const rawCds = tuple[27];
+    if (!Array.isArray(rawCds) || rawCds.length > SKILL_IDS.length) return null;
+    for (let i = 0; i < rawCds.length; i += 1) {
+      const entry = rawCds[i];
+      if (!Array.isArray(entry) || entry.length !== 3) return null;
+      const skillIdx = entry[0];
+      const rem = entry[1];
+      const max = entry[2];
+      if (
+        !isNonNegInt(skillIdx) ||
+        skillIdx >= SKILL_IDS.length ||
+        !isNonNegNumber(rem) ||
+        !isNonNegNumber(max)
+      ) {
+        return null;
+      }
+      secondaryCooldowns[SKILL_IDS[skillIdx]] = {
+        remaining: cleanZero(rem),
+        max: cleanZero(max),
+      };
+    }
   }
 
   const meta = lookupRosterMeta(rosterById, id);
@@ -1965,6 +2160,7 @@ function decodePlayerTuple(
     teamAuraLevel: cleanZero(tuple[24] as number),
     pylonBuffTimer: cleanZero(tuple[25] as number),
     skills,
+    secondaryCooldowns,
   };
 }
 
@@ -2245,6 +2441,52 @@ function decodeLightningArcTuple(tuple: unknown): PackedLightningArc | null {
   };
 }
 
+function decodeVisualFxTuple(tuple: unknown): PackedVisualFx | null {
+  if (!Array.isArray(tuple) || (tuple.length !== 6 && tuple.length !== 8)) {
+    return null;
+  }
+  const kindIdx = tuple[0];
+  const x = tuple[1];
+  const y = tuple[2];
+  const radius = tuple[3];
+  const ttl = tuple[4];
+  const maxTtl = tuple[5];
+  if (
+    !isNonNegInt(kindIdx) ||
+    kindIdx >= VISUAL_FX_KINDS.length ||
+    !isFiniteNumber(x) ||
+    !isFiniteNumber(y) ||
+    !isNonNegNumber(radius) ||
+    !isNonNegNumber(ttl) ||
+    !isNonNegNumber(maxTtl)
+  ) {
+    return null;
+  }
+  if (tuple.length === 8) {
+    const endX = tuple[6];
+    const endY = tuple[7];
+    if (!isFiniteNumber(endX) || !isFiniteNumber(endY)) return null;
+    return {
+      kind: VISUAL_FX_KINDS[kindIdx],
+      x: cleanZero(x),
+      y: cleanZero(y),
+      radius: cleanZero(radius),
+      ttl: cleanZero(ttl),
+      maxTtl: cleanZero(maxTtl),
+      endX: cleanZero(endX),
+      endY: cleanZero(endY),
+    };
+  }
+  return {
+    kind: VISUAL_FX_KINDS[kindIdx],
+    x: cleanZero(x),
+    y: cleanZero(y),
+    radius: cleanZero(radius),
+    ttl: cleanZero(ttl),
+    maxTtl: cleanZero(maxTtl),
+  };
+}
+
 function decodeZoneTuple(tuple: unknown): PackedZoneState | null {
   if (!Array.isArray(tuple) || tuple.length !== 3) return null;
   const id = tuple[0];
@@ -2402,6 +2644,10 @@ export function decodeSnapshotWire(
     raw.la !== undefined
       ? validateArrayWithCap(raw.la, MAX_WIRE_ARCS, decodeLightningArcTuple)
       : [];
+  const visualEffects =
+    raw.vf !== undefined
+      ? validateArrayWithCap(raw.vf, MAX_WIRE_VISUAL_FX, decodeVisualFxTuple)
+      : [];
   const zones =
     raw.zn !== undefined
       ? validateArrayWithCap(raw.zn, MAX_WIRE_ZONES, decodeZoneTuple)
@@ -2416,6 +2662,7 @@ export function decodeSnapshotWire(
     !pickups ||
     !hazards ||
     !lightningArcs ||
+    !visualEffects ||
     !zones
   ) {
     return null;
@@ -2450,6 +2697,7 @@ export function decodeSnapshotWire(
     pickups,
     hazards,
     lightningArcs,
+    visualEffects,
     zones,
   };
 }

@@ -146,6 +146,7 @@ function packedPlayerToSummary(p: PackedPlayer): SurvivalPlayerSummary {
     score: Math.round(p.score),
     revives: p.revives,
     skills: { ...p.skills },
+    secondaryCooldowns: p.secondaryCooldowns ? { ...p.secondaryCooldowns } : {},
     rerollsLeft: p.rerollsLeft,
     dashCooldownPct: Math.max(
       0,
@@ -299,6 +300,7 @@ function createPlaceholderClientView(
     floatingTexts: [],
     particles: [],
     lightningArcs: [],
+    visualEffects: [],
   };
 }
 

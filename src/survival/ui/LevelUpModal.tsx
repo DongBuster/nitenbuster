@@ -7,8 +7,12 @@ import {
   type ReactNode,
   type SyntheticEvent,
 } from 'react';
-import { RefreshCw, Sparkles, Timer, Zap } from 'lucide-react';
-import { SKILL_SCOPE_LABELS, getSkillSpec } from '../sim/catalog.ts';
+import { Heart, RefreshCw, Sparkles, Timer, Zap } from 'lucide-react';
+import {
+  SKILL_SCOPE_LABELS,
+  getSkillSpec,
+  getSkillTimingLabel,
+} from '../sim/catalog.ts';
 import type {
   SkillCategory,
   SkillMapScope,
@@ -131,15 +135,15 @@ const CATEGORY_META: Record<
   { label: string; badgeClass: string }
 > = {
   weapon: {
-    label: 'Vũ khí',
+    label: 'Nội tại · Vũ khí',
     badgeClass: 'border-rose-400/45 bg-rose-500/20 text-rose-200',
   },
   secondary: {
-    label: 'Vũ khí phụ',
-    badgeClass: 'border-violet-400/45 bg-violet-500/20 text-violet-200',
+    label: 'Chiêu phụ tự động',
+    badgeClass: 'border-violet-400/60 bg-violet-500/25 text-violet-100',
   },
   survival: {
-    label: 'Sinh tồn',
+    label: 'Nội tại · Sinh tồn',
     badgeClass: 'border-emerald-400/45 bg-emerald-500/20 text-emerald-200',
   },
 };
@@ -387,9 +391,15 @@ export function LevelUpModal({
           )}
         </div>
 
-        <p id={descId} className="text-xs font-bold text-slate-300 sm:text-sm">
-          Chọn 1 nâng cấp để cường hóa sức mạnh chiến đấu cho nhân vật của bạn.
-        </p>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p id={descId} className="text-xs font-bold text-slate-300 sm:text-sm">
+            Chọn 1 nâng cấp để cường hóa sức mạnh chiến đấu cho nhân vật của bạn.
+          </p>
+          <span className="inline-flex items-center gap-1 rounded-xl border border-emerald-400/45 bg-emerald-500/15 px-2.5 py-1 text-[11px] font-black text-emerald-200">
+            <Heart aria-hidden="true" className="h-3.5 w-3.5 text-emerald-300" />
+            <span>Đã hồi +15% Máu cho thành viên còn sống</span>
+          </span>
+        </div>
 
         {isOnlineCoop && (
           <div
@@ -441,6 +451,7 @@ export function LevelUpModal({
           {offers.map((offer, idx) => {
             const spec = getSkillSpec(offer.skillId);
             const cat = CATEGORY_META[spec.category];
+            const timingLabel = getSkillTimingLabel(offer.skillId);
             const rarityStyle = RARITY_STYLES[offer.rarity];
             const isEpicBoost = offer.rarity === 'epic' && offer.levelGain > 1;
             const rarityLabel = isEpicBoost
@@ -519,6 +530,13 @@ export function LevelUpModal({
                   <span className="block text-xs font-semibold leading-relaxed text-slate-200/95">
                     {spec.description}
                   </span>
+
+                  {timingLabel && (
+                    <span className="inline-flex w-fit items-center gap-1 rounded-lg border border-cyan-400/40 bg-cyan-950/55 px-2 py-0.5 text-[10px] font-black text-cyan-200">
+                      <Zap aria-hidden="true" className="h-3 w-3 text-cyan-300" />
+                      <span>{timingLabel}</span>
+                    </span>
+                  )}
                 </div>
 
                 {/* Footer: Per-level summary & Key Hint */}

@@ -468,10 +468,14 @@ const SECONDARY_UNLOCK_SKILLS = new Set<SkillId>([
   'warm_aura',
   'candy_meteor',
   'plush_drone',
+  'whirlwind_blade',
   'frost_nova',
+  'glacial_spear',
   'caramel_nova',
+  'popcorn_barrage',
   'prism_chain',
   'void_pulse',
+  'laser_turret',
 ]);
 
 const BASE_SKILL_SCORE: Record<SkillId, number> = {
@@ -489,16 +493,24 @@ const BASE_SKILL_SCORE: Record<SkillId, number> = {
   vampirism: 12,
   max_hp: 10,
   magnet_range: 8,
+  whirlwind_blade: 18,
+  vital_regen: 14,
   frost_nova: 16,
   ice_shatter: 22,
+  glacial_spear: 18,
+  blizzard_ward: 14,
   sugar_rush: 16,
   pepper_bomb: 18,
   caramel_nova: 20,
+  popcorn_barrage: 18,
+  honey_shield: 14,
   overcharge: 18,
   crystal_shield: 16,
   prism_chain: 18,
   gem_greed: 12,
   void_pulse: 22,
+  laser_turret: 20,
+  prism_focus: 18,
 };
 
 export function pickBotSkillIndex(
@@ -526,6 +538,10 @@ export function pickBotSkillIndex(
         score += 36;
       } else if (offer.skillId === 'vampirism') {
         score += 32;
+      } else if (offer.skillId === 'vital_regen') {
+        score += 28;
+      } else if (offer.skillId === 'honey_shield') {
+        score += 24;
       }
     }
 

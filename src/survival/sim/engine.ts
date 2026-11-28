@@ -1,7 +1,9 @@
 import {
   BOSS_NAMES,
   MAX_REROLLS_PER_MATCH,
+  buildPlayerSecondaryCooldowns,
   computeDerivedStats,
+  getSecondarySkillMaxCooldown,
   getSkillSpec,
   getWeaponSpec,
   rollSkillOffers,
@@ -26,6 +28,7 @@ import type {
   SurvivalPlayerSummary,
   SurvivalSimEvent,
   SurvivalWorldState,
+  VisualFxKind,
   WeaponId,
   GearId,
   XpGemEntity,
@@ -66,6 +69,7 @@ const MAX_XP_GEMS = 160;
 const MAX_FLOATING_TEXTS = 40;
 const MAX_PARTICLES = 120;
 const MAX_LIGHTNING_ARCS = 20;
+const MAX_VISUAL_EFFECTS = 24;
 
 const CAMPAIGN_BOSS_TIMINGS = [90, 210, 330] as const;
 
@@ -279,7 +283,15 @@ export function createSurvivalWorld(config: CreateWorldConfig): SurvivalWorldSta
       caramelNovaTimer: 0,
       prismChainTimer: 0,
       voidPulseTimer: 0,
+      whirlwindBladeTimer: 0,
+      glacialSpearTimer: 0,
+      popcornBarrageTimer: 0,
+      laserTurretTimer: 0,
+      vitalRegenTimer: 0,
       crystalShieldCooldown: 0,
+      blizzardWardCooldown: 0,
+      honeyShieldCooldown: 0,
+      honeyShieldReady: false,
       teamAuraHealTimer: 0,
       teamAuraBuffTimer: 0,
       pylonBuffTimer: 0,
@@ -332,6 +344,7 @@ export function createSurvivalWorld(config: CreateWorldConfig): SurvivalWorldSta
     floatingTexts: [],
     particles: [],
     lightningArcs: [],
+    visualEffects: [],
   };
 
   for (let i = 0; i < 8; i++) {
@@ -385,6 +398,32 @@ function spawnParticles(
   }
 }
 
+function pushVisualFx(
+  world: SurvivalWorldState,
+  kind: VisualFxKind,
+  x: number,
+  y: number,
+  radius: number,
+  durationSec: number,
+  endX?: number,
+  endY?: number,
+): void {
+  const safeDuration = Math.max(0.05, durationSec);
+  world.visualEffects.push({
+    kind,
+    x,
+    y,
+    radius,
+    ttl: safeDuration,
+    maxTtl: safeDuration,
+    ...(endX !== undefined ? { endX } : {}),
+    ...(endY !== undefined ? { endY } : {}),
+  });
+  if (world.visualEffects.length > MAX_VISUAL_EFFECTS) {
+    world.visualEffects.splice(0, world.visualEffects.length - MAX_VISUAL_EFFECTS);
+  }
+}
+
 function decayVisualFx(world: SurvivalWorldState, dt: number): void {
   let ftWrite = 0;
   for (let i = 0; i < world.floatingTexts.length; i++) {
@@ -426,6 +465,19 @@ function decayVisualFx(world: SurvivalWorldState, dt: number): void {
   world.lightningArcs.length = arcWrite;
   if (world.lightningArcs.length > MAX_LIGHTNING_ARCS) {
     world.lightningArcs.splice(0, world.lightningArcs.length - MAX_LIGHTNING_ARCS);
+  }
+
+  let vfxWrite = 0;
+  for (let i = 0; i < world.visualEffects.length; i++) {
+    const fx = world.visualEffects[i];
+    fx.ttl -= dt;
+    if (fx.ttl > 0) {
+      world.visualEffects[vfxWrite++] = fx;
+    }
+  }
+  world.visualEffects.length = vfxWrite;
+  if (world.visualEffects.length > MAX_VISUAL_EFFECTS) {
+    world.visualEffects.splice(0, world.visualEffects.length - MAX_VISUAL_EFFECTS);
   }
 }
 
@@ -595,6 +647,22 @@ function updatePlayers(
     p.pylonBuffTimer = Math.max(0, p.pylonBuffTimer - dt);
     p.teamAuraBuffTimer = Math.max(0, p.teamAuraBuffTimer - dt);
     p.crystalShieldCooldown = Math.max(0, p.crystalShieldCooldown - dt);
+    p.blizzardWardCooldown = Math.max(0, p.blizzardWardCooldown - dt);
+    if (!p.downed && p.stats.honeyShieldLevel > 0 && !p.honeyShieldReady) {
+      p.honeyShieldCooldown = Math.max(0, p.honeyShieldCooldown - dt);
+      if (p.honeyShieldCooldown <= 0) {
+        p.honeyShieldReady = true;
+      }
+    }
+    if (!p.downed && p.stats.hpRegenPerSec > 0 && p.hp < p.maxHp) {
+      p.vitalRegenTimer += dt;
+      while (p.vitalRegenTimer >= 0.5) {
+        p.vitalRegenTimer -= 0.5;
+        p.hp = Math.min(p.maxHp, p.hp + p.stats.hpRegenPerSec * 0.5);
+      }
+    } else {
+      p.vitalRegenTimer = 0;
+    }
     p.comboTimer = Math.max(0, p.comboTimer - dt);
     if (p.comboTimer === 0) {
       p.comboCount = 0;
@@ -737,7 +805,8 @@ function handleEnemyDeath(
       if (killer.vampirismKillCounter >= 12) {
         killer.vampirismKillCounter = 0;
         if (!killer.downed) {
-          const healAmt = 4 + killer.stats.vampirismLevel * 2;
+          const healBonusMult = 1 + killer.stats.vitalRegenLevel * 0.1;
+          const healAmt = Math.round((4 + killer.stats.vampirismLevel * 2) * healBonusMult);
           killer.hp = Math.min(killer.maxHp, killer.hp + healAmt);
         }
       }
@@ -1332,12 +1401,19 @@ function updateSecondaryWeapons(
       warmAuraLevel,
       meteorLevel,
       droneLevel,
+      whirlwindBladeLevel,
       frostNovaLevel,
+      glacialSpearLevel,
       caramelNovaLevel,
+      popcornBarrageLevel,
       prismChainLevel,
       voidPulseLevel,
+      laserTurretLevel,
     } = p.stats;
     const damageMultiplier = getPlayerDamageMultiplier(world, p);
+    if (droneLevel > 0 || laserTurretLevel > 0) {
+      p.droneAngle += dt * 2.1;
+    }
 
     if (orbitalLevel > 0) {
       p.orbitalAngle += dt * (2.6 + 0.25 * orbitalLevel);
@@ -1415,7 +1491,7 @@ function updateSecondaryWeapons(
           .queryRadius(p.x, p.y, 620, gridScratch)
           .filter((e) => e.hp > 0);
         if (nearby.length > 0) {
-          p.meteorTimer = Math.max(1.2, 3.8 - meteorLevel * 0.4);
+          p.meteorTimer = getSecondarySkillMaxCooldown('candy_meteor', meteorLevel);
           const count = 1 + Math.floor(meteorLevel / 2);
           const dmg = (48 + meteorLevel * 22) * damageMultiplier;
           if (nearby.length > 1) {
@@ -1449,7 +1525,6 @@ function updateSecondaryWeapons(
     }
 
     if (droneLevel > 0) {
-      p.droneAngle += dt * 2.1;
       p.droneTimer -= dt;
       if (p.droneTimer <= 0) {
         const target = enemyGrid.findNearest(
@@ -1507,7 +1582,7 @@ function updateSecondaryWeapons(
           gridScratch,
         );
         if (hits.some((e) => e.hp > 0 && Math.hypot(e.x - p.x, e.y - p.y) <= radius + e.radius)) {
-          p.frostNovaTimer = Math.max(2.0, 4.6 - frostNovaLevel * 0.45);
+          p.frostNovaTimer = getSecondarySkillMaxCooldown('frost_nova', frostNovaLevel);
           const dmg = (26 + frostNovaLevel * 14) * damageMultiplier;
           for (let h = 0; h < hits.length; h++) {
             const e = hits[h];
@@ -1534,6 +1609,7 @@ function updateSecondaryWeapons(
             }
           }
           spawnParticles(world, p.x, p.y, '#7dd3fc', 14, 210);
+          pushVisualFx(world, 'frost_nova', p.x, p.y, radius, 0.48);
         }
       }
     }
@@ -1548,7 +1624,7 @@ function updateSecondaryWeapons(
           (e) => e.hp > 0,
         );
         if (target) {
-          p.caramelNovaTimer = Math.max(2.2, 5.0 - caramelNovaLevel * 0.5);
+          p.caramelNovaTimer = getSecondarySkillMaxCooldown('caramel_nova', caramelNovaLevel);
           const radius = 130 + caramelNovaLevel * 16;
           const dmg = (38 + caramelNovaLevel * 18) * damageMultiplier;
           const cx = target.x;
@@ -1575,6 +1651,7 @@ function updateSecondaryWeapons(
             }
           }
           spawnParticles(world, cx, cy, '#ea580c', 14, 180);
+          pushVisualFx(world, 'caramel_nova', cx, cy, radius, 0.5);
         }
       }
     }
@@ -1589,7 +1666,7 @@ function updateSecondaryWeapons(
           (e) => e.hp > 0,
         );
         if (first) {
-          p.prismChainTimer = Math.max(1.1, 3.0 - prismChainLevel * 0.35);
+          p.prismChainTimer = getSecondarySkillMaxCooldown('prism_chain', prismChainLevel);
           const hops = 2 + prismChainLevel;
           let hopDmg = (28 + prismChainLevel * 14) * damageMultiplier;
           const visited = new Set<string>([first.id]);
@@ -1634,7 +1711,7 @@ function updateSecondaryWeapons(
           gridScratch,
         );
         if (hits.some((e) => e.hp > 0 && Math.hypot(e.x - p.x, e.y - p.y) <= radius + e.radius)) {
-          p.voidPulseTimer = Math.max(2.4, 5.2 - voidPulseLevel * 0.5);
+          p.voidPulseTimer = getSecondarySkillMaxCooldown('void_pulse', voidPulseLevel);
           const dmg = (46 + voidPulseLevel * 24) * damageMultiplier;
           for (let h = 0; h < hits.length; h++) {
             const e = hits[h];
@@ -1661,6 +1738,214 @@ function updateSecondaryWeapons(
             }
           }
           spawnParticles(world, p.x, p.y, '#9333ea', 16, 240);
+          pushVisualFx(world, 'void_pulse', p.x, p.y, radius, 0.55);
+        }
+      }
+    }
+
+    if (whirlwindBladeLevel > 0) {
+      p.whirlwindBladeTimer -= dt;
+      if (p.whirlwindBladeTimer <= 0) {
+        const target = enemyGrid.findNearest(p.x, p.y, 560, (e) => e.hp > 0);
+        if (target) {
+          p.whirlwindBladeTimer = getSecondarySkillMaxCooldown(
+            'whirlwind_blade',
+            whirlwindBladeLevel,
+          );
+          const angle = Math.atan2(target.y - p.y, target.x - p.x);
+          const speed = 680;
+          world.projectiles.push({
+            id: allocId(world, 'proj'),
+            ownerId: p.id,
+            fromEnemy: false,
+            weaponId: 'whirlwind_blade',
+            x: p.x,
+            y: p.y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            startX: p.x,
+            startY: p.y,
+            radius: 15,
+            damage: (26 + whirlwindBladeLevel * 11) * damageMultiplier,
+            isCrit: false,
+            pierceLeft: 99,
+            ricochetLeft: 0,
+            maxRange: 270 + whirlwindBladeLevel * 30,
+            traveled: 0,
+            ttl: 2.0,
+            knockback: 45,
+            aoeRadius: 0,
+            slowPct: 0,
+            slowDurationSec: 0,
+            boomerang: true,
+            returning: false,
+            hitIds: [],
+            color: '#22d3ee',
+          });
+        }
+      }
+    }
+
+    if (glacialSpearLevel > 0) {
+      p.glacialSpearTimer -= dt;
+      if (p.glacialSpearTimer <= 0) {
+        const target = enemyGrid.findNearest(p.x, p.y, 560, (e) => e.hp > 0);
+        if (target) {
+          p.glacialSpearTimer = getSecondarySkillMaxCooldown(
+            'glacial_spear',
+            glacialSpearLevel,
+          );
+          const baseAngle = Math.atan2(target.y - p.y, target.x - p.x);
+          const count = 1 + Math.floor(glacialSpearLevel / 2);
+          const spreadRad = (7 * Math.PI) / 180;
+          const speed = 780;
+          for (let s = 0; s < count; s++) {
+            const offset = (s - (count - 1) * 0.5) * spreadRad;
+            const ang = baseAngle + offset;
+            world.projectiles.push({
+              id: allocId(world, 'proj'),
+              ownerId: p.id,
+              fromEnemy: false,
+              weaponId: 'glacial_spear',
+              x: p.x,
+              y: p.y,
+              vx: Math.cos(ang) * speed,
+              vy: Math.sin(ang) * speed,
+              startX: p.x,
+              startY: p.y,
+              radius: 7,
+              damage: (24 + glacialSpearLevel * 10) * damageMultiplier,
+              isCrit: false,
+              pierceLeft: 4 + glacialSpearLevel,
+              ricochetLeft: 0,
+              maxRange: 540,
+              traveled: 0,
+              ttl: 0.9,
+              knockback: 38,
+              aoeRadius: 0,
+              slowPct: 0.35,
+              slowDurationSec: 2.0,
+              boomerang: false,
+              returning: false,
+              hitIds: [],
+              color: '#38bdf8',
+            });
+          }
+        }
+      }
+    }
+
+    if (popcornBarrageLevel > 0) {
+      p.popcornBarrageTimer -= dt;
+      if (p.popcornBarrageTimer <= 0) {
+        const nearby = enemyGrid
+          .queryRadius(p.x, p.y, 540, gridScratch)
+          .filter((e) => e.hp > 0);
+        if (nearby.length > 0) {
+          p.popcornBarrageTimer = getSecondarySkillMaxCooldown(
+            'popcorn_barrage',
+            popcornBarrageLevel,
+          );
+          const count = 2 + Math.floor(popcornBarrageLevel / 2);
+          const speed = 560;
+          for (let k = 0; k < count; k++) {
+            const tgt = nearby[k % nearby.length];
+            const jitter = (nextRng(world) - 0.5) * 0.24;
+            const ang = Math.atan2(tgt.y - p.y, tgt.x - p.x) + jitter;
+            world.projectiles.push({
+              id: allocId(world, 'proj'),
+              ownerId: p.id,
+              fromEnemy: false,
+              weaponId: 'popcorn_barrage',
+              x: p.x,
+              y: p.y,
+              vx: Math.cos(ang) * speed,
+              vy: Math.sin(ang) * speed,
+              startX: p.x,
+              startY: p.y,
+              radius: 6,
+              damage: (18 + popcornBarrageLevel * 8) * damageMultiplier,
+              isCrit: false,
+              pierceLeft: 1,
+              ricochetLeft: 2,
+              maxRange: 520,
+              traveled: 0,
+              ttl: 1.2,
+              knockback: 32,
+              aoeRadius: 46 + popcornBarrageLevel * 4,
+              slowPct: 0,
+              slowDurationSec: 0,
+              boomerang: false,
+              returning: false,
+              hitIds: [],
+              color: '#fde047',
+            });
+          }
+        }
+      }
+    }
+
+    if (laserTurretLevel > 0) {
+      p.laserTurretTimer -= dt;
+      if (p.laserTurretTimer <= 0) {
+        const nearby = enemyGrid
+          .queryRadius(p.x, p.y, 460, gridScratch)
+          .filter((e) => e.hp > 0);
+        if (nearby.length > 0) {
+          p.laserTurretTimer = getSecondarySkillMaxCooldown(
+            'laser_turret',
+            laserTurretLevel,
+          );
+          if (nearby.length > 1) {
+            nearby.sort((a, b) => {
+              const ad = (a.x - p.x) ** 2 + (a.y - p.y) ** 2;
+              const bd = (b.x - p.x) ** 2 + (b.y - p.y) ** 2;
+              return ad - bd;
+            });
+          }
+          const beamCount = laserTurretLevel >= 4 ? 2 : 1;
+          const beamLength = 420 + laserTurretLevel * 28;
+          const beamRadius = 14;
+          const beamDmg = (28 + laserTurretLevel * 12) * damageMultiplier;
+          const turretAngle = p.droneAngle + Math.PI;
+          const ox = p.x + Math.cos(turretAngle) * DRONE_ORBIT_RADIUS;
+          const oy = p.y + Math.sin(turretAngle) * DRONE_ORBIT_RADIUS;
+
+          for (let b = 0; b < beamCount; b++) {
+            const tgt = nearby[b % nearby.length];
+            const ang = Math.atan2(tgt.y - oy, tgt.x - ox);
+            const endX = clampCoord(ox + Math.cos(ang) * beamLength, 16);
+            const endY = clampCoord(oy + Math.sin(ang) * beamLength, 16);
+            const midX = (ox + endX) * 0.5;
+            const midY = (oy + endY) * 0.5;
+            const candidates = enemyGrid.queryRadius(
+              midX,
+              midY,
+              beamLength * 0.5 + beamRadius + MAX_ENEMY_RADIUS,
+              aoeGridScratch,
+            );
+            for (let c = 0; c < candidates.length; c++) {
+              const e = candidates[c];
+              if (e.hp <= 0) continue;
+              if (
+                closestPointOnSegmentDist(e.x, e.y, ox, oy, endX, endY) <=
+                beamRadius + e.radius
+              ) {
+                damageEnemy(world, e, beamDmg, p.id, false, 20, Math.cos(ang), Math.sin(ang), 0, 0, events);
+              }
+            }
+            for (let cr = 0; cr < world.crates.length; cr++) {
+              const crate = world.crates[cr];
+              if (
+                crate.hp > 0 &&
+                closestPointOnSegmentDist(crate.x, crate.y, ox, oy, endX, endY) <=
+                  beamRadius + crate.radius
+              ) {
+                damageCrate(world, crate, beamDmg, events);
+              }
+            }
+            pushVisualFx(world, 'laser_beam', ox, oy, beamRadius, 0.28, endX, endY);
+          }
         }
       }
     }
@@ -1677,6 +1962,7 @@ function detonateAoe(
   ownerId: string,
   isCrit: boolean,
   events: SurvivalSimEvent[],
+  fxKind?: VisualFxKind,
 ): void {
   const hits = enemyGrid.queryRadius(x, y, radius + MAX_ENEMY_RADIUS, aoeGridScratch);
   for (let i = 0; i < hits.length; i++) {
@@ -1699,7 +1985,10 @@ function detonateAoe(
     }
   }
 
-  spawnParticles(world, x, y, '#c084fc', 10, 180);
+  spawnParticles(world, x, y, fxKind === 'popcorn_pop' ? '#fde047' : '#c084fc', 10, 180);
+  if (fxKind) {
+    pushVisualFx(world, fxKind, x, y, radius, 0.34);
+  }
 }
 
 function damagePlayer(
@@ -1709,6 +1998,28 @@ function damagePlayer(
   events: SurvivalSimEvent[],
 ): void {
   if (player.downed || player.invulnTimer > 0) return;
+
+  if (player.honeyShieldReady && player.stats.honeyShieldLevel > 0) {
+    const lv = player.stats.honeyShieldLevel;
+    player.honeyShieldReady = false;
+    player.honeyShieldCooldown = getSecondarySkillMaxCooldown('honey_shield', lv);
+    player.invulnTimer = 0.45;
+    const healBonus = 1 + player.stats.vitalRegenLevel * 0.1;
+    const healAmt = Math.round(player.maxHp * (0.04 + lv * 0.01) * healBonus);
+    const actualHeal = Math.min(player.maxHp, player.hp + healAmt) - player.hp;
+    player.hp += actualHeal;
+    addFloatingText(
+      world,
+      player.x,
+      player.y - player.radius - 6,
+      actualHeal > 0 ? `KHIÊN +${actualHeal}` : 'KHIÊN MẬT!',
+      '#fde047',
+      false,
+    );
+    spawnParticles(world, player.x, player.y, '#fbbf24', 12, 165);
+    pushVisualFx(world, 'shield_break', player.x, player.y, 64, 0.42);
+    return;
+  }
 
   const dmg = Math.max(1, Math.round(rawDamage * (1 - player.stats.damageReduction)));
   player.hp = Math.max(0, player.hp - dmg);
@@ -1724,7 +2035,7 @@ function damagePlayer(
     player.crystalShieldCooldown <= 0
   ) {
     const lv = player.stats.crystalShieldLevel;
-    player.crystalShieldCooldown = Math.max(2.5, 6.0 - lv * 0.65);
+    player.crystalShieldCooldown = getSecondarySkillMaxCooldown('crystal_shield', lv);
     const shockRadius = 130 + lv * 18;
     const shockDmg = (28 + lv * 14) * getPlayerDamageMultiplier(world, player);
     const nearby = enemyGrid.queryRadius(
@@ -1746,6 +2057,38 @@ function damagePlayer(
       }
     }
     spawnParticles(world, player.x, player.y, '#818cf8', 12, 190);
+    pushVisualFx(world, 'shield_break', player.x, player.y, shockRadius, 0.42);
+  }
+
+  if (
+    player.hp > 0 &&
+    player.stats.blizzardWardLevel > 0 &&
+    player.blizzardWardCooldown <= 0
+  ) {
+    const lv = player.stats.blizzardWardLevel;
+    player.blizzardWardCooldown = getSecondarySkillMaxCooldown('blizzard_ward', lv);
+    const wardRadius = 135;
+    const wardDmg = (14 + lv * 6) * getPlayerDamageMultiplier(world, player);
+    const nearby = enemyGrid.queryRadius(
+      player.x,
+      player.y,
+      wardRadius + MAX_ENEMY_RADIUS,
+      aoeGridScratch,
+    );
+    for (let i = 0; i < nearby.length; i++) {
+      const e = nearby[i];
+      if (e.hp <= 0) continue;
+      const dx = e.x - player.x;
+      const dy = e.y - player.y;
+      const d = Math.hypot(dx, dy);
+      if (d <= wardRadius + e.radius) {
+        const nx = d > 1e-4 ? dx / d : 1;
+        const ny = d > 1e-4 ? dy / d : 0;
+        damageEnemy(world, e, wardDmg, player.id, false, 40, nx, ny, 0.3, 2.2, events);
+      }
+    }
+    spawnParticles(world, player.x, player.y, '#bae6fd', 10, 175);
+    pushVisualFx(world, 'blizzard_counter', player.x, player.y, wardRadius, 0.4);
   }
 
   if (player.hp <= 0) {
@@ -1800,6 +2143,7 @@ function updateProjectiles(
           proj.ownerId,
           proj.isCrit,
           events,
+          proj.weaponId === 'popcorn_barrage' ? 'popcorn_pop' : undefined,
         );
       }
       alive = false;
@@ -1874,6 +2218,7 @@ function updateProjectiles(
           proj.ownerId,
           proj.isCrit,
           events,
+          proj.weaponId === 'popcorn_barrage' ? 'popcorn_pop' : undefined,
         );
       }
       alive = false;
@@ -1962,6 +2307,8 @@ function updateProjectiles(
           proj.hitIds.push(enemy.id);
 
           if (proj.aoeRadius > 0) {
+            const aoeFx: VisualFxKind | undefined =
+              proj.weaponId === 'popcorn_barrage' ? 'popcorn_pop' : undefined;
             detonateAoe(
               world,
               enemy.x,
@@ -1972,7 +2319,29 @@ function updateProjectiles(
               proj.ownerId,
               proj.isCrit,
               events,
+              aoeFx,
             );
+            if (!proj.boomerang && proj.ricochetLeft > 0) {
+              proj.ricochetLeft -= 1;
+              const bounceTarget = enemyGrid.findNearest(
+                enemy.x,
+                enemy.y,
+                RICOCHET_RANGE,
+                (cand) => cand.hp > 0 && !proj.hitIds.includes(cand.id),
+              );
+              if (bounceTarget) {
+                const spd = Math.hypot(proj.vx, proj.vy) || 560;
+                proj.x = enemy.x;
+                proj.y = enemy.y;
+                const ang = Math.atan2(bounceTarget.y - proj.y, bounceTarget.x - proj.x);
+                proj.vx = Math.cos(ang) * spd;
+                proj.vy = Math.sin(ang) * spd;
+                proj.maxRange += 220;
+                proj.ttl = Math.max(proj.ttl, 0.45);
+                reachedRangeEnd = false;
+                break;
+              }
+            }
             proj.pierceLeft = 0;
             alive = false;
             break;
@@ -2037,6 +2406,7 @@ function updateProjectiles(
           proj.ownerId,
           proj.isCrit,
           events,
+          proj.weaponId === 'popcorn_barrage' ? 'popcorn_pop' : undefined,
         );
       }
       alive = false;
@@ -2121,6 +2491,7 @@ function updateHazards(
             damageCrate(world, crate, h.damage, events);
           }
         }
+        pushVisualFx(world, 'meteor_impact', h.x, h.y, h.radius, 0.45);
       } else {
         for (let j = 0; j < world.players.length; j++) {
           const p = world.players[j];
@@ -3371,6 +3742,10 @@ function applyOfferToPlayer(player: PlayerEntity, offer: SkillOffer): void {
   if (hpDelta > 0 && !player.downed) {
     player.hp = Math.min(player.maxHp, player.hp + hpDelta);
   }
+  if (offer.skillId === 'honey_shield' && prevLv === 0 && nextLv > 0) {
+    player.honeyShieldReady = true;
+    player.honeyShieldCooldown = 0;
+  }
 }
 
 function closeLevelUpPhase(world: SurvivalWorldState): void {
@@ -3414,6 +3789,20 @@ function triggerLevelUpIfReady(
   world.teamXp -= world.xpToNext;
   world.teamLevel += 1;
   world.xpToNext = xpForNextLevel(world.teamLevel);
+
+  // Heal all living heroes by 15% Max HP (min 15 HP) immediately upon leveling up
+  for (let i = 0; i < world.players.length; i++) {
+    const p = world.players[i];
+    if (p.downed || p.hp <= 0) continue;
+    const healTarget = Math.max(15, Math.round(p.maxHp * 0.15));
+    const healed = Math.min(p.maxHp, p.hp + healTarget) - p.hp;
+    if (healed > 0) {
+      p.hp += healed;
+      addFloatingText(world, p.x, p.y - p.radius - 10, `+${healed}`, '#4ade80', false);
+      spawnParticles(world, p.x, p.y, '#4ade80', 8, 120);
+      pushVisualFx(world, 'level_heal', p.x, p.y, 68, 0.48);
+    }
+  }
 
   const guaranteeRare = world.levelUpGuaranteeRare;
   world.levelUpGuaranteeRare = false;
@@ -3546,11 +3935,16 @@ function updateXpAndPickups(
       if (Math.hypot(p.x - pk.x, p.y - pk.y) <= p.radius + 22) {
         taken = true;
         if (pk.kind === 'heal') {
-          p.hp = Math.min(p.maxHp, p.hp + Math.round(p.maxHp * 0.3));
+          const selfBonus = 1 + p.stats.vitalRegenLevel * 0.1;
+          p.hp = Math.min(p.maxHp, p.hp + Math.round(p.maxHp * 0.3 * selfBonus));
           for (let k = 0; k < world.players.length; k++) {
             const mate = world.players[k];
             if (mate.id !== p.id && !mate.downed) {
-              mate.hp = Math.min(mate.maxHp, mate.hp + Math.round(mate.maxHp * 0.15));
+              const mateBonus = 1 + mate.stats.vitalRegenLevel * 0.1;
+              mate.hp = Math.min(
+                mate.maxHp,
+                mate.hp + Math.round(mate.maxHp * 0.15 * mateBonus),
+              );
             }
           }
         } else {
@@ -3771,6 +4165,7 @@ function toPlayerSummary(p: PlayerEntity): SurvivalPlayerSummary {
     score: Math.round(p.score),
     revives: p.revives,
     skills: { ...p.skills },
+    secondaryCooldowns: buildPlayerSecondaryCooldowns(p),
     rerollsLeft: p.rerollsLeft,
     dashCooldownPct: Math.max(
       0,

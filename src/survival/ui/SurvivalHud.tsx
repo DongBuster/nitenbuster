@@ -1,9 +1,13 @@
+import { useEffect, useRef, useState } from 'react';
 import {
   AlertTriangle,
+  Check,
   Clock,
   Crosshair,
+  Flag,
   Infinity as InfinityIcon,
   Pause,
+  Shield,
   Skull,
   Sparkles,
   Swords,
@@ -18,6 +22,7 @@ import {
   getGearSpec,
   getWeaponSpec,
 } from '../sim/catalog.ts';
+import { getSurvivalMapMeta } from '../sim/maps.ts';
 import type { SurvivalHudSnapshot } from '../sim/types.ts';
 import { GearArt, SkillArt, WeaponArt } from './SurvivalIcons.tsx';
 
@@ -96,6 +101,172 @@ export function SurvivalHud({
   const acquiredSkills = SKILLS.filter(
     (spec) => (local.skills[spec.id] ?? 0) > 0,
   );
+  const secondarySkills = acquiredSkills.filter(
+    (spec) => spec.category === 'secondary',
+  );
+  const passiveSkills = acquiredSkills.filter(
+    (spec) => spec.category !== 'secondary',
+  );
+
+  const mapMeta = getSurvivalMapMeta(hud.mapId);
+  const currentChapterIdx = isEndlessHighlight
+    ? hud.elapsedSec >= 360
+      ? 2
+      : hud.elapsedSec >= 90
+        ? 1
+        : 0
+    : Math.min(2, hud.bossesSlain);
+  const activeChapter =
+    mapMeta.scenario.chapters[currentChapterIdx] ?? mapMeta.scenario.chapters[0];
+
+  const [scenarioBanner, setScenarioBanner] = useState<{
+    title: string;
+    subtitle: string;
+    tone: 'chapter' | 'event' | 'boss';
+  } | null>(null);
+  const bannerTimerRef = useRef<number | null>(null);
+  const prevStateRef = useRef<{
+    mapId: string;
+    chapterIdx: number;
+    sandstorm: boolean;
+    activeBossName: string | null;
+    initialized: boolean;
+  }>({
+    mapId: hud.mapId,
+    chapterIdx: currentChapterIdx,
+    sandstorm: hud.sandstormActive,
+    activeBossName: hud.activeBoss?.name ?? null,
+    initialized: false,
+  });
+
+  useEffect(() => {
+    const showBanner = (
+      title: string,
+      subtitle: string,
+      tone: 'chapter' | 'event' | 'boss',
+    ) => {
+      setScenarioBanner({ title, subtitle, tone });
+      if (bannerTimerRef.current !== null) {
+        window.clearTimeout(bannerTimerRef.current);
+      }
+      bannerTimerRef.current = window.setTimeout(() => {
+        bannerTimerRef.current = null;
+        setScenarioBanner(null);
+      }, 3400);
+    };
+
+    const prev = prevStateRef.current;
+    const bossName = hud.activeBoss?.name ?? null;
+
+    if (!prev.initialized || prev.mapId !== hud.mapId) {
+      prev.initialized = true;
+      prev.mapId = hud.mapId;
+      prev.chapterIdx = currentChapterIdx;
+      prev.sandstorm = hud.sandstormActive;
+      prev.activeBossName = bossName;
+      if (hud.elapsedSec < 5) {
+        showBanner(
+          activeChapter.title,
+          mapMeta.scenario.headline,
+          'chapter',
+        );
+      }
+      return;
+    }
+
+    if (bossName && bossName !== prev.activeBossName) {
+      showBanner(
+        hud.activeBoss?.isFinalBoss ? 'BOSS CUỐI XUẤT HIỆN!' : 'BOSS XUẤT HIỆN!',
+        `${bossName} — ${hud.activeBoss?.isFinalBoss ? 'Tiêu diệt để chiến thắng!' : 'Hạ gục để mở Rương Hiếm!'}`,
+        'boss',
+      );
+    } else if (hud.sandstormActive && !prev.sandstorm) {
+      showBanner(
+        'BÃO CÁT NGỌT THỔI QUA!',
+        'Gió đẩy lùi nhẹ · Hòm tiếp tế xuất hiện gấp đôi!',
+        'event',
+      );
+    } else if (currentChapterIdx > prev.chapterIdx) {
+      showBanner(activeChapter.title, activeChapter.summary, 'chapter');
+    }
+
+    prev.chapterIdx = currentChapterIdx;
+    prev.sandstorm = hud.sandstormActive;
+    prev.activeBossName = bossName;
+  }, [
+    hud.mapId,
+    hud.elapsedSec,
+    hud.sandstormActive,
+    hud.activeBoss?.name,
+    hud.activeBoss?.isFinalBoss,
+    currentChapterIdx,
+    activeChapter.title,
+    activeChapter.summary,
+    mapMeta.scenario.headline,
+  ]);
+
+  useEffect(() => {
+    return () => {
+      if (bannerTimerRef.current !== null) {
+        window.clearTimeout(bannerTimerRef.current);
+      }
+    };
+  }, []);
+
+  const campaignNodes = !isEndlessHighlight
+    ? [
+        {
+          id: 'ch1',
+          label: 'Ch.1',
+          done: hud.bossesSlain >= 1 || (hud.bossesSlain === 0 && Boolean(hud.activeBoss)),
+          active: hud.bossesSlain === 0 && !hud.activeBoss,
+          isBoss: false,
+        },
+        {
+          id: 'b1',
+          label: 'B1',
+          done: hud.bossesSlain >= 1,
+          active: hud.bossesSlain === 0 && Boolean(hud.activeBoss),
+          isBoss: true,
+        },
+        {
+          id: 'ch2',
+          label: 'Ch.2',
+          done: hud.bossesSlain >= 2 || (hud.bossesSlain === 1 && Boolean(hud.activeBoss)),
+          active: hud.bossesSlain === 1 && !hud.activeBoss,
+          isBoss: false,
+        },
+        {
+          id: 'b2',
+          label: 'B2',
+          done: hud.bossesSlain >= 2,
+          active: hud.bossesSlain === 1 && Boolean(hud.activeBoss),
+          isBoss: true,
+        },
+        {
+          id: 'ch3',
+          label: 'Ch.3',
+          done: hud.bossesSlain >= 3 || (hud.bossesSlain === 2 && Boolean(hud.activeBoss)),
+          active: hud.bossesSlain === 2 && !hud.activeBoss,
+          isBoss: false,
+        },
+        {
+          id: 'b3',
+          label: 'Boss Cuối',
+          done: hud.bossesSlain >= 3,
+          active: Boolean(hud.activeBoss?.isFinalBoss),
+          isBoss: true,
+        },
+      ]
+    : [];
+
+  const missionHint = hud.activeBoss
+    ? hud.activeBoss.isFinalBoss
+      ? `Mục tiêu: Hạ ${hud.activeBoss.name} để chiến thắng màn chơi!`
+      : `Mục tiêu: Hạ ${hud.activeBoss.name} nhận Rương Hiếm!`
+    : isEndlessHighlight
+      ? `Đấu Trường Vô Cực · Đã hạ ${hud.bossesSlain} Boss · Độ khó leo thang liên tục`
+      : `${activeChapter.title} · ${activeChapter.enemyHint}`;
 
   const bossHpPct = hud.activeBoss
     ? Math.max(
@@ -267,8 +438,76 @@ export function SurvivalHud({
           <div className="hidden md:block" aria-hidden="true" />
         </header>
 
-        {/* Center Alerts: Boss Warning, Boss HP Bar, Sandstorm (kept clear of top-right 136x136 minimap) */}
+        {/* Center Alerts: Campaign Scenario Stepper, Chapter Banner, Boss Warning, Boss HP Bar, Sandstorm */}
         <div className="flex flex-col items-start gap-2 sm:items-center sm:px-40">
+          {/* Compact Scenario Progression Strip */}
+          <div className="hidden max-w-[calc(100vw-11rem)] flex-col items-center gap-1 rounded-2xl border border-white/12 bg-[#0c1322]/82 px-3 py-1.5 shadow-lg backdrop-blur-md sm:flex [@media(max-height:560px)]:hidden">
+            {!isEndlessHighlight ? (
+              <div className="flex items-center gap-1 text-[10px] font-black">
+                {campaignNodes.map((node, idx) => (
+                  <div key={node.id} className="flex items-center gap-1">
+                    {idx > 0 && (
+                      <span
+                        aria-hidden="true"
+                        className={`h-0.5 w-2.5 rounded-full ${
+                          node.done || node.active ? 'bg-amber-400/75' : 'bg-white/15'
+                        }`}
+                      />
+                    )}
+                    <span
+                      className={`inline-flex items-center gap-0.5 rounded-md border px-1.5 py-0.5 ${
+                        node.active
+                          ? node.isBoss
+                            ? 'border-rose-400/80 bg-rose-500/30 text-rose-100 shadow-[0_0_10px_rgba(244,63,94,0.35)]'
+                            : 'border-amber-300/80 bg-amber-400/25 text-amber-100'
+                          : node.done
+                            ? 'border-emerald-400/45 bg-emerald-500/20 text-emerald-200'
+                            : 'border-white/10 bg-white/5 text-slate-400'
+                      }`}
+                    >
+                      {node.done && <Check aria-hidden="true" className="h-2.5 w-2.5" />}
+                      {!node.done && node.isBoss && (
+                        <Skull aria-hidden="true" className="h-2.5 w-2.5" />
+                      )}
+                      <span>{node.label}</span>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 text-[10px] font-black text-amber-200">
+                <InfinityIcon aria-hidden="true" className="h-3 w-3 text-amber-300" />
+                <span>{activeChapter.title}</span>
+              </div>
+            )}
+            <p className="max-w-md truncate text-[10px] font-bold text-slate-300">
+              {missionHint}
+            </p>
+          </div>
+
+          {/* Non-blocking Chapter / Event Announcement Toast */}
+          {scenarioBanner && !hud.bossWarningSec && (
+            <div
+              role="status"
+              aria-live="polite"
+              className={`max-w-[calc(100vw-11rem)] rounded-2xl border px-3.5 py-1.5 text-center shadow-xl backdrop-blur-md transition-opacity motion-reduce:transition-none sm:max-w-md ${
+                scenarioBanner.tone === 'boss'
+                  ? 'border-rose-400/75 bg-rose-950/88 text-rose-100'
+                  : scenarioBanner.tone === 'event'
+                    ? 'border-amber-400/75 bg-amber-950/88 text-amber-100'
+                    : 'border-cyan-400/65 bg-[#0c192d]/90 text-cyan-100'
+              }`}
+            >
+              <div className="flex items-center justify-center gap-1.5 text-xs font-black">
+                <Flag aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
+                <span>{scenarioBanner.title}</span>
+              </div>
+              <p className="mt-0.5 text-[10px] font-bold opacity-90">
+                {scenarioBanner.subtitle}
+              </p>
+            </div>
+          )}
+
           {hud.bossWarningSec > 0 && (
             <div className="max-w-[calc(100vw-10.5rem)] animate-pulse rounded-2xl border-2 border-rose-400/80 bg-rose-950/92 px-4 py-2 text-center text-xs font-black text-rose-100 shadow-2xl backdrop-blur-md motion-reduce:animate-none sm:max-w-md sm:text-sm">
               <span role="status" aria-live="polite" className="sr-only">
@@ -541,25 +780,120 @@ export function SurvivalHud({
             </div>
           </div>
 
-          {/* Acquired Skills Row (hidden on very short touch viewports to keep arena unobstructed) */}
-          {acquiredSkills.length > 0 && (
-            <div className="mt-2.5 hidden flex-wrap gap-1 border-t border-white/10 pt-2 sm:flex [@media(max-height:540px)]:hidden">
-              {acquiredSkills.map((spec) => {
-                const lv = local.skills[spec.id] ?? 0;
-                return (
-                  <span
-                    key={spec.id}
-                    title={`${spec.name} · ${SKILL_RARITY_LABEL[spec.rarity]} (Lv.${lv})`}
-                    className={`inline-flex items-center gap-1 rounded-lg border px-1.5 py-0.5 text-[10px] font-bold ${SKILL_RARITY_PILL_CLASS[spec.rarity]}`}
-                  >
-                    <SkillArt skillId={spec.id} className="h-4 w-4 shrink-0" />
-                    <span>{spec.name}</span>
-                    <span className="font-mono font-black text-amber-300">
-                      Lv.{lv}
+          {/* Split Skill Rack: Active Auto-Secondary Tray + Passive Pills */}
+          {secondarySkills.length > 0 && (
+            <div className="mt-2.5 border-t border-white/10 pt-2 [@media(max-height:480px)]:hidden">
+              <div className="mb-1.5 flex items-center justify-between text-[10px] font-black uppercase tracking-wide text-violet-200">
+                <span className="inline-flex items-center gap-1">
+                  <Zap aria-hidden="true" className="h-3 w-3 text-cyan-300" />
+                  <span>Chiêu phụ tự động</span>
+                </span>
+                <span className="font-mono text-[9px] text-slate-400">
+                  {secondarySkills.length} đang bật
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {secondarySkills.map((spec) => {
+                  const lv = local.skills[spec.id] ?? 0;
+                  const cd = local.secondaryCooldowns?.[spec.id];
+                  const isAlwaysOn = !cd || cd.max <= 0;
+                  const rem = cd ? Math.max(0, cd.remaining) : 0;
+                  const isReady = isAlwaysOn || rem <= 0.05;
+                  const cdPct =
+                    !isAlwaysOn && cd && cd.max > 0
+                      ? Math.max(0, Math.min(100, (rem / cd.max) * 100))
+                      : 0;
+
+                  return (
+                    <div
+                      key={spec.id}
+                      title={`${spec.name} · Chiêu phụ tự động (${SKILL_RARITY_LABEL[spec.rarity]}, Cấp ${lv})`}
+                      className={`relative flex h-12 w-12 flex-col items-center justify-center overflow-hidden rounded-xl border-2 bg-[#090e1a] shadow-md ${
+                        isReady
+                          ? 'border-cyan-300/85 shadow-[0_0_12px_rgba(34,211,238,0.3)]'
+                          : 'border-white/20'
+                      }`}
+                    >
+                      <SkillArt skillId={spec.id} className="h-7 w-7" />
+
+                      {/* Cooldown Curtain Overlay */}
+                      {!isReady && (
+                        <span
+                          aria-hidden="true"
+                          className="pointer-events-none absolute inset-x-0 bottom-0 bg-[#050811]/75 transition-[height] duration-75 motion-reduce:transition-none"
+                          style={{ height: `${cdPct}%` }}
+                        />
+                      )}
+
+                      {/* Level Badge */}
+                      <span className="absolute right-0.5 top-0.5 rounded bg-black/80 px-1 font-mono text-[8px] font-black text-amber-300">
+                        C.{lv}
+                      </span>
+
+                      {/* Ready / Active / Countdown Footer */}
+                      <span
+                        className={`relative z-10 mt-0.5 rounded px-1 font-mono text-[8px] font-black leading-none tabular-nums ${
+                          isAlwaysOn
+                            ? 'bg-emerald-500/25 text-emerald-200'
+                            : isReady
+                              ? 'bg-cyan-500/25 text-cyan-200'
+                              : 'bg-black/75 text-amber-200'
+                        }`}
+                      >
+                        {isAlwaysOn
+                          ? 'BẬT'
+                          : isReady
+                            ? 'SẴN'
+                            : `${rem.toFixed(1)}s`}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {passiveSkills.length > 0 && (
+            <div className="mt-2 hidden flex-col gap-1 border-t border-white/10 pt-2 sm:flex [@media(max-height:540px)]:hidden">
+              <span className="text-[9px] font-black uppercase tracking-wide text-slate-400">
+                Nội tại ({passiveSkills.length})
+              </span>
+              <div className="flex flex-wrap gap-1">
+                {passiveSkills.map((spec) => {
+                  const lv = local.skills[spec.id] ?? 0;
+                  const shieldCd = local.secondaryCooldowns?.[spec.id];
+                  const hasShieldTimer = Boolean(shieldCd && shieldCd.max > 0);
+                  const shieldReady = hasShieldTimer && (shieldCd?.remaining ?? 0) <= 0.05;
+
+                  return (
+                    <span
+                      key={spec.id}
+                      title={`${spec.name} · Nội tại (${SKILL_RARITY_LABEL[spec.rarity]}, Cấp ${lv})`}
+                      className={`inline-flex items-center gap-1 rounded-lg border px-1.5 py-0.5 text-[10px] font-bold ${SKILL_RARITY_PILL_CLASS[spec.rarity]}`}
+                    >
+                      <SkillArt skillId={spec.id} className="h-3.5 w-3.5 shrink-0" />
+                      <span>{spec.name}</span>
+                      <span className="font-mono font-black text-amber-300">
+                        C.{lv}
+                      </span>
+                      {hasShieldTimer && (
+                        <span
+                          className={`inline-flex items-center gap-0.5 rounded px-1 font-mono text-[9px] font-black tabular-nums ${
+                            shieldReady
+                              ? 'bg-amber-400/25 text-amber-200'
+                              : 'bg-white/10 text-slate-300'
+                          }`}
+                        >
+                          <Shield aria-hidden="true" className="h-2.5 w-2.5" />
+                          <span>
+                            {shieldReady ? 'Sẵn' : `${shieldCd!.remaining.toFixed(0)}s`}
+                          </span>
+                        </span>
+                      )}
                     </span>
-                  </span>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           )}
         </section>
